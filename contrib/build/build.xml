@@ -78,6 +78,9 @@
 			<fileset refid="buildfiles" />
 		</zip>
 		
+		<!-- create tar.gz file -->
+		<tar destfile="${project.distpath}\\cfpayment-${svn.builddate}.tar.gz" basedir="${project.buildpath}" compression="gzip" />
+			
 	</target>
 	
 </project>
