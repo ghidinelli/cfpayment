@@ -1,0 +1,52 @@
+ ANT Build Tool
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+1.In order to use ANT Tool you have to  install  Apache ANT Tool in your system.
+
+2.Download ANT  Tool from "http://www.devlib.org/apache/ant/binaries/apache-ant-1.7.0-bin.zip".
+
+3.Unzip the file and paste it any where you want (For example  C:\Ant ).
+
+4. Set the ANT_HOME and JAVA_HOME environment variables and add them to your PATH. 
+
+
+
+Bouncy Castle Crypto APIs
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+1. Download  "bcprov-jdk14-136.jar"  "from http://ftp.cica.es/mirrors/maven2/bouncycastle/bcprov-jdk14/136/"
+
+2. Put the jar file "bcprov-jdk14-136.jar" in "<coldfusion intalled directory>\runtime\jre\lib\ext"  directory. 
+
+   [ Note: If the jar file is put to any other directory, the Java and JVM Class path needs to be set in the Coldfusion Administrator. The path
+     needs to be the full physical path containing the jar file name. ]
+
+
+
+Project Setup.
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+1. Put the java file to any desired directory of your project folder. [For example "<project root>\java"].
+
+2. Put the component cfc file to any desired directory of your project folder. [For example "<project root>\cfc"].
+
+3. Put the "build.xml" file to any desired path. 
+
+4. Next you need to edit the "build.xml" file with few paths.
+   There are mainly 4 properties whose path needs to be set.
+
+    <property name="src" location="path to source java file"/>
+    <property name="dist" location="destination path for jar file"/>	
+    <property name="classes" location="destination path for class file"/>
+    <property name="bcjar" location="path for the bcprov-jdk14-136.jar file"/>
+
+   The location attribute of property "src" needs to be path where the java file is kept. For example "<project root>\java".
+   The location attribute of property "dist" needs to be the destination path where the jar file will be extracted. For example "<project root>\build\jar".
+   The location attribute of property "classes" needs to be the destination path where the class file will be extracted. For example "<project root>\build\classes".
+   The location attribute of property "bcjar" needs to be path where the bcprov-jdk14-136.jar file is kept. For example "<project root>\bouncycastlejar".
+
+5.Now, in order to run the "build.xml" file go to the directory where "build.xml" file is  present  using command line and then type  "ant" in the command line .
+    And pressing  enter would create the required jar and class files in the specified directories.
+
+6. Set  the Java and JVM Class path for the generated jar file in Coldfusion Administrator.
+
+7. Restart Coldfusion Administrator.
+
+8. Now the cfc methods can be used.

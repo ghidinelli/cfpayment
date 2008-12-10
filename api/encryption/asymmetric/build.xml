@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<project  name="Crptography" default="archive">
+	<description>
+		Compiles and create jar files for Cryptography application
+	</description>
+
+      <property name="src" location="java/"/>
+      <property name="dist" location="dist/"/>
+      <property name="classes" location="build/"/>
+      <!-- should check this out from http://trac.pukkasoft.com/svn/external/bouncycastle/tags/136 for compiling -->
+      <property name="bcjar" location="lib/"/>
+
+
+	<target name="init" description="Initializes the project by deleting and creating temporary directories" >
+		<delete dir="${dist}"/>
+		<delete dir="${classes}"/>
+
+		<mkdir dir="${dist}" />
+		<mkdir dir="${classes}" />
+	</target>
+
+	<target name="compile" depends="init" description="Compile the Cryptography files">
+		<javac srcdir="${src}" destdir="${classes}">
+		
+			<classpath>
+				<fileset dir="${bcjar}">
+					<include name="*.jar"/>
+				</fileset>
+			</classpath>
+			
+		</javac>
+	</target>
+	
+	<target name="archive" depends="compile" description="create jar files of the compiled classes" >
+		<jar destfile="${dist}/Cryptography.jar" basedir="${classes}" />		
+	</target>
+</project>         
+
+	

@@ -1,0 +1,31 @@
+ABOUT ITRANSACT.COM - $Id$
+
+iTransact has three products available:
+
+ * "Front-end" HTML - create HTML forms customers post to iTransact.com, no programming required;
+                      includes features like customer email receipts, merchant dashboard and reporting.
+                      http://www.itransact.com/support/connect_html.html
+
+ * "Front-end" XML - receive customer details and post them to iTransact.com using HTTP; includes
+                     features like customer email receipts, merchant dashboard and reporting.
+                     http://www.itransact.com/support/connect_xml_fe.html
+
+ * "Back-end" XML - receive customer details and post them to iTransact.com using alternative XML
+                    interface - does NOT provide customer email receipts, etc.  The private-labeled
+                    solution that requires more integration but more flexibility.
+ 
+This Gateway implementation is for the third gateway, the "Back-end XML Gateway".  For serious 
+e-commerce merchants, this gives you absolute control over all aspects of the payment processing
+workflow but also requires more integration.  Or, it did until we wrote the gateway for you.
+
+Now you simply need to worry about the order tracking and reporting on your end, which any serious
+e-commerce shop is already doing.  Even simple e-commerce companies will have a few database tables
+for orders, customers and so forth.
+
+I've been using this gateway for the last 5 years (and 4 years at a company before that) and it has
+served me well.  
+
+To obtain service documentation (if desired) or your own test account (recommended), contact iTransact
+by email at support@itransact.com.
+
+
