@@ -1,0 +1,83 @@
+<?xml version="1.0"?>
+<!-- Sample build file used to retrieve svnant's sources -->
+<project name="cfpayment" default="buildtrunk" basedir=".">
+
+	<!-- make svn ant work -->
+	<path id="svnant.classpath">
+		<fileset dir="C:\\eclipse\\plugins\\org.apache.ant_1.6.5\\lib">
+			<include name="*.jar" />
+		</fileset>
+	</path> 
+    <typedef resource="org/tigris/subversion/svnant/svnantlib.xml" classpathref="svnant.classpath" />
+		
+	<!-- init the TSTAMP -->
+	<tstamp>
+		<format property="svn.builddate" pattern="yyyyMMddHHmm"/>		
+	</tstamp>
+
+	<!-- TARGETS -->
+	<target name="init" description="Create temp local directories for build">
+		<property file="cfpayment.properties" />
+
+		<property name="project.buildpath" value="${basedir}/clean" />
+		<property name="project.distpath" value="${basedir}/dist" />
+
+		<delete dir="${project.buildpath}" />
+		<echo message="Temporary build directories created successfully!"/>
+	</target>
+
+	<target name="export" description="Export from the modified local checkout to a temp dir" depends="init">
+		<echo message="Exporting files from svn repository:" />
+		<svn>
+			<export srcUrl="${svn.projecturl}" destPath="${project.buildpath}" />
+		</svn>		
+	</target>
+
+	<target name="prepare" description="take an exported dir, perform replaces" depends="export">
+				
+		<replace file="${project.buildpath}/LICENSE">
+			<!-- properties from elsewhere -->		
+			<replacefilter token="@VERSION@" value="${revision}" />
+			<replacefilter token="@TIMESTAMP@" value="${svn.builddate}" />
+		</replace>
+		
+		<!-- replace tokens in all static config files
+		<replace dir="${project.buildpath}/config/">
+			<include name="**/*.xml" />
+			<replacefilter token="PUKKA_API_MAP" value="${cf.mapping.api}" />
+			<replacefilter token="PUKKA_CORE_MAP" value="${cf.mapping.core}" />
+		</replace>
+			 -->
+
+		<!-- remove some files before sending (not necessary with zip filelist
+		<delete dir="${project.buildpath}/build" />
+		-->
+		
+	</target>		
+
+	
+	<target name="buildtrunk" description="take a finished build and move it to the destination" depends="prepare">
+		<echo message="Creating zip file in ${project.distpath}..." />
+
+		<!-- create complete fileset -->
+		<fileset id="buildfiles" dir="${project.buildpath}" casesensitive="no">
+			<exclude name="**/*.svn*" />
+			<exclude name="**/*build*" />
+			<exclude name="**/*svn*" />
+			<exclude name="**/*.project*" />	
+		</fileset>	
+		
+		<!-- clean up permissions and ownership -->
+		<chmod dir="${project.buildpath}" type="file" perm="0644" />
+		<chmod dir="${project.buildpath}" type="dir" perm="0755" />
+		
+		<mkdir dir="${project.distpath}" description="make sure distribution dir exists" />
+		
+		<!-- create zip file -->
+		<zip destfile="${project.distpath}\\cfpayment-${svn.builddate}.zip">
+			<fileset refid="buildfiles" />
+		</zip>
+		
+	</target>
+	
+</project>
