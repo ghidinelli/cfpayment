@@ -239,7 +239,9 @@
 							<cfset keylist=StructKeyList(arguments.payload[key]) />
 						</cfif>
 						<cfloop list="#keylist#" index="skey">
-							<cfhttpparam name="#skey#" value="#arguments.payload[key][skey]#" type="#paramType#" />
+							<cfif ucase(skey) NEQ "_KEYLIST">
+								<cfhttpparam name="#skey#" value="#arguments.payload[key][skey]#" type="#paramType#" />
+							</cfif>
 						</cfloop>
 					<cfelse>
 						<cfset response.setMessage("Invalid data type for #key#") />
