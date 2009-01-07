@@ -196,10 +196,14 @@
 		<cfset var status = "" />
 		<cfset var paramType = "" />
 		<cfset var RequestData = "" />
+		<cfset var skey = "" />
+		<cfset var keylist = "" />
 
 		<!--- TODO: NOTE: THIS INTERNAL DATA REFERENCE MAY GO AWAY, DO NOT RELY UPON IT!!! --->
 		<!--- store payload for reference --->
 		<cfset RequestData = duplicate(arguments.payload) />
+		<cfset RequestData.GATEWAY_URL=getGatewayURL(argumentCollection = arguments)>
+		<cfset RequestData.HTTP_METHOD=arguments.method>
 
 		<cfset response.setRequestData(RequestData) /><!--- TODO: should this be another duplicate? --->
 
@@ -225,7 +229,23 @@
 			<cfhttp url="#getGatewayURL(argumentCollection = arguments)#" method="#arguments.method#" timeout="#timeout#" throwonerror="no">
 				<cfloop collection="#arguments.payload#" item="key">
 					<!--- TODO: how do we support raw XML post (type=xml, supported back to CF 6.1) here?  Do any gateways use this? --->
-					<cfhttpparam name="#key#" value="#arguments.payload[key]#" type="#paramType#" />
+					<cfif isSimpleValue(arguments.payload[key])>
+						<cfhttpparam name="#key#" value="#arguments.payload[key]#" type="#paramType#" />
+					<cfelseif isStruct(arguments.payload[key])>
+						<!--- loop over structure (check for _keylist to use a pre-determined output order) --->
+						<cfif structKeyExists(arguments.payload[key], "_keylist")>
+							<cfset keylist=arguments.payload[key]._keylist />
+						<cfelse>
+							<cfset keylist=StructKeyList(arguments.payload[key]) />
+						</cfif>
+						<cfloop list="#keylist#" index="skey">
+							<cfhttpparam name="#skey#" value="#arguments.payload[key][skey]#" type="#paramType#" />
+						</cfloop>
+					<cfelse>
+						<cfset response.setMessage("Invalid data type for #key#") />
+						<cfset response.setStatus(getService().getStatusFailure()) />
+						<cfreturn response />
+					</cfif>
 				</cfloop>
 			</cfhttp>
 
