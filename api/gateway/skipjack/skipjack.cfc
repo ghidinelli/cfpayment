@@ -25,6 +25,7 @@
 	<cfset variables.cfpayment.SKIPJACK_GATEWAY_URL_METHOD = StructNew() />
 	<cfset variables.cfpayment.SKIPJACK_GATEWAY_URL_METHOD["authorize"] = "AuthorizeAPI" />
 	<cfset variables.cfpayment.SKIPJACK_GATEWAY_URL_METHOD["credit"] = "SJAPI_TransactionChangeStatusRequest" />
+	<cfset variables.cfpayment.SKIPJACK_GATEWAY_URL_METHOD["newcharge"] = "SJAPI_TransactionChangeStatusRequest" />
 	<cfset variables.cfpayment.SKIPJACK_GATEWAY_URL_METHOD["void"] = "SJAPI_TransactionChangeStatusRequest" />
 	<cfset variables.cfpayment.SKIPJACK_GATEWAY_URL_METHOD["capture"] = "SJAPI_TransactionChangeStatusRequest" />
 	<cfset variables.cfpayment.SKIPJACK_GATEWAY_URL_METHOD["status"] = "SJAPI_TransactionStatusRequest" />
@@ -53,10 +54,13 @@
 	<cfset variables.cfpayment.SKIPJACK_DELETE_RECURRING_RESPONSE_COLUMN_HEADERS = ListToArray("SerialNumber,ResponseCode,zReserved1,zReserved2,zReserved3,zReserved4,zReserved5,zReserved6,zReserved7,zReserved8,zReserved9,zReserved10") />
 	<cfset variables.cfpayment.SKIPJACK_GET_RECURRING_RESPONSE_COLUMN_HEADERS = ListToArray("SerialNumber,ResponseCode,NumberOfRecords,zReserved1,zReserved2,zReserved3,zReserved4,zReserved5,zReserved6,zReserved7,zReserved8,zReserved9") />
 	<!--- don't make these an array b/c we need them as a plain string list --->
-	<cfset variables.cfpayment.SKIPJACK_GET_RECURRINGRESPONSE_DATA_COLUMN_HEADERS = "SerialNumber,DeveloperSerialNumber,RecurringPaymentId,CustomerName,PaymentFrequency,RecurringAmount,TransactionDate,TotalTransactions,RemainingTransactions,Email,Address1,Address2,Address3,Address4,City,State,PostalCode,Country,Phone,Fax,AccountNumber,ExpMonth,ExpYear,ItemNumber,ItemDescription,Comment,OrderNumber" />
+	<cfset variables.cfpayment.SKIPJACK_GET_RECURRING_RESPONSE_DATA_COLUMN_HEADERS = "SerialNumber,DeveloperSerialNumber,RecurringPaymentId,CustomerName,PaymentFrequency,RecurringAmount,TransactionDate,TotalTransactions,RemainingTransactions,Email,Address1,Address2,Address3,Address4,City,State,PostalCode,Country,Phone,Fax,AccountNumber,ExpMonth,ExpYear,ItemNumber,ItemDescription,Comment,OrderNumber" />
 	<cfset variables.cfpayment.SKIPJACK_CHANGE_STATUS_RESPONSE_COLUMN_HEADERS = ListToArray("SerialNumber,ResponseCode,NumberOfRecords,zReserved1,zReserved2,zReserved3,zReserved4,zReserved5,zReserved6,zReserved7,zReserved8,zReserved9") />
 	<!--- don't make these an array b/c we need them as a plain string list --->
 	<cfset variables.cfpayment.SKIPJACK_CHANGE_STATUS_RESPONSE_DATA_COLUMN_HEADERS = "SerialNumber,TransactionAmount,DesiredStatus,StatusResponse,StatusResponseMessage,OrderNumber,AuditID" />
+	<cfset variables.cfpayment.SKIPJACK_TRANSACTION_STATUS_RESPONSE_COLUMN_HEADERS = ListToArray("SerialNumber,ResponseCode,NumberOfRecords,zReserved1,zReserved2,zReserved3,zReserved4,zReserved5,zReserved6,zReserved7,zReserved8,zReserved9") />
+	<!--- don't make these an array b/c we need them as a plain string list --->
+	<cfset variables.cfpayment.SKIPJACK_TRANSACTION_STATUS_RESPONSE_DATA_COLUMN_HEADERS = "SerialNumber,TransactionAmount,TransactionStatusCode,TransactionStatusMessage,OrderNumber,TransactionDateTime,TransactionID,ApprovalCode,BatchNumber" />
 
 	<!---
 	___SCENARIOS___ (from SkipJack_Integration_Guide.pdf, pp 70-79)
@@ -83,6 +87,7 @@
     <cfset variables.cfpayment.SKIPJACK_CHANGE_STATUS_SETTLE="SETTLE">
     <cfset variables.cfpayment.SKIPJACK_CHANGE_STATUS_DELETE="DELETE">
     <cfset variables.cfpayment.SKIPJACK_CHANGE_STATUS_CREDIT="CREDIT">
+    <cfset variables.cfpayment.SKIPJACK_CHANGE_STATUS_NEWCHARGE="AUTHORIZEADDITIONAL">
 
 	<cfset variables.cfpayment.SKIPJACK_TRANSACTION_CURRENT_STATUS=StructNew()>
 	<cfset variables.cfpayment.SKIPJACK_TRANSACTION_CURRENT_STATUS["0"]="Idle">
@@ -272,8 +277,10 @@ PARSE RESPONSE
 				<cfset arguments.Response.setTransactionId(ResponseMap.RecurringPaymentId)>
 			</cfif>
 		</cfif>
-	<cfelseif ListFindNoCase("capture,credit,void", getGatewayAction())>
+	<cfelseif ListFindNoCase("capture,credit,void,newcharge", getGatewayAction())>
 		<cfset ResponseMap=ParseChangeStatusResponse(argumentCollection=arguments)>
+	<cfelseif ListFindNoCase("status", getGatewayAction())>
+		<cfset ResponseMap=ParseGetTransactionStatusResponse(argumentCollection=arguments)>
 	<cfelse>
 		<!--- comment out cfdump for production --->
 		<!--- <cfsavecontent variable="tmp"><cfdump var="#arguments.Response.getResult()#"></cfsavecontent> --->
@@ -320,7 +327,7 @@ PARSE RESPONSE
 			<cfif structKeyExists(ParsedResult, "szAuthorizationDeclinedMessage")>
 				<cfset message=ParsedResult.szAuthorizationDeclinedMessage>
 			<cfelse>
-				<cfsavecontent variable="tmp"><cfdump var="#arguments.response.getMemento()#" label="response"></cfsavecontent><cfthrow detail="#tmp#">
+				<!--- <cfsavecontent variable="tmp"><cfdump var="#arguments.response.getMemento()#" label="response"></cfsavecontent><cfthrow detail="#tmp#"> --->
 				<cfset message="Unknown Gateway Failure">
 			</cfif>
 		</cfif>
@@ -434,79 +441,97 @@ RECURRING
 </cffunction>
 
 <!---
-
 GET RECURRING
-
 --->
 <cffunction name="ParseGetRecurringResponse" output="false" access="private" returntype="any" hint="">
-	<cfargument name="Response" type="any" required="true"/>
-	<cfset var ResponseMap=MapGetRecurringResponse(arguments.response)>
-	<cfif arguments.response.getStatus() EQ getService().getStatusPending()>
-		<cfset ResponseMap["success"]=StructKeyExists(ResponseMap, "ResponseCode") and (ResponseMap.ResponseCode EQ "0")>
-	<cfelse>
-		<cfset ResponseMap["success"]=false>
+	<cfargument name="Response" type="any" required="true" />
+	<cfreturn MapGenericDataResponse(
+				arguments.response,
+				variables.cfpayment.SKIPJACK_GET_RECURRING_RESPONSE_COLUMN_HEADERS,
+				variables.cfpayment.SKIPJACK_GET_RECURRING_RESPONSE_DATA_COLUMN_HEADERS
+				) />
+</cffunction>
+
+<!---
+GET CHANGE_STATUS
+--->
+<cffunction name="ParseChangeStatusResponse" output="false" access="private" returntype="any" hint="">
+	<cfargument name="Response" type="any" required="true" />
+	<cfset var StatusResponseList="">
+	<cfset var ResponseMap=MapGenericDataResponse(
+				arguments.response,
+				variables.cfpayment.SKIPJACK_CHANGE_STATUS_RESPONSE_COLUMN_HEADERS,
+				variables.cfpayment.SKIPJACK_CHANGE_STATUS_RESPONSE_DATA_COLUMN_HEADERS
+				) />
+	<!--- do further processing to check for individual failures --->
+	<cfif ResponseMap["success"]>
+		<cfif structKeyExists(ResponseMap, "ResultDataQuery") and isQuery(ResponseMap.ResultDataQuery)>
+			<cfset StatusResponseList=ValueList(ResponseMap.ResultDataQuery.StatusResponse)>
+			<cfif ListFindNoCase(StatusResponseList, "UNSUCCESSFUL") OR ListFindNoCase(StatusResponseList, "NOT ALLOWED")>
+				<cfset ResponseMap["success"]=false>
+				<cfset arguments.Response.setMessage("The transaction succeeded, but one or more individual items failed.")>
+				<cfset arguments.Response.setStatus(getService().getStatusDeclined())>
+			</cfif>
+		</cfif>
 	</cfif>
 	<cfreturn ResponseMap />
 </cffunction>
 
-<cffunction name="MapGetRecurringResponse" output="false" access="private" returntype="any" hint="">
-	<cfargument name="Response" type="any" required="true"/>
-	<cfset var lines=SplitLines(arguments.Response.getResult())>
-	<cfset var keys="">
-	<cfset var values="">
-	<cfset var ctr=0>
-	<cfset var numKeys=0>
-	<cfset var numValues=0>
-	<cfset var res=StructNew()>
-	<cfset var dataArray="">
-	<cfset var dataList="">
-	<cfif ArrayLen(lines) GTE 1>
-	 	<cfset keys=variables.cfpayment.SKIPJACK_GET_RECURRING_RESPONSE_COLUMN_HEADERS>
-		<cfset values=SplitLine(lines[1])>
-		<cfset numKeys=ArrayLen(keys)>
-		<cfset numValues=ArrayLen(values)>
-		<cfif numKeys eq numValues>
-			<cfloop from="1" to="#numKeys#" index="ctr">
-				<cfset res[keys[ctr]]=values[ctr]>
-			</cfloop>
-		<cfelse>
-			<cfthrow message="Invalid GetRecurring Response Result (keys/values)" type="cfpayment.skipjack.InvalidResponseResult">
-		</cfif>
-		<cfif StructKeyExists(res, "NumberOfRecords") and (isNumeric(res.NumberOfRecords)) and (res.NumberOfRecords GT 0)>
-			<!--- successful return: map out returned data records --->
-			<!--- save to the result structure --->
-			<cfset dataArray=duplicate(lines)>
-			<!--- remove the first line from the lines array --->
-			<cfset ArrayDeleteAt(dataArray, 1)>
-			<!--- append the column names as the first row --->
- 			<cfset ArrayPrepend(dataArray, variables.cfpayment.SKIPJACK_GET_RECURRINGRESPONSE_DATA_COLUMN_HEADERS)>
-			<!--- convert to a list for passing to CSVtoQuery function --->
-			<cfset dataList=ArrayToList(dataArray, chr(10))>
-			<!--- convert to a query --->
-			<!--- <cfsavecontent variable="tmp"><cfdump var="#variables.cfpayment.csvutils.CSVtoQuery(CSV=dataList, FirstRowColumnNames=true, trim=true, trimData=true)#"></cfsavecontent><cfthrow message="Invalid GetRecurring Response Result (keys/values)" type="cfpayment.skipjack.InvalidResponseResult" detail="#tmp#"> --->
-			<cfset res.ResultDataQuery=variables.cfpayment.csvutils.CSVtoQuery(CSV=dataList, FirstRowColumnNames=true, trim=true, trimData=true)>
-			<cfset res.ResultDataArray=duplicate(dataArray)>
-		<cfelseif StructKeyExists(res, "ResponseCode") and (res.ResponseCode NEQ "0") AND (ArrayLen(lines) EQ 2)>
-			<!--- extra message on line two --->
-			<cfset arguments.response.setMessage(lines[2])>
-			<cfset arguments.Response.setStatus(getService().getStatusFailure())>
-		</cfif>
-	<cfelse>
-		<cfthrow message="Invalid GetRecurring Response Result" type="cfpayment.skipjack.InvalidResponseResult">
-	</cfif>
-	<!--- <cfdump var="#lines#" label="lines"><cfdump var="#keys#" label="keys"><cfdump var="#values#" label="values"> --->
-	<cfreturn res />
+<!---
+GET TRANSACTION STATUS
+--->
+<cffunction name="ParseGetTransactionStatusResponse" output="false" access="private" returntype="any" hint="">
+	<cfargument name="Response" type="any" required="true" />
+	<cfreturn MapGenericDataResponse(
+				arguments.response,
+				variables.cfpayment.SKIPJACK_TRANSACTION_STATUS_RESPONSE_COLUMN_HEADERS,
+				variables.cfpayment.SKIPJACK_TRANSACTION_STATUS_RESPONSE_DATA_COLUMN_HEADERS
+				) />
 </cffunction>
 
 <!---
 
-GET CHANGE_STATUS
+GENERIC RESPONSE DATA MAPPERS
 
 --->
-<cffunction name="ParseChangeStatusResponse" output="false" access="private" returntype="any" hint="">
-	<cfargument name="Response" type="any" required="true"/>
-	<cfset var ResponseMap=MapChangeStatusResponse(arguments.response)>
-	<!--- <cfsavecontent variable="tmp"><cfdump var="#arguments.response.getMemento()#" label="response"><cfdump var="#ResponseMap#" label="ResponseMap"></cfsavecontent><cfthrow detail="#tmp#"> --->
+<!--- the error message is actually on a second line, separated by chr(10)+chr(13)
+FROM: Skipjack Integration Guide.pdf, pp 87-97
+1. Status Record (Header Record) is the first record returned and contains information about the
+subsequent records.
+  1 - HTML Serial Number
+  2 - Error Code
+      Response Error Code indicating success or error conditions.
+		 0 = Success
+		-1 = Invalid Command
+		-2 = Parameter Missing
+		-3 = Failed retrieving response
+		-4 = Invalid Status
+		-5 = Failed reading security flags
+		-6 = Developer serial number not found
+		-7 = Invalid Serial Number
+  3 - Number of records in the response
+
+2. Response Record (Data Record) is the second and subsequent record(s) returned for
+successful transactions (szErrorCode=0) and includes transaction information described in
+the table below.
+An Error Record is returned as the third record only when an error condition exists
+(szErrorCode != 0). An Error Record contains a brief text description of the transaction error.
+
+"123123123123","-6","","","","","","","","","",""
+Developer serialnumber doesn't match account.
+
+"123123123123","-2","","","","","","","","","",""
+Parameter Missing: (szDeveloperSerialNumber)
+
+**This is a successful, non-error return (for get transaction response):
+"123123123123","0","1","","","","","","","","",""
+"123123123123","100.0000","30","Settled","987987987987","08/22/07 23:55:15","11223344556677.103","123456","456456456456"
+--->
+<cffunction name="MapGenericDataResponse" output="false" access="private" returntype="any" hint="">
+	<cfargument name="Response" type="any" required="true" />
+	<cfargument name="ResponseColumnHeaders" type="any" required="true" />
+	<cfargument name="DataColumnHeaders" type="any" required="true" />
+	<cfset var ResponseMap=MapGenericResponse(argumentCollection = arguments) />
 	<cfif arguments.response.getStatus() EQ getService().getStatusPending()>
 		<cfset ResponseMap["success"]=StructKeyExists(ResponseMap, "ResponseCode") and (ResponseMap.ResponseCode EQ "0")>
 	<cfelse>
@@ -515,8 +540,10 @@ GET CHANGE_STATUS
 	<cfreturn ResponseMap />
 </cffunction>
 
-<cffunction name="MapChangeStatusResponse" output="false" access="private" returntype="any" hint="">
+<cffunction name="MapGenericResponse" output="false" access="private" returntype="any" hint="">
 	<cfargument name="Response" type="any" required="true"/>
+	<cfargument name="ResponseColumnHeaders" type="any" required="true" />
+	<cfargument name="DataColumnHeaders" type="any" required="true" />
 	<cfset var lines=SplitLines(arguments.Response.getResult())>
 	<cfset var keys="">
 	<cfset var values="">
@@ -527,7 +554,7 @@ GET CHANGE_STATUS
 	<cfset var dataArray="">
 	<cfset var dataList="">
 	<cfif ArrayLen(lines) GTE 1>
-	 	<cfset keys=variables.cfpayment.SKIPJACK_CHANGE_STATUS_RESPONSE_COLUMN_HEADERS>
+	 	<cfset keys=arguments.ResponseColumnHeaders>
 		<cfset values=SplitLine(lines[1])>
 		<cfset numKeys=ArrayLen(keys)>
 		<cfset numValues=ArrayLen(values)>
@@ -536,7 +563,7 @@ GET CHANGE_STATUS
 				<cfset res[keys[ctr]]=values[ctr]>
 			</cfloop>
 		<cfelse>
-			<cfthrow message="Invalid ChangeStatus Response Result (keys/values)" type="cfpayment.skipjack.InvalidResponseResult">
+			<cfthrow message="Invalid Response Result (keys/values)" type="cfpayment.skipjack.InvalidResponseResult">
 		</cfif>
 		<cfif StructKeyExists(res, "NumberOfRecords") and (isNumeric(res.NumberOfRecords)) and (res.NumberOfRecords GT 0)>
 			<!--- successful return: map out returned data records --->
@@ -545,43 +572,24 @@ GET CHANGE_STATUS
 			<!--- remove the first line from the lines array --->
 			<cfset ArrayDeleteAt(dataArray, 1)>
 			<!--- append the column names as the first row --->
- 			<cfset ArrayPrepend(dataArray, variables.cfpayment.SKIPJACK_CHANGE_STATUS_RESPONSE_DATA_COLUMN_HEADERS)>
+ 			<cfset ArrayPrepend(dataArray, arguments.DataColumnHeaders)>
 			<!--- convert to a list for passing to CSVtoQuery function --->
 			<cfset dataList=ArrayToList(dataArray, chr(10))>
 			<!--- convert to a query --->
-			<!--- <cfsavecontent variable="tmp"><cfdump var="#variables.cfpayment.csvutils.CSVtoQuery(CSV=dataList, FirstRowColumnNames=true, trim=true, trimData=true)#"></cfsavecontent><cfthrow message="Invalid ChangeStatus Response Result (keys/values)" type="cfpayment.skipjack.InvalidResponseResult" detail="#tmp#"> --->
+			<!--- <cfsavecontent variable="tmp"><cfdump var="#variables.cfpayment.csvutils.CSVtoQuery(CSV=dataList, FirstRowColumnNames=true, trim=true, trimData=true)#"></cfsavecontent><cfthrow message="Invalid Response Result (keys/values)" type="cfpayment.skipjack.InvalidResponseResult" detail="#tmp#"> --->
 			<cfset res.ResultDataQuery=variables.cfpayment.csvutils.CSVtoQuery(CSV=dataList, FirstRowColumnNames=true, trim=true, trimData=true)>
 			<cfset res.ResultDataArray=duplicate(dataArray)>
-			<!--- issue: if doing a credit, the main response may return responsecode of 0, but the resulting credit may fail (StatusResponse="UNSUCCESSFUL"), such as with a  "Status Mismatch" --->
-			<!--- here is the test data for this scenario:
-			"100928490128","0","1","","","","","","","","",""
-			"000111222","17.0200","CREDIT","UNSUCCESSFUL","Status Mismatch","0512335621","9802853638860.022"
-			--->
-			<cfif res.NumberOfRecords EQ 1>
-				<!--- StatusResponse is one of "SUCCESSFUL,UNSUCCESSFUL,NOT ALLOWED" --->
-				<cfif res.ResultDataQuery.StatusResponse NEQ "SUCCESSFUL">
-					<!--- set message to something like "UNSUCCESSFUL: Status Mismatch" --->
-					<cfset arguments.response.setMessage(res.ResultDataQuery.StatusResponse & ": " & res.ResultDataQuery.StatusResponseMessage)>
-					<cfset arguments.Response.setStatus(getService().getStatusFailure())>
-					<!--- make sure the response code is not zero --->
-					<cfif res.ResponseCode EQ "0">
-						<!--- set to some arbitrarily high number that skipjack doesn't use so the message above will be seen --->
-						<cfset res.ResponseCode="-112233">
-					</cfif>
-				</cfif>
-			</cfif>
 		<cfelseif StructKeyExists(res, "ResponseCode") and (res.ResponseCode NEQ "0") AND (ArrayLen(lines) EQ 2)>
 			<!--- extra message on line two --->
 			<cfset arguments.response.setMessage(lines[2])>
 			<cfset arguments.Response.setStatus(getService().getStatusFailure())>
 		</cfif>
 	<cfelse>
-		<cfthrow message="Invalid ChangeStatus Response Result" type="cfpayment.skipjack.InvalidResponseResult">
+		<cfthrow message="Invalid Response Result" type="cfpayment.skipjack.InvalidResponseResult">
 	</cfif>
 	<!--- <cfdump var="#lines#" label="lines"><cfdump var="#keys#" label="keys"><cfdump var="#values#" label="values"> --->
 	<cfreturn res />
 </cffunction>
-
 
 <!---
 
