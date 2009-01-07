@@ -21,19 +21,6 @@
 		<cfreturn true />
 	</cffunction>
 
-<!---
-TODO: status (transaction status)
-
-skipjack change status: (SkipJack integration guide, page 87)
-• Authorize
-• Authorize Additional (Re-Bill)
-• Credit (Refund)
-• Delete (Void)
-• Freeze
-• Settle
-• Split Settle (Partial Settle)
---->
-
 	<!--- implement primary methods --->
 	<cffunction name="authorize" output="false" access="public" returntype="any" hint="Perform an authorization immediately followed by a capture/settle">
 		<cfargument name="money" type="any" required="true" />
@@ -54,23 +41,7 @@ skipjack change status: (SkipJack integration guide, page 87)
 		<cfset addMisc(payload, arguments.options) />
 		<cfset addCredentials(payload, arguments.options) />
 		<cfset addAmount(payload, arguments.money) />
-
 		<cfreturn process(payload=payload, options=arguments.options) />
-	</cffunction>
-
-	<cffunction name="purchase" output="false" access="public" returntype="any" hint="Perform an authorization immediately followed by a capture/settle">
-		<cfargument name="money" type="any" required="true" />
-		<cfargument name="account" type="any" required="true" /><!--- credit card or eft object --->
-		<cfargument name="options" type="struct" default="#StructNew()#" />
-		<cfset var response = "" />
-
-		<cfset response = authorize(argumentCollection=arguments) />
-
-		<cfif response.getSuccess()>
-			<cfset response = capture(arguments.money, response.getTransactionId(), arguments.options) />
-		</cfif>
-
-		<cfreturn response />
 	</cffunction>
 
 	<cffunction name="capture" access="public" output="false" returntype="any" hint="Confirms an authorization with direction to charge the account">
@@ -89,7 +60,7 @@ skipjack change status: (SkipJack integration guide, page 87)
 		<cfreturn process(payload=payload, options=arguments.options) />
 	</cffunction>
 
-	<cffunction name="credit" access="public" output="false" returntype="any" hint="">
+	<cffunction name="credit" access="public" output="false" returntype="any" hint="Returns an amount back to the previously charged account.  Only for use with captured transactions.">
 		<cfargument name="money" type="any" required="true" />
 		<cfargument name="identification" type="any" required="true" />
 		<cfargument name="options" type="struct" default="#StructNew()#" />
@@ -105,18 +76,35 @@ skipjack change status: (SkipJack integration guide, page 87)
 		<cfreturn process(payload=payload, options=arguments.options) />
 	</cffunction>
 
-	<cffunction name="void" access="public" output="false" returntype="any" hint="">
-		<cfargument name="authorization" type="any" required="true" />
+	<cffunction name="newcharge" access="public" output="false" returntype="any" hint="">
+		<cfargument name="money" type="any" required="true" />
+		<cfargument name="identification" type="any" required="true" />
 		<cfargument name="options" type="struct" default="#StructNew()#" />
 		<cfset var payload = StructNew() />
-		<cfset setGatewayAction("void") />
+		<cfset setGatewayAction("newcharge") />
 
-		<cfset addStatusAction(payload, variables.cfpayment.SKIPJACK_CHANGE_STATUS_DELETE) />
+		<cfset addStatusAction(payload, variables.cfpayment.SKIPJACK_CHANGE_STATUS_NEWCHARGE) />
 		<cfset addForcedSettlement(payload, arguments.options) />
-		<cfset addTransactionId(payload, arguments.authorization) />
+		<cfset addTransactionId(payload, arguments.identification) />
 		<cfset addCredentials(payload, arguments.options) />
+		<cfset addAmount(payload, arguments.money) />
 
 		<cfreturn process(payload=payload, options=arguments.options) />
+	</cffunction>
+
+	<cffunction name="purchase" output="false" access="public" returntype="any" hint="Perform an authorization immediately followed by a capture/settle">
+		<cfargument name="money" type="any" required="true" />
+		<cfargument name="account" type="any" required="true" /><!--- credit card or eft object --->
+		<cfargument name="options" type="struct" default="#StructNew()#" />
+		<cfset var response = "" />
+
+		<cfset response = authorize(argumentCollection=arguments) />
+
+		<cfif response.getSuccess()>
+			<cfset response = capture(arguments.money, response.getTransactionId(), arguments.options) />
+		</cfif>
+
+		<cfreturn response />
 	</cffunction>
 
 	<cffunction name="recurring" output="false" access="public" returntype="any" hint="Perform an add/edit recurring transaction">
@@ -164,6 +152,37 @@ skipjack change status: (SkipJack integration guide, page 87)
 		<cfreturn process(payload=payload, options=arguments.options) />
 	</cffunction>
 
+	<cffunction name="status" access="public" output="false" returntype="any" hint="Reconstruct a response object for a previously executed transaction">
+		<cfargument name="transactionid" type="any" required="true" /><!--- in SkipJack, this is actually the application-generated unique order number --->
+		<cfargument name="options" type="struct" required="false" />
+		<cfset var payload = StructNew() />
+		<cfset setGatewayAction("status") />
+
+		<cfset payload["szOrderNumber"]=arguments.transactionid>
+		<!--- also allow the transaction date to be passed in --->
+		<cfif isDate(GetOption(arguments.options, "transaction_date"))>
+			<!--- format should be mm/dd/yyyy --->
+			<cfset payload["szDate"]=DateFormat(GetOption(arguments.options, "transaction_date"), "mm/dd/yyyy")>
+		</cfif>
+		<cfset addCredentials(payload, arguments.options) />
+		<cfreturn process(payload=payload, options=arguments.options) />
+	</cffunction>
+
+	<cffunction name="void" access="public" output="false" returntype="any" hint="Cancels a previously captured transaction that has not yet settled">
+		<cfargument name="authorization" type="any" required="true" />
+		<cfargument name="options" type="struct" default="#StructNew()#" />
+		<cfset var payload = StructNew() />
+		<cfset setGatewayAction("void") />
+
+		<cfset addStatusAction(payload, variables.cfpayment.SKIPJACK_CHANGE_STATUS_DELETE) />
+		<cfset addForcedSettlement(payload, arguments.options) />
+		<cfset addTransactionId(payload, arguments.authorization) />
+		<cfset addCredentials(payload, arguments.options) />
+
+		<cfreturn process(payload=payload, options=arguments.options) />
+	</cffunction>
+
+
 	<!---
 
 		PRIVATE METHODS
@@ -176,14 +195,14 @@ skipjack change status: (SkipJack integration guide, page 87)
 		<cfset var currOrder = "" />
 		<cfset var orderStr = "" />
 		<cfif ListFindNoCase("authorize", getGatewayAction())>
-			<cfset arguments.payload["ordernumber"]=GetOption(arguments.options, "order_id")>
-			<cfset arguments.payload["customercode"]=GetOption(arguments.options, "Customer")>
-			<cfset arguments.payload["invoicenumber"]=GetOption(arguments.options, "Invoice")>
-			<cfset arguments.payload["orderdescription"]=GetOption(arguments.options, "Description")>
+			<cfset arguments.payload["ordernumber"]=GetOption(arguments.options, "order_id") />
+			<cfset arguments.payload["customercode"]=GetOption(arguments.options, "Customer") />
+			<cfset arguments.payload["invoicenumber"]=GetOption(arguments.options, "Invoice") />
+			<cfset arguments.payload["orderdescription"]=GetOption(arguments.options, "Description") />
 			<cfif StructKeyExists(arguments.options, "Order")>
 				<cfif isArray(arguments.options.order)>
 					<!--- array of structs --->
-					<cfset arguments.payload["orderstring"]="">
+					<cfset arguments.payload["orderstring"]="" />
 					<cfloop from="1" to="#ArrayLen(arguments.options.order)#" index="ctr">
 						<!---
 							==Order Keys==
@@ -205,37 +224,37 @@ skipjack change status: (SkipJack integration guide, page 87)
 								TaxType
 								TaxAmount
 						--->
-						<cfset currOrder = arguments.options.order[ctr] >
+						<cfset currOrder = arguments.options.order[ctr] />
 						<cfif isStruct(currOrder)>
 							<cftry>
 								<cfset orderStr="">
-								<cfset orderStr=ListAppend(orderStr, currOrder.sku, "~")>
-								<cfset orderStr=ListAppend(orderStr, replace(currOrder.description, "~", "_", "ALL"), "~")>
-								<cfset orderStr=ListAppend(orderStr, currOrder.declaredValue, "~")>
-								<cfset orderStr=ListAppend(orderStr, currOrder.quantity, "~")>
-								<cfset orderStr=ListAppend(orderStr, currOrder.taxable, "~")>
+								<cfset orderStr=ListAppend(orderStr, currOrder.sku, "~") />
+								<cfset orderStr=ListAppend(orderStr, replace(currOrder.description, "~", "_", "ALL"), "~") />
+								<cfset orderStr=ListAppend(orderStr, currOrder.declaredValue, "~") />
+								<cfset orderStr=ListAppend(orderStr, currOrder.quantity, "~") />
+								<cfset orderStr=ListAppend(orderStr, currOrder.taxable, "~") />
 								<!--- <cfset orderStr=ListAppend(orderStr, currOrder.taxRate, "~")> --->
-								<cfset arguments.payload["orderstring"]=ListAppend(arguments.payload["orderstring"], orderStr, "||")>
+								<cfset arguments.payload["orderstring"]=ListAppend(arguments.payload["orderstring"], orderStr, "||") />
 							<cfcatch>
-								<cfthrow message="Invalid OrderStruct" type="cfpayment.InvalidParameter.OrderStruct">
+								<cfthrow message="Invalid OrderStruct" type="cfpayment.InvalidParameter.OrderStruct" />
 							</cfcatch>
 							</cftry>
 						<cfelse>
-							<cfthrow message="Invalid OrderArray" type="cfpayment.InvalidParameter.OrderArray">
+							<cfthrow message="Invalid OrderArray" type="cfpayment.InvalidParameter.OrderArray" />
 						</cfif>
 					</cfloop>
 				<cfelse>
 					<!--- simple string --->
-					<cfset arguments.payload["orderstring"]=arguments.options.order>
+					<cfset arguments.payload["orderstring"]=arguments.options.order />
 				</cfif>
 			<cfelse>
-				<cfset arguments.payload["orderstring"]=variables.cfpayment.SKIPJACK_ORDER_STRING_DUMMY_VALUES>
+				<cfset arguments.payload["orderstring"]=variables.cfpayment.SKIPJACK_ORDER_STRING_DUMMY_VALUES />
 			</cfif>
 		<cfelseif ListFindNoCase("recurring", getGatewayAction())>
 			<!--- required fields --->
-			<cfset arguments.payload["rtOrderNumber"]=GetOption(arguments.options, "order_id")>
-			<cfset arguments.payload["rtItemNumber"]=GetOption(arguments.options, "ItemNumber")>
-			<cfset arguments.payload["rtItemDescription"]=GetOption(arguments.options, "ItemDescription")>
+			<cfset arguments.payload["rtOrderNumber"]=GetOption(arguments.options, "order_id") />
+			<cfset arguments.payload["rtItemNumber"]=GetOption(arguments.options, "ItemNumber") />
+			<cfset arguments.payload["rtItemDescription"]=GetOption(arguments.options, "ItemDescription") />
 		<cfelse>
 			<cfthrow message="Invalid GatewayAction Logic in AddInvoice" type="cfpayment.InvalidParameter" />
 		</cfif>
@@ -272,7 +291,7 @@ skipjack change status: (SkipJack integration guide, page 87)
 			<cfif StructKeyExists(arguments.options, "address")>
 				<cfset billing_address = arguments.options.address />
 			<cfelse>
-				<cfthrow message="Missing Address Structure" type="cfpayment.MissingParameter.Address">
+				<cfthrow message="Missing Address Structure" type="cfpayment.MissingParameter.Address" />
 			</cfif>
 		</cfif>
 
@@ -313,9 +332,9 @@ skipjack change status: (SkipJack integration guide, page 87)
 		<cfargument name="payload" type="any" required="true"/>
 		<cfargument name="options" type="any" required="true"/>
 		<cfif ListFindNoCase("authorize", getGatewayAction())>
-			<cfset arguments.payload["email"]=arguments.options.Email>
+			<cfset arguments.payload["email"]=arguments.options.Email />
 		<cfelseif getGatewayAction() eq "recurring">
-			<cfset arguments.payload["rtEmail"]=arguments.options.Email>
+			<cfset arguments.payload["rtEmail"]=arguments.options.Email />
 		<cfelse>
 			<cfthrow message="Invalid GatewayAction Logic in AddCustomerData" type="cfpayment.InvalidParameter" />
 		</cfif>
@@ -325,9 +344,9 @@ skipjack change status: (SkipJack integration guide, page 87)
 		<cfargument name="payload" type="any" required="true"/>
 		<cfargument name="options" type="any" required="true"/>
 		<cfif getGatewayAction() eq "recurring">
-			<cfset arguments.payload["rtComment"]=getOption(arguments.options, "Comment")>
+			<cfset arguments.payload["rtComment"]=getOption(arguments.options, "Comment") />
 		<cfelse>
-			<cfset arguments.payload["comment"]=getOption(arguments.options, "Comment")>
+			<cfset arguments.payload["comment"]=getOption(arguments.options, "Comment") />
 		</cfif>
 	</cffunction>
 
@@ -349,9 +368,9 @@ skipjack change status: (SkipJack integration guide, page 87)
 		<cfif ListFindNoCase("authorize", getGatewayAction())>
 			<cfset arguments.payload["Serialnumber"]=getMerchantAccount() />
 		<cfelse>
-			<cfset arguments.payload["szSerialnumber"]=getMerchantAccount() />
+			<cfset arguments.payload["szSerialNumber"]=getMerchantAccount() />
 		</cfif>
-		<cfif ListFindNoCase("recurring,capture,void,credit", getGatewayAction())>
+		<cfif ListFindNoCase("recurring,capture,void,credit,newcharge,status", getGatewayAction())>
 			<cfset arguments.payload["szDeveloperSerialNumber"] = getOption(arguments.options, "DeveloperSerialNumber") />
 		</cfif>
 	</cffunction>
@@ -383,14 +402,26 @@ skipjack change status: (SkipJack integration guide, page 87)
 		<cfargument name="options" type="any" required="true"/>
 		<cfset var keylist = "" />
 		<cfset var key = "" />
+		<cfset var udfStruct = StructNew() />
 		<!--- User-Defined Data --->
+		<!---
+			NOTE: For SkiJack reporting purposes, these must be put in the same order each-and-every time. Note that SkipJack will report
+				the values in REVERSE order of how they are specified via the cfhttpparam tags, so the order here must be the reverse
+				of what we actually want later. To assure the order, we will create a separate structure under the payload key and pass
+				the _keylist along. The base.process() method will check for a structure vs. simple value and for the _keylist and
+				assure that they will go in the order specified in the _keylist.
+		--->
 		<cfif structKeyExists(arguments.options, "UserDefined") and isStruct(arguments.options.UserDefined)>
-			<!--- user defined fields will show up in reverse order of how they are output here --->
+			<cfset udfStruct=StructCopy(arguments.options.UserDefined)>
+			<!--- user defined fields will show up in reverse order of how they are output in the http params section --->
+			<cfif NOT structKeyExists(arguments.options.UserDefined, "_KeyList")>
+				<!--- alphabetize the keys for consistency --->
+				<cfset udfStruct._keylist=ListSort(StructKeyList(udfStruct), "textnocase", "asc") />
+			</cfif>
 			<!--- put in reverse alpha-order so they show up in alpha order in the skipjack admin --->
-			<cfset keylist=ListSort(StructKeyList(arguments.options.UserDefined), "textnocase", "desc")>
-			<cfloop list="#keylist#" index="key">
-				<cfset arguments.payload[key]=arguments.options.UserDefined[key]>
-			</cfloop>
+			<cfset udfStruct._keylist=ListReverse(udfStruct._keylist)>
+			<!--- add to the payload (note that this key won't actually get output anywhere) --->
+			<cfset arguments.payload["USERDEFINED"]=StructCopy(udfStruct) />
 		</cfif>
 	</cffunction>
 
@@ -398,16 +429,16 @@ skipjack change status: (SkipJack integration guide, page 87)
 		<cfargument name="payload" type="any" required="true"/>
 		<cfargument name="account" type="any" required="true"/>
 		<cfif getGatewayAction() eq "recurring">
-			<cfset arguments.payload["rtAccountnumber"]=arguments.account.getAccount()>
-			<cfset arguments.payload["rtExpMonth"]=arguments.account.getMonth()>
-			<cfset arguments.payload["rtExpYear"]=arguments.account.getYear()>
-			<cfset arguments.payload["rtName"]=arguments.account.getName()>
+			<cfset arguments.payload["rtAccountnumber"]=arguments.account.getAccount() />
+			<cfset arguments.payload["rtExpMonth"]=arguments.account.getMonth() />
+			<cfset arguments.payload["rtExpYear"]=arguments.account.getYear() />
+			<cfset arguments.payload["rtName"]=arguments.account.getName() />
 		<cfelse>
-			<cfset arguments.payload["accountnumber"]=arguments.account.getAccount()>
-			<cfset arguments.payload["month"]=arguments.account.getMonth()>
-			<cfset arguments.payload["year"]=arguments.account.getYear()>
-			<cfset arguments.payload["cvv2"]=arguments.account.getVerificationValue()>
-			<cfset arguments.payload["sjName"]=arguments.account.getName()>
+			<cfset arguments.payload["accountnumber"]=arguments.account.getAccount() />
+			<cfset arguments.payload["month"]=arguments.account.getMonth() />
+			<cfset arguments.payload["year"]=arguments.account.getYear() />
+			<cfset arguments.payload["cvv2"]=arguments.account.getVerificationValue() />
+			<cfset arguments.payload["sjName"]=arguments.account.getName() />
 		</cfif>
 	</cffunction>
 
@@ -439,5 +470,40 @@ skipjack change status: (SkipJack integration guide, page 87)
 			<cfthrow message="Invalid Mode Logic in addRecurringFields" type="cfpayment.InvalidParameter" />
 		</cfif>
 	</cffunction>
+
+	<cfscript>
+	/**
+	* Reverses a list.
+	* Modified by RCamden to use var scope
+	*
+	* @param list      List to be modified.
+	* @param delimiter      Delimiter for the list. Defaults to a comma.
+	* @return Returns a list.
+	* @author Stephen Milligan (spike@spike.org.uk)
+	* @version 2, July 17, 2001
+	*/
+	function ListReverse(list) {
+
+	    var newlist = "";
+	    var i = 0;
+	    var delims = "";
+	    var thisindex = "";
+	    var thisitem = "";
+
+	    var argc = ArrayLen(arguments);
+	    if (argc EQ 1) {
+	        ArrayAppend(arguments,',');
+	    }
+	    delims = arguments[2];
+	    while (i LT listlen(list,delims))
+	    {
+	    thisindex = listlen(list,delims)-i;
+	    thisitem = listgetat(list,thisindex,delims);
+	newlist = listappend(newlist,thisitem,delims);
+	i = i +1;
+	    }
+	return newlist;
+	}
+	</cfscript>
 
 </cfcomponent>

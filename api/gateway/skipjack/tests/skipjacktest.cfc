@@ -204,8 +204,8 @@
 		<cfset response = gw.credit(money = money, identification = transId, options = options) />
 		<cfset debug(response.getMemento()) />
 		<!--- <cfset assertTrue(response.getSuccess(), "The valid capture test did not return successful") /> --->
-		<!--- it appears you cannot do a credit or refund on a new transaction --->
-		<cfset assertEquals(response.getMessage(), "UNSUCCESSFUL: Status Mismatch", "The valid credit test did not return the proper response.") />
+		<!--- <cfset assertEquals(response.getMessage(), "UNSUCCESSFUL: Status Mismatch", "The valid credit test did not return the proper response.") /> --->
+		<cfset assertEquals(response.getMessage(), "The transaction succeeded, but one or more individual items failed.", "The valid credit test did not return the proper response.") />
 
 		<!---  flag the authorization for settlement into your bank account --->
 		<cfset response = gw.capture(money = money, authorization = transId, options = options) />
@@ -213,6 +213,32 @@
 		<cfset assertTrue(response.getSuccess(), "The valid capture test did not return successful") />
 
 		<!--- NOTE: once captured, you cannot void --->
+	</cffunction>
+
+	<cffunction name="testValidAuthorizeGetStatus" access="public" returntype="void" output="false">
+		<cfset var account =  getTestCreditCard() />
+		<cfset var money = svc.createMoney(getRandomCents()) />
+		<cfset var options = getTestRequiredOptions() />
+		<cfset var response = "" />
+		<cfset var originalOrderNumber = "" />
+
+		<!--- card should result in success --->
+		<cfset response = gw.authorize(money = money, account = account, options = options) />
+		<cfset debug(response.getMemento()) />
+		<cfif response.GetMessage() EQ "Length or value of HTML Serial Number">
+			<cfset fail("The valid authorize attempt was stopped because you have supplied an invalid SkipJack HTML Serial Number.")>
+		<cfelse>
+			<cfset assertTrue(response.getSuccess(), "The valid authorize test did not return successful") />
+		</cfif>
+
+		<!--- attempt to get status of this transaction --->
+		<cfset originalOrderNumber = options.order_id />
+		<cfset options.DeveloperSerialNumber = gwParams.DeveloperSerialNumber />
+		<cfset response = gw.status(transactionId = originalOrderNumber, options = options) />
+		<cfset debug(response.getMemento()) />
+		<cfset assertTrue(response.getSuccess(), "The valid Get Transaction Status test did not return successful") />
+		<cfset assertTrue(structKeyExists(response.getParsedResult(), "ResultDataQuery") and isQuery(response.getParsedResult().ResultDataQuery), "The valid Get Transaction Status test did not return  a valid ResultDataQuery.") />
+		<cfset assertEquals(response.getParsedResult().ResultDataQuery.TransactionStatusMessage, "Approved", "The valid Get Transaction Status test did not return an approved message in the ResultDataQuery.") />
 	</cffunction>
 
 	<cffunction name="testValidAuthorizeAdditionalChargeVoid" access="public" returntype="void" output="false">
@@ -435,9 +461,12 @@ Parameter Missing: (rtName)</cfoutput></cfsavecontent>
 		<cfif arguments.cardtype eq "visa">
 			<cfset account.setAccount(testdata.visa_card_number) />
 			<cfset account.setVerificationValue(testdata.visa_cvv2) />
-		<cfelse>
+		<cfelseif arguments.cardtype eq "mastercard">
 			<cfset account.setAccount(testdata.mastcard_card_number) />
 			<cfset account.setVerificationValue(testdata.mastcard_cvv2) />
+		<cfelse>
+			<cfset account.setAccount(testdata.discover_card_number) />
+			<cfset account.setVerificationValue(testdata.discover_cvv2) />
 		</cfif>
 		<cfreturn account>
 	</cffunction>
@@ -449,8 +478,8 @@ Parameter Missing: (rtName)</cfoutput></cfsavecontent>
 		<cfset options.address=StructNew() />
 		<cfset options.address.FirstName="John" />
 		<cfset options.address.LastName="Doe" />
-		<cfset options.address.Address1="251 N Main St" />
-		<cfset options.address.City="Cedarville" />
+		<cfset options.address.Address1="123 Some Street" />
+		<cfset options.address.City="Anywhere" />
 		<cfset options.address.State="OH" />
 		<cfset options.address.PostalCode="45314" />
 		<cfset options.address.Phone = "123-123-1234" />
