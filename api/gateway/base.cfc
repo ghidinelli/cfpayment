@@ -218,7 +218,7 @@
 		<cfelseif ucase(arguments.method) EQ "POST">
 			<cfset paramType = "formfield" />
 		<cfelse>
-			<cfthrow message="Invalid Method" type="cfpyament.InvalidParameter.Method">
+			<cfthrow message="Invalid Method" type="cfpayment.InvalidParameter.Method">
 		</cfif>
 
 		<cftry>
