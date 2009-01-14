@@ -169,6 +169,8 @@
 		<cfreturn this />
 	</cffunction>
 
+
+	<!---  Gateways typically return both an Authorization code (from Visa/Amex/MC/etc) and a Transaction ID (their reference number) --->
 	<cffunction name="getAuthorization" access="public" output="false" returntype="string">
 		<cfreturn variables.cfpayment.Authorization />
 	</cffunction>
@@ -178,8 +180,6 @@
 		<cfreturn this />
 	</cffunction>
 
-
-	<!---  Gateways typically return both an Authorization code (from Visa/Amex/MC/etc) and a Transaction ID (their reference number) --->
 	<cffunction name="getTransactionID" access="public" output="false" returntype="any">
 		<cfreturn variables.cfpayment.TransactionID />
 	</cffunction>
