@@ -219,7 +219,7 @@
 	<cffunction name="purchase" output="false" access="public" returntype="any" hint="Authorize + Capture in one step">
 		<cfargument name="money" type="any" required="true" />
 		<cfargument name="account" type="any" required="true" />
-		<cfargument name="options" type="struct" required="false" />
+		<cfargument name="options" type="struct" required="false" default="#structNew()#" />
 
 		<cfset var post = structNew() />
 		
@@ -254,7 +254,7 @@
 	<cffunction name="authorize" output="false" access="public" returntype="any" hint="Authorize (only) a credit card">
 		<cfargument name="money" type="any" required="true" />
 		<cfargument name="account" type="any" required="true" />
-		<cfargument name="options" type="struct" required="false" />
+		<cfargument name="options" type="struct" required="false" default="#structNew()#" />
 
 		<cfset var post = structNew() />
 		
@@ -287,7 +287,7 @@
 	<cffunction name="capture" output="false" access="public" returntype="any" hint="Add a previous authorization to be settled">
 		<cfargument name="money" type="any" required="true" />
 		<cfargument name="authorization" type="any" required="true" />
-		<cfargument name="options" type="struct" required="false" />
+		<cfargument name="options" type="struct" required="false" default="#structNew()#" />
 
 		<cfset var post = structNew() />
 		
