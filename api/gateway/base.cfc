@@ -342,6 +342,26 @@
 
 	</cffunction>
 
+	<!--- ------------------------------------------------------------------------------
+
+		  PRIVATE HELPER METHODS FOR DEVELOPERS
+
+		  ------------------------------------------------------------------------- --->
+	<cffunction name="GetOption" output="false" access="private" returntype="any" hint="">
+		<cfargument name="Options" type="any" required="true"/>
+		<cfargument name="Key" type="any" required="true"/>
+		<cfargument name="ErrorIfNotFound" type="boolean" default="false"/>
+		<cfif isStruct(arguments.Options) and StructKeyExists(arguments.Options, arguments.Key)>
+			<cfreturn arguments.Options[arguments.Key] />
+		<cfelse>
+			<cfif arguments.ErrorIfNotFound>
+				<cfthrow message="Missing Option: #HTMLEditFormat(arguments.key)#" type="cfpayment.MissingParameter.Option" />
+			<cfelse>
+				<cfreturn "" />
+			</cfif>
+		</cfif>
+	</cffunction>
+
 	<cffunction name="verifyRequiredOptions" output="false" access="private" returntype="void" hint="I verify that the passed in Options structure exists for each item in the RequiredOptionList argument.">
 		<cfargument name="options" type="struct" required="true"/>
 		<cfargument name="requiredOptionList" type="string" required="true"/>
