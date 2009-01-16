@@ -266,7 +266,11 @@ PARSE RESPONSE
 		<cfelseif structKeyExists(ResponseMap, "szTransactionId")>
 			<cfset arguments.Response.setTransactionId(ResponseMap.szTransactionId)>
 		</cfif>
-		<cfset arguments.Response.setAVSCode(ResponseMap.szAVSResponseCode)>
+			<!--- Skipjack will often return a zero AVS Response Code when the CVV fails, so we check for it and ignore it since it is an invalid value --->
+			<cfif trim(ResponseMap.szAVSResponseCode) NEQ "0">
+				<cfset arguments.Response.setAVSCode(ResponseMap.szAVSResponseCode)>
+			</cfif>
+
 		<cfset arguments.Response.setCVVCode(ResponseMap.szCVV2ResponseCode)>
 	<cfelseif ListFindNoCase("recurring", getGatewayAction())>
 		<cfif ListLast(getGatewayAction(shortaction=false), "_") eq "get">
@@ -374,11 +378,11 @@ AUTHORIZE
 	<cfif arguments.Response.getSuccess()>
 		<cfset ret=variables.cfpayment.SKIPJACK_SUCCESS_MESSAGE>
 		<cfset arguments.Response.setStatus(getService().getStatusSuccessful())>
-	<cfelseif not arguments.Response.isValidCVV()>
-		<cfset ret=arguments.Response.getCVVMessage()>
+	<cfelseif not arguments.Response.isValidCVV(AllowBlankCode=true)><!--- TODO: should these extra "allow" arguments be configurable --->
+		<cfset ret="Security Code Error: " & arguments.Response.getCVVMessage()>
 		<cfset arguments.Response.setStatus(getService().getStatusFailure())>
 	<cfelseif not arguments.Response.isValidAVS(AllowStreetOnlyMatch=true)><!--- TODO: should these extra "allow" arguments be configurable --->
-		<cfset ret=arguments.Response.getAVSMessage()>
+		<cfset ret="Address Verification Error: " & arguments.Response.getAVSMessage()>
 		<cfset arguments.Response.setStatus(getService().getStatusFailure())>
 	<cfelseif ParsedResult.szReturnCode>
 		<cfset ret=variables.cfpayment.SKIPJACK_RETURN_CODE_MESSAGES[ParsedResult.szReturnCode]>
