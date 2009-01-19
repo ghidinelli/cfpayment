@@ -226,7 +226,7 @@
 			<cfset response.setStatus(getService().getStatusPending()) />
 
 			<!--- send request --->
-			<cfhttp url="#getGatewayURL(argumentCollection = arguments)#" method="#arguments.method#" timeout="#timeout#" throwonerror="no">
+			<cfhttp url="#getGatewayURL(argumentCollection = arguments)#" method="#arguments.method#" timeout="#timeout#" throwonerror="yes">
 				<cfloop collection="#arguments.payload#" item="key">
 					<!--- TODO: how do we support raw XML post (type=xml, supported back to CF 6.1) here?  Do any gateways use this? --->
 					<cfif isSimpleValue(arguments.payload[key])>
@@ -278,7 +278,7 @@
 						<cfreturn response />
 					</cfdefaultcase>
 				</cfswitch>
-
+				
 			</cfif>
 
 			<!---
@@ -296,38 +296,40 @@
 			--->
 
 			<cfcatch type="COM.Allaire.ColdFusion.HTTPFailure">
-				<!--- ColdFusion wasn't able to connect successfully.  This can be an expired, not legit or self-signed SSL cert. --->
+				<!--- "Connection Failure" - ColdFusion wasn't able to connect successfully.  This can be an expired, not legit or self-signed SSL cert. --->
+				<cfset response.setMessage("Gateway was not successfully reached and the transaction was not processed (100)") />
 				<cfset response.setStatus(getService().getStatusFailure()) />
 				<cfreturn response />
 			</cfcatch>
 			<cfcatch type="coldfusion.runtime.RequestTimedOutException">
+				<cfset response.setMessage("The bank did not respond to our request.  Please wait a few moments and try again. (101)") />
 				<cfset response.setStatus(getService().getStatusTimeout()) />
 				<cfreturn response />
 			</cfcatch>
-			<!---
-			Since changing from throwonerror=true, these are no longer needed?
 			<cfcatch type="COM.Allaire.ColdFusion.HTTPNotFound">
 				<!--- 404 error, obviously transaction wasn't processed unless response was faked --->
+				<cfset response.setMessage("Gateway was not successfully reached and the transaction was not processed (404)") />
 				<cfset response.setStatus(getService().getStatusFailure()) />
 				<cfreturn response />
 			</cfcatch>
 			<cfcatch type="COM.Allaire.ColdFusion.HTTPMovedTemporarily">
 				<!--- 302 response, CF doesn't follow so this is like a 404 --->
+				<cfset response.setMessage("Gateway was not successfully reached and the transaction was not processed (302)") />
 				<cfset response.setStatus(getService().getStatusFailure()) />
 				<cfreturn response />
 			</cfcatch>
 			<cfcatch type="COM.Allaire.ColdFusion.HTTPServiceUnavailable">
 				<!--- 503 response, "503 Service Unavailable"; highly unlikely the other end processes --->
+				<cfset response.setMessage("Gateway was not successfully reached and the transaction was not processed (503)") />
 				<cfset response.setStatus(getService().getStatusFailure()) />
 				<cfreturn response />
 			</cfcatch>
 			<cfcatch type="COM.Allaire.ColdFusion.HTTPServerError">
 				<!--- 500 response, this is an unknown answer since the other end might have processed --->
+				<cfset response.setMessage("Gateway did not respond as expected and the transaction may have been processed (500)") />
 				<cfset response.setStatus(getService().getStatusUnknown()) />
 				<cfreturn response />
 			</cfcatch>
-			--->
-
 			<cfcatch type="any">
 				<!--- something we don't yet have an exception for --->
 				<cfset response.setStatus(getService().getStatusUnknown()) />
