@@ -202,8 +202,8 @@
 		<!--- TODO: NOTE: THIS INTERNAL DATA REFERENCE MAY GO AWAY, DO NOT RELY UPON IT!!! --->
 		<!--- store payload for reference --->
 		<cfset RequestData = duplicate(arguments.payload) />
-		<cfset RequestData.GATEWAY_URL=getGatewayURL(argumentCollection = arguments)>
-		<cfset RequestData.HTTP_METHOD=arguments.method>
+		<cfset RequestData.GATEWAY_URL = getGatewayURL(argumentCollection = arguments) />
+		<cfset RequestData.HTTP_METHOD = arguments.method />
 
 		<cfset response.setRequestData(RequestData) /><!--- TODO: should this be another duplicate? --->
 

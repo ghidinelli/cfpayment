@@ -52,6 +52,7 @@
 		variables.cfpayment.CVVCode = "";
 		variables.cfpayment.ParsedResult = "";
 		variables.cfpayment.RequestData = "";		// store the payload from the Request; internal use only; may go away
+		variables.cfpayment.TokenID = "";			// normalize an ID for vault/remote lockbox services (store/unstore methods)
 
 		// list the possible AVS responses
 		variables.cfpayment.ResponseAVS = structNew();
@@ -186,6 +187,15 @@
 	<cffunction name="setTransactionID" access="public" output="false" returntype="any">
 		<cfargument name="TransactionID" type="any" required="true" />
 		<cfset variables.cfpayment.TransactionID = arguments.TransactionID />
+		<cfreturn this />
+	</cffunction>
+
+	<cffunction name="getTokenID" access="public" output="false" returntype="any">
+		<cfreturn variables.cfpayment.TokenID />
+	</cffunction>
+	<cffunction name="setTokenID" access="public" output="false" returntype="any">
+		<cfargument name="TokenID" type="any" required="true" />
+		<cfset variables.cfpayment.TokenID = arguments.TokenID />
 		<cfreturn this />
 	</cffunction>
 

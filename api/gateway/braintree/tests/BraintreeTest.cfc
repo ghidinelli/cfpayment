@@ -147,12 +147,14 @@
 		<cfset var response = "" />
 		<cfset var options = structNew() />
 		<cfset var vault = structNew() />
-		<cfset options["store"] = token.getID() />
+		<cfset options["tokenId"] = token.getID() />
+		<cfset options["tokenize"] = true />
 		
 		<cfset response = gw.authorize(money = money, account = createValidCard(), options = options) />
 		<cfset assertTrue(response.getSuccess(), "The authorization did not succeed") />
 
 		<cfset response = gw.purchase(money = money, account = token, options = options) />
+		<cfset debug(response.getMemento()) />
 		<cfset assertTrue(response.getSuccess(), "The token-based purchase did not succeed") />
 
 	</cffunction>
@@ -168,21 +170,30 @@
 
 		<!--- try storing withOUT a populated token value --->
 		<cfset response = gw.store(account = createValidCard(), options = options) />
-		<cfset token.setID(response.getParsedResult().customer_vault_id) />
+		<cfset token.setID(response.getTokenID()) />
 		<cfset assertTrue(response.getSuccess(), "The store did not succeed") />
 		
+		
+		<!--- get the masked details --->
+		<cfset options = { tokenId = token.getID(), report_type = "customer_vault" } />
+		<cfset response = gw.status(options = options) />
+		<cfset debug(response.getMemento()) />
+		<cfset options = { } />
+		 
+		<!--- unstore, using whatever they gave us as a token ID --->
 		<cfset response = gw.unstore(account = token, options = options) />
 		<cfset assertTrue(response.getSuccess(), "The unstore did not succeed") />
 
+
 		<!--- try storing with a populated token value --->
 		<cfset token = variables.svc.createToken(createUUID()) />
-		<cfset options["store"] = token.getID() />
+		<cfset options["tokenId"] = token.getID() />
 		<cfset response = gw.store(account = createValidCard(), options = options) />
 		<cfset debug(response.getMemento()) />
 		<cfset assertTrue(response.getSuccess(), "The store did not succeed") />
+		<cfset assertTrue(response.getTokenID() EQ token.getID(), "The submitted token ID was not returned, sent #token.getID()#, received: #response.getParsedResult().customer_vault_id#") />
 		
 		<cfset response = gw.unstore(account = token, options = options) />
-		<cfset debug(response.getMemento()) />
 		<cfset assertTrue(response.getSuccess(), "The unstore did not succeed") />
 
 	</cffunction>
@@ -351,7 +362,7 @@
 	<cffunction name="testPurchaseThenVoidEFT" access="public" returntype="void" output="false">
 	
 		<cfset var account = createValidEFT() />
-		<cfset var money = variables.svc.createMoney(5000) /><!--- in cents, $50.00 --->
+		<cfset var money = variables.svc.createMoney(4400) /><!--- in cents, $50.00 --->
 		<cfset var response = "" />
 		<cfset var options = structNew() />
 		
