@@ -75,17 +75,15 @@
 
 		<!--- create structure of URL parameters; swap in test parameters if necessary --->
 		<cfif getTestMode()>
-			<cfset p["username"] = "btdemo" />
-			<cfset p["password"] = "btdemo123" />
+			<cfset p["username"] = "testapi" />
+			<cfset p["password"] = "password1" />
 		<cfelse>
 			<cfset p["username"] = getUsername() />
 			<cfset p["password"] = getPassword() />
 		</cfif>
 
 		<!--- provide optional data --->
-		<cfloop collection="#arguments.options#" item="itm">
-			<cfset post[itm] = arguments.options[itm] />
-		</cfloop>
+		<cfset structAppend(p, arguments.options, true) />
 
 		<!---
 		state (recommended) Format: CC, 2 Character abbrev.
@@ -140,7 +138,7 @@
 					<cfelse>
 						<cfset response.setStatus(getService().getStatusSuccessful()) />
 					</cfif>
-			
+					
 				<cfelse>
 				
 					<!--- From: http://developer.getbraintree.com/apis/1-payment-processing 
@@ -175,6 +173,10 @@
 					<cfif structKeyExists(results, "authcode")>
 						<cfset response.setAuthorization(results.authcode) />
 					</cfif>
+					<cfif structKeyExists(results, "customer_vault_id")>
+						<cfset response.setTokenID(results.customer_vault_id) />
+					</cfif>
+					
 					<!--- handle common "success" fields --->
 					<cfif structKeyExists(results, "avsresponse")>
 						<cfset response.setAVSCode(results.avsresponse) />					
@@ -200,7 +202,7 @@
 					</cfif>
 			
 				</cfif>
-			
+		
 			<cfelse>
 			
 				<!--- this is bad, because Braintree didn't return a response.  Uh oh! --->
@@ -356,7 +358,7 @@
 		Only requests that have valid structure and therefore reach the processing modules are available for this.
 	--->	
 	<cffunction name="status" output="false" access="public">
-		<cfargument name="transactionid" type="any" required="false" default="" hint="If checking status of a transaction with unknown response, this may not be known and can be blank" />
+		<cfargument name="transactionid" type="any" required="false" hint="If checking status of a transaction with unknown response, this may not be known and can be blank" />
 		<cfargument name="options" type="any" required="false" default="#structNew()#" />
 
 		<cfset var post = structNew() />
@@ -365,6 +367,12 @@
 		<cfif structKeyExists(arguments, "transactionid")>
 			<cfset post["transaction_id"] = arguments.transactionid />
 		</cfif>
+
+		<!--- convert normalized option names to Braintree-specific names --->
+		<cfif structKeyExists(arguments.options, "tokenId")>
+			<cfset post["customer_vault_id"] = arguments.options.tokenId />
+		</cfif>
+
 
 		<!---
 			email (recommended) 
@@ -386,9 +394,10 @@
 
 	<cffunction name="store" output="false" access="public" returntype="any" hint="Put payment information into the vault">
 		<cfargument name="account" type="any" required="true" />
-		<cfargument name="options" type="struct" required="true" />
+		<cfargument name="options" type="struct" required="false" default="#structNew()#" />
 
 		<cfset var post = structNew() />
+		<cfset var res = "" />
 		
 		<cfswitch expression="#lcase(listLast(getMetaData(arguments.account).fullname, "."))#">
 			<cfcase value="creditcard">
@@ -406,20 +415,21 @@
 		<cfset post = addCustomer(post = post, account = arguments.account) />
 
 		<!--- check if we have an optional vault id --->
-		<cfif structKeyExists(arguments.options, "store")>
-			<cfif NOT isBoolean(arguments.options.store)>
-				<cfset post["customer_vault_id"] = arguments.options.store />
-			</cfif>
+		<cfif structKeyExists(arguments.options, "tokenId")>
+			<cfset post["customer_vault_id"] = arguments.options.tokenId />
 		</cfif>
-
+		
+		<!--- process transaction --->
 		<cfreturn process(payload = post, options = arguments.options) />
 	</cffunction>
 
 
 	<cffunction name="unstore" output="false" access="public" returntype="any" hint="Delete information from the vault">
-		<cfargument name="account" type="any" required="true" /><!--- must be type of "token" --->
+		<cfargument name="account" type="any" required="true" /><!--- must be type of "token"? --->
+		<cfargument name="options" type="struct" required="false" default="#structNew()#" />
 
 		<cfset var post = structNew() />
+		<cfset var res = "" />
 
 		<cfif lcase(listLast(getMetaData(arguments.account).fullname, ".")) NEQ "token">
 			<cfthrow type="cfpayment.InvalidAccount" message="Only an account type of token is supported by this method." />
@@ -428,7 +438,9 @@
 		<cfset post["customer_vault"] = "delete_customer" />
 		<cfset post = addToken(post = post, account = arguments.account) />
 
+		<!--- process transaction --->
 		<cfreturn process(payload = post, options = arguments.options) />
+		
 	</cffunction>	
  
 
@@ -468,7 +480,7 @@
 	<cffunction name="addCreditCard" output="false" access="private" returntype="any" hint="Add payment source fields to the request object">
 		<cfargument name="post" type="struct" required="true" />
 		<cfargument name="account" type="any" required="true" />
-		<cfargument name="options" type="struct" required="true" />
+		<cfargument name="options" type="struct" required="false" default="#structNew()#" />
 		
 		<cfset post["payment"] = "creditcard" />
 		<cfset post["ccnumber"] = arguments.account.getAccount() />
@@ -476,10 +488,10 @@
 		<cfset post["cvv"] = arguments.account.getVerificationValue() />
 
 		<!--- if we want to save the instrument to the vault; check if we have an optional vault id --->
-		<cfif structKeyExists(arguments.options, "store")>
+		<cfif structKeyExists(arguments.options, "tokenize")>
 			<cfset post["customer_vault"] = "add_customer" />
-			<cfif NOT isBoolean(arguments.options.store)>
-				<cfset post["customer_vault_id"] = arguments.options.store />
+			<cfif structKeyExists(arguments.options, "tokenId")>
+				<cfset post["customer_vault_id"] = arguments.options.tokenId />
 			</cfif>
 		</cfif>
 
@@ -490,7 +502,7 @@
 	<cffunction name="addEFT" output="false" access="private" returntype="any" hint="Add payment source fields to the request object">
 		<cfargument name="post" type="struct" required="true" />
 		<cfargument name="account" type="any" required="true" />
-		<cfargument name="options" type="struct" required="true" />
+		<cfargument name="options" type="struct" required="false" default="#structNew()#" />
 		
 		<cfset arguments.post["payment"] = "check" />
 		<cfset arguments.post["checkname"] = arguments.account.getName() />
@@ -507,10 +519,10 @@
 		</cfif>
 
 		<!--- if we want to save the instrument to the vault; check if we have an optional vault id --->
-		<cfif structKeyExists(arguments.options, "store")>
-			<cfset arguments.post["customer_vault"] = "add_customer" />
-			<cfif NOT isBoolean(arguments.options.store)>
-				<cfset arguments.post["customer_vault_id"] = arguments.options.store />
+		<cfif structKeyExists(arguments.options, "tokenize")>
+			<cfset post["customer_vault"] = "add_customer" />
+			<cfif structKeyExists(arguments.options, "tokenId")>
+				<cfset post["customer_vault_id"] = arguments.options.tokenId />
 			</cfif>
 		</cfif>
 	
