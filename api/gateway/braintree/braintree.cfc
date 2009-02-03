@@ -43,9 +43,9 @@
 	<cfset variables.braintree["252"] = "Stolen card" />
 	<cfset variables.braintree["253"] = "Fraudulent card" />
 	<cfset variables.braintree["260"] = "Declined with further instructions available (see response text)" />
-	<cfset variables.braintree["261"] = "Declined – Stop all recurring payments" />
-	<cfset variables.braintree["262"] = "Declined – Stop this recurring program" /> 
-	<cfset variables.braintree["263"] = "Declined – Updated cardholder data available" /> 
+	<cfset variables.braintree["261"] = "Declined ï¿½ Stop all recurring payments" />
+	<cfset variables.braintree["262"] = "Declined ï¿½ Stop this recurring program" /> 
+	<cfset variables.braintree["263"] = "Declined ï¿½ Updated cardholder data available" /> 
 	<cfset variables.braintree["264"] = "Declined - Retry in a few days" />
 	<cfset variables.braintree["300"] = "Transaction was rejected by gateway" />
 	<cfset variables.braintree["400"] = "Transaction error returned by processor" />
@@ -249,7 +249,7 @@
 			</cfdefaultcase>
 		</cfswitch>
 
-		<cfreturn process(payload = post) />
+		<cfreturn process(payload = post, options = options) />
 	</cffunction>
 
 	
@@ -282,7 +282,7 @@
 			</cfdefaultcase>
 		</cfswitch>
 
-		<cfreturn process(payload = post) />
+		<cfreturn process(payload = post, options = options) />
 	</cffunction>	
 	
 
@@ -309,7 +309,7 @@
 			orderid (optional) 
 		--->
 
-		<cfreturn process(payload = post) />
+		<cfreturn process(payload = post, options = options) />
 	</cffunction>
 
 
@@ -335,7 +335,7 @@
 			<cfset post["transactionid"] = arguments.transactionid />
 		</cfif>
 
-		<cfreturn process(payload = post) />
+		<cfreturn process(payload = post, options = options) />
 	</cffunction>
 
 
@@ -349,7 +349,7 @@
 		<cfset post["type"] = "void" />
 		<cfset post["transactionid"] = arguments.transactionid />
 
-		<cfreturn process(payload = post) />
+		<cfreturn process(payload = post, options = options) />
 	</cffunction>
 
 
