@@ -19,7 +19,7 @@
 	Triggering Errors in Test Mode
 	To cause a declined message, pass an amount less than 1.00. 
 	To trigger a fatal message, pass an invalid card number. 
-	To simulate an AVS Match, pass 77777 in the zip field for a ‘Z – 5 Character Zip match only’. Pass 888 in the address1 field to generate an ‘A – Address match only’. Pass them both for a ‘Y – Exact match, 5-character numeric ZIP’ match. 
+	To simulate an AVS Match, pass 77777 in the zip field for a ï¿½Z ï¿½ 5 Character Zip match onlyï¿½. Pass 888 in the address1 field to generate an ï¿½A ï¿½ Address match onlyï¿½. Pass them both for a ï¿½Y ï¿½ Exact match, 5-character numeric ZIPï¿½ match. 
 	To simulate a CVV Match, pass 999 in the cvv field. 
 
 --->
@@ -160,8 +160,7 @@
 	</cffunction>
 
 
-	<!--- confirm authorize throws error --->
-	<cffunction name="testStoreAndUnstore" access="public" returntype="void" output="false">
+	<cffunction name="testStoreAndUnstoreCreditCard" access="public" returntype="void" output="false">
 	
 		<cfset var money = variables.svc.createMoney(5000) /><!--- in cents, $50.00 --->
 		<cfset var response = "" />
@@ -177,7 +176,7 @@
 		<!--- get the masked details --->
 		<cfset options = { tokenId = token.getID(), report_type = "customer_vault" } />
 		<cfset response = gw.status(options = options) />
-		<cfset debug(response.getMemento()) />
+		<cfset debug(response.getParsedResult()) />
 		<cfset options = { } />
 		 
 		<!--- unstore, using whatever they gave us as a token ID --->
@@ -198,6 +197,44 @@
 
 	</cffunction>
 	
+
+	<cffunction name="testStoreAndUnstoreEFT" access="public" returntype="void" output="false">
+	
+		<cfset var money = variables.svc.createMoney(5100) /><!--- in cents, $50.00 --->
+		<cfset var response = "" />
+		<cfset var options = structNew() />
+		<cfset var token = variables.svc.createToken(createUUID()) />
+
+		<!--- try storing withOUT a populated token value --->
+		<cfset response = gw.store(account = createValidEFT(), options = options) />
+		<cfset token.setID(response.getTokenID()) />
+		<cfset assertTrue(response.getSuccess(), "The store did not succeed") />
+		
+		
+		<!--- get the masked details --->
+		<cfset options = { tokenId = token.getID(), report_type = "customer_vault" } />
+		<cfset response = gw.status(options = options) />
+		<cfset debug(response.getParsedResult()) />
+		<cfset options = { } />
+		 
+		<!--- unstore, using whatever they gave us as a token ID --->
+		<cfset response = gw.unstore(account = token, options = options) />
+		<cfset assertTrue(response.getSuccess(), "The unstore did not succeed") />
+
+
+		<!--- try storing with a populated token value --->
+		<cfset token = variables.svc.createToken(createUUID()) />
+		<cfset options["tokenId"] = token.getID() />
+		<cfset response = gw.store(account = createValidEFT(), options = options) />
+		<cfset debug(response.getMemento()) />
+		<cfset assertTrue(response.getSuccess(), "The store did not succeed") />
+		<cfset assertTrue(response.getTokenID() EQ token.getID(), "The submitted token ID was not returned, sent #token.getID()#, received: #response.getParsedResult().customer_vault_id#") />
+		
+		<cfset response = gw.unstore(account = token, options = options) />
+		<cfset assertTrue(response.getSuccess(), "The unstore did not succeed") />
+
+	</cffunction>
+
 
 	<!--- confirm authorize throws error --->
 	<cffunction name="testAuthorizeThrowsException" access="public" returntype="void" output="false">
@@ -364,7 +401,7 @@
 		<cfset var account = createValidEFT() />
 		<cfset var money = variables.svc.createMoney(4400) /><!--- in cents, $50.00 --->
 		<cfset var response = "" />
-		<cfset var options = structNew() />
+		<cfset var options = structNew() /><!--- required for EFT voids --->
 		
 		<!--- validate object --->
 		<cfset assertTrue(account.getIsValid(), "EFT is not valid") />
@@ -375,6 +412,7 @@
 		<cfset assertTrue(response.getSuccess(), "The purchase did not succeed") />
 
 		<!--- then try to void transaction --->
+		<cfset options["payment"] = "check" />
 		<cfset response = gw.void(transactionid = response.getTransactionID(), options = options) />
 		<cfset debug(response.getMemento()) />
 		<cfset assertTrue(response.getSuccess(), "The void did not succeed") />
