@@ -31,7 +31,6 @@
 			variables.svc = createObject("component", "cfpayment.api.core");
 			
 			gw.path = "braintree.braintree";
-			gw.MerchantAccount = 0;
 			gw.Username = 'demo';
 			gw.Password = 'password';
 			gw.TestMode = true;		// defaults to true anyways
@@ -383,11 +382,17 @@
 
 	<cffunction name="testDirectDepositEFT" access="public" returntype="void" output="false">
 	
-		<cfset var account = createValidEFT() />
-		<cfset var money = variables.svc.createMoney(500000) /><!--- in cents, $5000.00 --->
+		<cfset var account = variables.svc.createEFT() />
+		<cfset var money = variables.svc.createMoney(500) /><!--- in cents, $5000.00 --->
 		<cfset var response = "" />
 		<cfset var report = "" />
 		<cfset var options = structNew() />
+
+		<cfset account.setAccount("22034-234233") />
+		<cfset account.setRoutingNumber("121000358") />
+		<cfset account.setFirstName("Test Account") />
+		<cfset account.setAccountType("checking") />
+		<cfset account.setSEC("CCD") />
 
 		<cfset response = gw.credit(money = money, account = account, options = options) />
 		<cfset debug(response.getMemento()) />
@@ -489,7 +494,7 @@
 		<cfset var account = variables.svc.createCreditCard() />
 		<cfset account.setAccount(4111111111111111) />
 		<cfset account.setMonth(10) />
-		<cfset account.setYear(10) />
+		<cfset account.setYear(2010) />
 		<cfset account.setVerificationValue(999) />
 		<cfset account.setFirstName("John") />
 		<cfset account.setLastName("Doe") />
@@ -504,7 +509,7 @@
 		<cfset var account = variables.svc.createCreditCard() />
 		<cfset account.setAccount(4100000000000000) />
 		<cfset account.setMonth(10) />
-		<cfset account.setYear(10) />
+		<cfset account.setYear(2010) />
 		<cfset account.setVerificationValue(123) />
 		<cfset account.setFirstName("John") />
 		<cfset account.setLastName("Doe") />
@@ -519,7 +524,7 @@
 		<cfset var account = variables.svc.createCreditCard() />
 		<cfset account.setAccount(4111111111111111) />
 		<cfset account.setMonth(10) />
-		<cfset account.setYear(10) />
+		<cfset account.setYear(2010) />
 		<cfset account.setVerificationValue() />
 		<cfset account.setFirstName("John") />
 		<cfset account.setLastName("Doe") />
@@ -534,7 +539,7 @@
 		<cfset var account = variables.svc.createCreditCard() />
 		<cfset account.setAccount(4111111111111111) />
 		<cfset account.setMonth(10) />
-		<cfset account.setYear(10) />
+		<cfset account.setYear(2010) />
 		<cfset account.setVerificationValue(111) />
 		<cfset account.setFirstName("John") />
 		<cfset account.setLastName("Doe") />
@@ -549,7 +554,7 @@
 		<cfset var account = variables.svc.createCreditCard() />
 		<cfset account.setAccount(4111111111111111) />
 		<cfset account.setMonth(10) />
-		<cfset account.setYear(10) />
+		<cfset account.setYear(2010) />
 		<cfset account.setVerificationValue() />
 		<cfset account.setFirstName("John") />
 		<cfset account.setLastName("Doe") />
@@ -564,7 +569,7 @@
 		<cfset var account = variables.svc.createCreditCard() />
 		<cfset account.setAccount(4111111111111111) />
 		<cfset account.setMonth(10) />
-		<cfset account.setYear(10) />
+		<cfset account.setYear(2010) />
 		<cfset account.setVerificationValue() />
 		<cfset account.setFirstName("John") />
 		<cfset account.setLastName("Doe") />
@@ -592,5 +597,32 @@
 		<cfreturn account />	
 	</cffunction>
 	
+
+	<cffunction name="testReportFirstDirectDeposit" access="public" returntype="void" output="false">
+	
+		<cfset var response = "" />
+		<cfset var transactionId = 896601960 /><!--- the id of the first test $5 direct deposit --->
+		<cfset var options = { } />
+
+		<!--- get masked details --->
+		<cfset response = gw.status(transactionId = transactionId, options = options) />
+		<cfset debug(response.getParsedResult()) />
+		<cfset assertTrue(response.getSuccess(), "The status report did not succeed") />
+
+	</cffunction>
+
+
+	<cffunction name="testReportFirstVault" access="public" returntype="void" output="false">
+	
+		<cfset var response = "" />
+		<cfset var options = { tokenId = '3E9A2107-1D72-822B-795B7BC564D749BF' } /><!--- the id of our GGC test token --->
+
+		<!--- get masked details --->
+		<cfset response = gw.status(options = options) />
+		<cfset debug(response.getParsedResult()) />
+
+	</cffunction>
+
+
 
 </cfcomponent>
