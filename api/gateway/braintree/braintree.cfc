@@ -43,9 +43,9 @@
 	<cfset variables.braintree["252"] = "Stolen card" />
 	<cfset variables.braintree["253"] = "Fraudulent card" />
 	<cfset variables.braintree["260"] = "Declined with further instructions available (see response text)" />
-	<cfset variables.braintree["261"] = "Declined � Stop all recurring payments" />
-	<cfset variables.braintree["262"] = "Declined � Stop this recurring program" /> 
-	<cfset variables.braintree["263"] = "Declined � Updated cardholder data available" /> 
+	<cfset variables.braintree["261"] = "Declined - Stop all recurring payments" />
+	<cfset variables.braintree["262"] = "Declined - Stop this recurring program" /> 
+	<cfset variables.braintree["263"] = "Declined - Updated cardholder data available" /> 
 	<cfset variables.braintree["264"] = "Declined - Retry in a few days" />
 	<cfset variables.braintree["300"] = "Transaction was rejected by gateway" />
 	<cfset variables.braintree["400"] = "Transaction error returned by processor" />
@@ -84,6 +84,15 @@
 
 		<!--- provide optional data --->
 		<cfset structAppend(p, arguments.options, true) />
+
+		<!--- process standard and common CFPAYMENT mappings into Braintree-specific values --->
+		<cfif structKeyExists(arguments.options, "orderId")>
+			<cfset p["order_id"] = arguments.options.orderId />
+		</cfif>
+		<cfif structKeyExists(arguments.options, "tokenId")>
+			<cfset p["customer_vault_id"] = arguments.options.tokenId />
+		</cfif>
+
 
 		<!---
 		state (recommended) Format: CC, 2 Character abbrev.
@@ -329,8 +338,11 @@
 			<!--- in the direct deposit scenario, we need the account --->
 			<cfset post["type"] = "credit" />
 			<cfset post = addEFT(post = post, account = arguments.account, options = arguments.options) />
+		<cfelseif structKeyExists(arguments.options, "tokenId")>
+			<!--- direct deposit using the vault --->
+			<cfset post["type"] = "credit" />
+			<cfset post["customer_vault_id"] = arguments.options.tokenId /><!--- redundant due to normalized processing in process() --->
 		<cfelseif structKeyExists(arguments, "transactionid")>
-			<!--- in the direct deposit scenario, the transactionid may not be present --->
 			<cfset post["type"] = "refund" />
 			<cfset post["transactionid"] = arguments.transactionid />
 		</cfif>
@@ -341,7 +353,7 @@
 
 	<cffunction name="void" output="false" access="public" returntype="any" hint="">
 		<cfargument name="transactionid" type="any" required="true" />
-		<cfargument name="options" type="struct" required="true" />
+		<cfargument name="options" type="struct" required="false" default="#structNew()#" />
 
 		<cfset var post = structNew() />
 		
@@ -367,12 +379,6 @@
 		<cfif structKeyExists(arguments, "transactionid")>
 			<cfset post["transaction_id"] = arguments.transactionid />
 		</cfif>
-
-		<!--- convert normalized option names to Braintree-specific names --->
-		<cfif structKeyExists(arguments.options, "tokenId")>
-			<cfset post["customer_vault_id"] = arguments.options.tokenId />
-		</cfif>
-
 
 		<!---
 			email (recommended) 
@@ -417,6 +423,7 @@
 		<!--- check if we have an optional vault id --->
 		<cfif structKeyExists(arguments.options, "tokenId")>
 			<cfset post["customer_vault_id"] = arguments.options.tokenId />
+			<cfset post["customer_vault"] = "update_customer" /><!--- tell it to update --->
 		</cfif>
 		
 		<!--- process transaction --->
@@ -510,6 +517,7 @@
 		<cfset arguments.post["checkaccount"] = arguments.account.getAccount() />
 		<cfset arguments.post["account_type"] = arguments.account.getAccountType() />
 		<cfset arguments.post["phone"] = arguments.account.getPhoneNumber() />
+		<cfset arguments.post["sec_code"] = arguments.account.getSEC() />
 
 		<!--- convert SEC code to braintree values --->
 		<cfif arguments.account.getSEC() EQ "PPD">
