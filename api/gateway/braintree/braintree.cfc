@@ -122,6 +122,12 @@
 		descriptor_phone (optional) 
 		--->
 
+	
+		<!--- braintree requires lower case parameters (per Katrina in support on 3/25/09), so force case --->
+		<cfloop collection="p" item="ii">
+			<cfset p[lcase(ii)] = p[ii] />
+		</cfloop>
+
 
 		<!--- send it over the wire using the base gateway --->
 		<cfset response = super.process(payload = p) />

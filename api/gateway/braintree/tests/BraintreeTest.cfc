@@ -1,4 +1,4 @@
-<cfcomponent name="ItransactTest" extends="mxunit.framework.TestCase" output="false">
+<cfcomponent name="BraintreeTest" extends="mxunit.framework.TestCase" output="false">
 
 <!---
 	
@@ -442,6 +442,16 @@
 		<cfset response = gw.credit(account = account, money = money, options = options) />
 		<cfset debug(response.getMemento()) />
 		<cfset assertTrue(response.getSuccess(), "You can credit a purchase") />
+
+	</cffunction>
+
+
+	<cffunction name="testUpperCaseParameters" access="public" returntype="void" output="false">
+	
+		<!--- gateway will lower-case all params per BT requirements: transactionId not valid, but transactionid valid --->
+		<cfset report = gw.status(TransactionId = "11111111") />
+		<cfset debug(report.getMemento()) />
+		<cfset assertTrue(report.getSuccess() AND arrayLen(report.getParsedResult().xmlRoot.xmlChildren) EQ 0, "Invalid transactionid should result in no returned matches") />
 
 	</cffunction>
 
