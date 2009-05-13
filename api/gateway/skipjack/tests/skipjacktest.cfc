@@ -186,7 +186,7 @@
 		<cfset var response = "" />
 		<cfset var transId = "" />
 
-		<!--- card should result in success --->
+		<!--- authorize should result in success --->
 		<cfset response = gw.authorize(money = money, account = account, options = options) />
 		<cfset debug(response.getMemento()) />
 		<cfif response.GetMessage() EQ "Length or value of HTML Serial Number">
@@ -200,7 +200,11 @@
 		<cfset options.DeveloperSerialNumber=gwParams.DeveloperSerialNumber>
 
 		<!--- let's give them a $5 credit --->
-		<cfset money.setCents(money.getCents()-500)>
+		<cfif money.getCents() GT 501>
+			<cfset money.setCents(money.getCents()-500)>
+		<cfelse>
+			<cfset money.setCents(money.getCents()-1)>
+		</cfif>
 		<cfset response = gw.credit(money = money, identification = transId, options = options) />
 		<cfset debug(response.getMemento()) />
 		<!--- <cfset assertTrue(response.getSuccess(), "The valid capture test did not return successful") /> --->
@@ -214,6 +218,21 @@
 
 		<!--- NOTE: once captured, you cannot void --->
 	</cffunction>
+
+	<cffunction name="testCredit" access="public" returntype="void" output="false">
+		<cfset var options = getTestRequiredOptions() />
+		<cfset var response = "" />
+		<cfset var transId = "9802853713244.022" /><!--- find a settled transaction id --->
+		<cfset var money = svc.createMoney(100) />
+		<cfset options.DeveloperSerialNumber=gwParams.DeveloperSerialNumber>
+
+		<cfset response = gw.credit(money = money, identification = transId, options = options) />
+		<cfset debug(response.getMemento()) />
+		<!--- <cfset assertTrue(response.getSuccess(), "The valid capture test did not return successful") /> --->
+		<!--- <cfset assertEquals(response.getMessage(), "UNSUCCESSFUL: Status Mismatch", "The valid credit test did not return the proper response.") /> --->
+		<cfset assertEquals(response.getMessage(), "The transaction succeeded, but one or more individual items failed.", "The valid credit test did not return the proper response.") />
+	</cffunction>
+
 
 	<cffunction name="testValidAuthorizeGetStatus" access="public" returntype="void" output="false">
 		<cfset var account =  getTestCreditCard() />
