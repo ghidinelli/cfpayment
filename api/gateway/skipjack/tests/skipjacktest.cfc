@@ -32,6 +32,7 @@
 			<cfset gwParams = StructNew() />
 			<cfset gwParams.Path = "skipjack.skipjack_cc" />
 			<cfset gwParams.MerchantAccount = "" /><!--- skipjack html serial number --->
+			<cfset gwParams.DeveloperSerialNumber = "" /><!--- skipjack-assigned serial number (sign up for a developer account) --->
 			<!--- username and password only used for reporting in SkipJack --->
 			<cfset gwParams.userName = "" />
 			<cfset gwParams.password = "" />
@@ -88,7 +89,7 @@
 
 	<cffunction name="testInvalidOptions" access="public" returntype="void" output="false">
 		<cfset var account =  getTestCreditCard() />
-		<cfset var money = svc.createMoney(getRandomCents()) />
+		<cfset var money = svc.createMoney(cents = getRandomCents()) />
 		<cfset var response = "" />
 		<cfset var invalidOptions = "" />
 		<cfset var options = getTestRequiredOptions() />
@@ -113,7 +114,7 @@
 
 	<cffunction name="testInvalidAuthorizations" access="public" returntype="void" output="false">
 		<cfset var account =  getTestCreditCard() />
-		<cfset var money = svc.createMoney(getRandomCents()) />
+		<cfset var money = svc.createMoney(cents = getRandomCents()) />
 		<cfset var response = "" />
 		<cfset var options = getTestRequiredOptions() />
 
@@ -147,7 +148,7 @@
 
 	<cffunction name="testValidAuthorizations" access="public" returntype="void" output="false">
 		<cfset var account =  getTestCreditCard() />
-		<cfset var money = svc.createMoney(getRandomCents()) />
+		<cfset var money = svc.createMoney(cents = getRandomCents()) />
 		<cfset var response = "" />
 		<cfset var options = getTestRequiredOptions() />
 
@@ -163,25 +164,24 @@
 
 	<cffunction name="testValidPurchase" access="public" returntype="void" output="false">
 		<cfset var account =  getTestCreditCard() />
-		<cfset var money = svc.createMoney(getRandomCents()) />
+		<cfset var money = svc.createMoney(cents = getRandomCents()) />
 		<cfset var response = "" />
 		<cfset var options = getTestRequiredOptions() />
 		<!--- developer serial number required to settle --->
 		<cfset options.DeveloperSerialNumber=gwParams.DeveloperSerialNumber>
-
 		<!--- card should result in success --->
 		<cfset response = gw.purchase(money = money, account = account, options = options) />
 		<cfset debug(response.getMemento()) />
 		<cfif response.GetMessage() EQ "Length or value of HTML Serial Number">
 			<cfset fail("The valid purchase attempt was stopped because you have supplied an invalid SkipJack HTML Serial Number.")>
 		<cfelse>
-			<cfset assertTrue(response.getSuccess(), "The valid purchase test did not return successful") />
+			<cfset assertTrue(response.getSuccess(), "The valid purchase test did not return successful:" & response.getMessage()) />
 		</cfif>
 	</cffunction>
 
 	<cffunction name="testValidAuthorizeCreditCapture" access="public" returntype="void" output="false">
 		<cfset var account =  getTestCreditCard() />
-		<cfset var money = svc.createMoney(getRandomCents()) />
+		<cfset var money = svc.createMoney(cents = getRandomCents()) />
 		<cfset var options = getTestRequiredOptions() />
 		<cfset var response = "" />
 		<cfset var transId = "" />
@@ -223,7 +223,7 @@
 		<cfset var options = getTestRequiredOptions() />
 		<cfset var response = "" />
 		<cfset var transId = "9802853713244.022" /><!--- find a settled transaction id --->
-		<cfset var money = svc.createMoney(100) />
+		<cfset var money = svc.createMoney(cents = 100) />
 		<cfset options.DeveloperSerialNumber=gwParams.DeveloperSerialNumber>
 
 		<cfset response = gw.credit(money = money, identification = transId, options = options) />
@@ -236,7 +236,7 @@
 
 	<cffunction name="testValidAuthorizeGetStatus" access="public" returntype="void" output="false">
 		<cfset var account =  getTestCreditCard() />
-		<cfset var money = svc.createMoney(getRandomCents()) />
+		<cfset var money = svc.createMoney(cents = getRandomCents()) />
 		<cfset var options = getTestRequiredOptions() />
 		<cfset var response = "" />
 		<cfset var originalOrderNumber = "" />
@@ -262,7 +262,7 @@
 
 	<cffunction name="testValidAuthorizeAdditionalChargeVoid" access="public" returntype="void" output="false">
 		<cfset var account =  getTestCreditCard() />
-		<cfset var money = svc.createMoney(getRandomCents()) />
+		<cfset var money = svc.createMoney(cents = getRandomCents()) />
 		<cfset var options = getTestRequiredOptions() />
 		<cfset var response = "" />
 		<cfset var transId = "" />
@@ -306,7 +306,7 @@ Parameter Missing: (rtName)</cfoutput></cfsavecontent>
 
 	<cffunction name="testInvalidRecurring" access="public" returntype="void" output="false">
 		<cfset var account =  getTestCreditCard() />
-		<cfset var money = svc.createMoney(getRandomCents()) />
+		<cfset var money = svc.createMoney(cents = getRandomCents()) />
 		<cfset var response = "" />
 		<cfset var invalidOptions = "" />
 		<cfset var options = getTestRequiredOptions() />
@@ -322,7 +322,7 @@ Parameter Missing: (rtName)</cfoutput></cfsavecontent>
 		<!--- missing DeveloperSerialNumber --->
 		<cfset invalidOptions=duplicate(options)>
 		<cfset StructDelete(invalidOptions, "DeveloperSerialNumber")>
-		<cfset response = gw.recurring(money = money, account = account, options = invalidOptions) />
+		<cfset response = gw.recurring(mode = "add", money = money, account = account, options = invalidOptions) />
 		<cfset debug(response.getMemento()) />
 		<!--- just check this on the first one in this test --->
 		<cfif response.GetMessage() EQ "Length or value of HTML Serial Number">
@@ -334,42 +334,42 @@ Parameter Missing: (rtName)</cfoutput></cfsavecontent>
 		<!--- missing ItemDescription --->
 		<cfset invalidOptions=duplicate(options)>
 		<cfset StructDelete(invalidOptions, "ItemDescription")>
-		<cfset response = gw.recurring(money = money, account = account, options = invalidOptions) />
+		<cfset response = gw.recurring(mode = "add", money = money, account = account, options = invalidOptions) />
 		<cfset debug(response.getMemento()) />
 		<cfset assertEquals(response.getMessage(), "Parameter Missing: (rtItemDescription)", "The missing ItemDescription test did not return the correct response message.") />
 
 		<!--- missing ItemNumber --->
 		<cfset invalidOptions=duplicate(options)>
 		<cfset StructDelete(invalidOptions, "ItemNumber")>
-		<cfset response = gw.recurring(money = money, account = account, options = invalidOptions) />
+		<cfset response = gw.recurring(mode = "add", money = money, account = account, options = invalidOptions) />
 		<cfset debug(response.getMemento()) />
 		<cfset assertEquals(response.getMessage(), "Parameter Missing: (rtItemNumber)", "The missing ItemNumber test did not return the correct response message.") />
 
 		<!--- missing StartingDate --->
 		<cfset invalidOptions=duplicate(options)>
 		<cfset StructDelete(invalidOptions, "StartingDate")>
-		<cfset response = gw.recurring(money = money, account = account, options = invalidOptions) />
+		<cfset response = gw.recurring(mode = "add", money = money, account = account, options = invalidOptions) />
 		<cfset debug(response.getMemento()) />
 		<cfset assertEquals(response.getMessage(), "Parameter Missing: (rtStartingDate)", "The missing StartingDate test did not return the correct response message.") />
 
 		<!--- missing Frequency --->
 		<cfset invalidOptions=duplicate(options)>
 		<cfset StructDelete(invalidOptions, "Periodicity")>
-		<cfset response = gw.recurring(money = money, account = account, options = invalidOptions) />
+		<cfset response = gw.recurring(mode = "add", money = money, account = account, options = invalidOptions) />
 		<cfset debug(response.getMemento()) />
 		<cfset assertEquals(response.getMessage(), "Parameter Missing: (rtFrequency)", "The missing Frequency test did not return the correct response message.") />
 
 		<!--- missing TotalTransactions --->
 		<cfset invalidOptions=duplicate(options)>
 		<cfset StructDelete(invalidOptions, "TotalTransactions")>
-		<cfset response = gw.recurring(money = money, account = account, options = invalidOptions) />
+		<cfset response = gw.recurring(mode = "add", money = money, account = account, options = invalidOptions) />
 		<cfset debug(response.getMemento()) />
 		<cfset assertEquals(response.getMessage(), "Parameter Missing: (rtTotalTransactions)", "The missing TotalTransactions test did not return the correct response message.") />
 
 		<!--- starting date too early --->
 		<cfset invalidOptions=duplicate(options)>
 		<cfset invalidOptions.StartingDate=DateFormat(DateAdd("m", -3, now()), "mm/dd/yyyy")>
-		<cfset response = gw.recurring(money = money, account = account, options = invalidOptions) />
+		<cfset response = gw.recurring(mode = "add", money = money, account = account, options = invalidOptions) />
 		<cfset debug(response.getMemento()) />
 		<!--- check just the first 96 characters, because the error ends with dynamic data (the date passed in) --->
 		<cfset assertEquals(left(response.getMessage(), 96), "invalid starting date entered.  date must not be more than 60 days earlier than the current date", "The starting date too early test did not return the correct response message.") />
@@ -377,14 +377,14 @@ Parameter Missing: (rtName)</cfoutput></cfsavecontent>
 		<!--- invalid frequency --->
 		<cfset invalidOptions=duplicate(options)>
 		<cfset invalidOptions.Periodicity="daily"><!--- daily is not supported by skipjack --->
-		<cfset response = gw.recurring(money = money, account = account, options = invalidOptions) />
+		<cfset response = gw.recurring(mode = "add", money = money, account = account, options = invalidOptions) />
 		<cfset debug(response.getMemento()) />
 		<cfset assertEquals(response.getMessage(), "Parameter Missing: (rtFrequency)", "The invalid frequency test did not return the correct response message.") />
 	</cffunction>
 
 	<cffunction name="testValidRecurring" access="public" returntype="void" output="false">
 		<cfset var account =  getTestCreditCard() />
-		<cfset var money = svc.createMoney(getRandomCents()) />
+		<cfset var money = svc.createMoney(cents = getRandomCents()) />
 		<cfset var options = getTestRequiredOptions() />
 		<cfset var response = "" />
 		<cfset var PaymentId1 = "" />
@@ -399,8 +399,7 @@ Parameter Missing: (rtName)</cfoutput></cfsavecontent>
 		<cfset options.TotalTransactions="12">
 
 		<!--- ADD RECURRING --->
-		<cfset options.mode="add">
-		<cfset response = gw.recurring(money = money, account = account, options = options) />
+		<cfset response = gw.recurring(mode = "add", money = money, account = account, options = options) />
 		<cfset debug(response.getMemento()) />
 		<cfif response.GetMessage() EQ "Length or value of HTML Serial Number">
 			<cfset fail("The valid authorize attempt was stopped because you have supplied an invalid SkipJack HTML Serial Number.")>
@@ -412,47 +411,42 @@ Parameter Missing: (rtName)</cfoutput></cfsavecontent>
 		<cfset options.PaymentId=PaymentId1>
 
 		<!--- EDIT RECURRING --->
-		<cfset options.mode="edit">
 		<!--- change the starting date --->
 		<cfset options.StartingDate=DateFormat(DateAdd("yyyy", 1, options.StartingDate), "mm/dd/yyyy")>
-		<cfset response = gw.recurring(money = money, account = account, options = options) />
+		<cfset response = gw.recurring(mode = "edit", money = money, account = account, options = options) />
 		<cfset debug(response.getMemento()) />
 		<cfset assertTrue(response.getSuccess(), "The valid 'edit recurring' method did not return successful") />
 
 		<!--- GET RECURRING BY RecurringPaymentId --->
-		<cfset options.mode="get">
-		<cfset response = gw.recurring(options = options) />
+		<cfset response = gw.recurring(mode = "get", options = options) />
 		<cfset debug(response.getMemento()) />
 		<cfset assertTrue(response.getSuccess(), "The valid 'get recurring' method did not return successful") />
 
 		<!--- ADD ANOTHER RECURRING --->
-		<cfset options.mode="add">
 		<cfset options.ItemNumber="54321">
 		<cfset options.ItemDescription="Bright Red Widget">
 		<cfset options.StartingDate=DateFormat(DateAdd("d", 14, now()), "mm/dd/yyyy")>
 		<cfset options.Periodicity="biweekly">
 		<cfset options.TotalTransactions="12">
-		<cfset response = gw.recurring(money = money, account = account, options = options) />
+		<cfset response = gw.recurring(mode = "add", money = money, account = account, options = options) />
 		<cfset debug(response.getMemento()) />
 		<cfset assertTrue(response.getSuccess(), "The valid 'add recurring 2' method did not return successful") />
 		<cfset PaymentId2=StructFind(response.GetParsedResult(), "RecurringPaymentId")>
 
 		<!--- GET ALL RECURRING TRANSACTIONS --->
-		<cfset options.mode="get">
 		<cfset StructDelete(options, "paymentid")>
-		<cfset response = gw.recurring(options = options) />
+		<cfset response = gw.recurring(mode = "get", options = options) />
 		<cfset debug(response.getMemento()) />
 		<cfset assertTrue(response.getSuccess(), "The valid 'get recurring' method did not return successful") />
 
 		<!--- DELETE BOTH RECURRING --->
-		<cfset options.mode="delete">
 		<cfset options.PaymentId=PaymentId1>
-		<cfset response = gw.recurring(options = options) />
+		<cfset response = gw.recurring(mode = "delete", options = options) />
 		<cfset debug(response.getMemento()) />
 		<cfset assertTrue(response.getSuccess(), "The valid 'delete recurring 1' method did not return successful") />
 
 		<cfset options.PaymentId=PaymentId2>
-		<cfset response = gw.recurring(options = options) />
+		<cfset response = gw.recurring(mode = "delete", options = options) />
 		<cfset debug(response.getMemento()) />
 		<cfset assertTrue(response.getSuccess(), "The valid 'delete recurring 2' method did not return successful") />
 	</cffunction>
