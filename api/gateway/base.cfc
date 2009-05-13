@@ -454,6 +454,7 @@
 	</cffunction>
 
 	<cffunction name="recurring" access="public" output="false" returntype="any" hint="">
+		<cfargument name="mode" type="string" required="true" /><!--- must be one of: add, edit, delete, get --->
 		<cfargument name="money" type="any" required="true" />
 		<cfargument name="account" type="any" required="true" />
 		<cfargument name="options" type="struct" required="false" />
