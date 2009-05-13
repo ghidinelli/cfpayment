@@ -17,6 +17,13 @@
 --->
 <cfcomponent displayname="Base SkipJack Interface" extends="cfpayment.api.gateway.base" hint="Common functionality for SkipJack Gateway" output="false">
 
+<!---
+PROGRAM: skipjack.cfc
+UPDATES:
+	22-JAN-2009-MBM: added len() check on ParsedResult.szAuthorizationDeclinedMessage in ParseAuthorizeMessage()
+	30-JAN-2009-MBM: added logic to MapGenericResponse() to find AuditId in response query and set response.TransactionId with the value (used for credit/newcharge items)
+					 removed isValidCVV and isValidAVS checks in ParseAuthorizeMessage() since we don't pass in the validity options
+--->
 	<cfset variables.cfpayment.GATEWAY_NAME = "SkipJack" />
 	<cfset variables.cfpayment.GATEWAY_VERSION = "1.0" />
 	<cfset variables.cfpayment.GATEWAY_LIVE_URL = "https://ms.skipjackic.com/scripts/EvolvCC.dll?" />
@@ -266,12 +273,33 @@ PARSE RESPONSE
 		<cfelseif structKeyExists(ResponseMap, "szTransactionId")>
 			<cfset arguments.Response.setTransactionId(ResponseMap.szTransactionId)>
 		</cfif>
+		<cftry>
 			<!--- Skipjack will often return a zero AVS Response Code when the CVV fails, so we check for it and ignore it since it is an invalid value --->
 			<cfif trim(ResponseMap.szAVSResponseCode) NEQ "0">
 				<cfset arguments.Response.setAVSCode(ResponseMap.szAVSResponseCode)>
 			</cfif>
-
+		<cfcatch>
+			<!--- TODO: remove logging --->
+			<cf_log4cf level="error"><cfoutput>Error Setting AVS Response Code</cfoutput>
+				<cfdump var="#CFCatch#" label="CFCatch Scope">
+				<cfif isdefined("arguments") and structKeyExists(arguments, "response")><cfdump var="#arguments.response.getMemento()#" label="Response Object"></cfif>
+				<cfif isdefined("arguments")><cfdump var="#arguments#" label="Arguments Scope"></cfif>
+				<cfif isdefined("ResponseMap")><cfdump var="#ResponseMap#" label="ResponseMap"></cfif>
+			</cf_log4cf>
+		</cfcatch>
+		</cftry>
+		<cftry>
 		<cfset arguments.Response.setCVVCode(ResponseMap.szCVV2ResponseCode)>
+		<cfcatch>
+			<!--- TODO: remove logging --->
+			<cf_log4cf level="error"><cfoutput>Error Setting CVV Response Code</cfoutput>
+				<cfdump var="#CFCatch#" label="CFCatch Scope">
+				<cfif isdefined("arguments") and structKeyExists(arguments, "response")><cfdump var="#arguments.response.getMemento()#" label="Response Object"></cfif>
+				<cfif isdefined("arguments")><cfdump var="#arguments#" label="Arguments Scope"></cfif>
+				<cfif isdefined("ResponseMap")><cfdump var="#ResponseMap#" label="ResponseMap"></cfif>
+			</cf_log4cf>
+		</cfcatch>
+		</cftry>
 	<cfelseif ListFindNoCase("recurring", getGatewayAction())>
 		<cfif ListLast(getGatewayAction(shortaction=false), "_") eq "get">
 			<cfset ResponseMap=ParseGetRecurringResponse(argumentCollection=arguments)>
@@ -328,7 +356,7 @@ PARSE RESPONSE
 			<cfset arguments.Response.setStatus(getService().getStatusFailure())>
 			<!--- <cfthrow message="Invalid Logic to ParseMessage for #getGatewayAction()#" type="cfpayment.InvalidParameter.skipjack.GatewayAction"> --->
 		<cfelse>
-			<cfif structKeyExists(ParsedResult, "szAuthorizationDeclinedMessage")>
+			<cfif structKeyExists(ParsedResult, "szAuthorizationDeclinedMessage") and (len(ParsedResult.szAuthorizationDeclinedMessage))>
 				<cfset message=ParsedResult.szAuthorizationDeclinedMessage>
 			<cfelse>
 				<!--- <cfsavecontent variable="tmp"><cfdump var="#arguments.response.getMemento()#" label="response"></cfsavecontent><cfthrow detail="#tmp#"> --->
@@ -378,12 +406,16 @@ AUTHORIZE
 	<cfif arguments.Response.getSuccess()>
 		<cfset ret=variables.cfpayment.SKIPJACK_SUCCESS_MESSAGE>
 		<cfset arguments.Response.setStatus(getService().getStatusSuccessful())>
-	<cfelseif not arguments.Response.isValidCVV(AllowBlankCode=true)><!--- TODO: should these extra "allow" arguments be configurable --->
+	<!--- give error message priority to the szAuthorizationDeclinedMessage returned from skipjack --->
+	<cfelseif StructKeyExists(ParsedResult, "szAuthorizationDeclinedMessage") and (len(ParsedResult.szAuthorizationDeclinedMessage))>
+		<cfset ret=ParsedResult.szAuthorizationDeclinedMessage>
+		<cfset arguments.Response.setStatus(getService().getStatusFailure())>
+<!--- 	<cfelseif not arguments.Response.isValidCVV(AllowBlankCode=true)><!--- TODO: should these extra "allow" arguments be configurable --->
 		<cfset ret="Security Code Error: " & arguments.Response.getCVVMessage()>
 		<cfset arguments.Response.setStatus(getService().getStatusFailure())>
 	<cfelseif not arguments.Response.isValidAVS(AllowStreetOnlyMatch=true)><!--- TODO: should these extra "allow" arguments be configurable --->
 		<cfset ret="Address Verification Error: " & arguments.Response.getAVSMessage()>
-		<cfset arguments.Response.setStatus(getService().getStatusFailure())>
+		<cfset arguments.Response.setStatus(getService().getStatusFailure())> --->
 	<cfelseif ParsedResult.szReturnCode>
 		<cfset ret=variables.cfpayment.SKIPJACK_RETURN_CODE_MESSAGES[ParsedResult.szReturnCode]>
 		<cfset arguments.Response.setStatus(getService().getStatusFailure())>
@@ -567,7 +599,7 @@ Parameter Missing: (szDeveloperSerialNumber)
 				<cfset res[keys[ctr]]=values[ctr]>
 			</cfloop>
 		<cfelse>
-			<cfthrow message="Invalid Response Result (keys/values)" type="cfpayment.skipjack.InvalidResponseResult">
+			<cfthrow message="Invalid Response Result (keys/values=#numKeys#/#numValues#)" detail="#lines.toString()#" type="cfpayment.skipjack.InvalidResponseResult">
 		</cfif>
 		<cfif StructKeyExists(res, "NumberOfRecords") and (isNumeric(res.NumberOfRecords)) and (res.NumberOfRecords GT 0)>
 			<!--- successful return: map out returned data records --->
@@ -583,6 +615,27 @@ Parameter Missing: (szDeveloperSerialNumber)
 			<!--- <cfsavecontent variable="tmp"><cfdump var="#variables.cfpayment.csvutils.CSVtoQuery(CSV=dataList, FirstRowColumnNames=true, trim=true, trimData=true)#"></cfsavecontent><cfthrow message="Invalid Response Result (keys/values)" type="cfpayment.skipjack.InvalidResponseResult" detail="#tmp#"> --->
 			<cfset res.ResultDataQuery=variables.cfpayment.csvutils.CSVtoQuery(CSV=dataList, FirstRowColumnNames=true, trim=true, trimData=true)>
 			<cfset res.ResultDataArray=duplicate(dataArray)>
+			<!--- if the result of this request returns a single record, see if there is an audit id; if so, set the response transaction id value to it (e.g. during a credit/newcharge call) --->
+			<cftry>
+				<cfif (res.ResultDataQuery.RecordCount EQ 1)>
+					<!--- change status request returns AuditId --->
+					<cfif ListFindNoCase(res.ResultDataQuery.ColumnList, "AuditID") AND len(res.ResultDataQuery.AuditID)>
+					<cfset arguments.Response.setTransactionId(res.ResultDataQuery.AuditID)>
+					<!--- get trans status request returns TransactionId --->
+					<cfelseif ListFindNoCase(res.ResultDataQuery.ColumnList, "TransactionID") AND len(res.ResultDataQuery.TransactionID)>
+						<cfset arguments.Response.setTransactionId(res.ResultDataQuery.TransactionID)>
+					</cfif>
+				</cfif>
+			<cfcatch>
+				<!--- TODO: remove logging --->
+				<cf_log4cf level="error"><cfoutput>Error Setting Authorization from change transaction to result audit id</cfoutput>
+					<cfdump var="#CFCatch#" label="CFCatch Scope">
+					<cfif isdefined("arguments")><cfdump var="#arguments#" label="Arguments Scope"></cfif>
+					<cfif isdefined("arguments") and structKeyExists(arguments, "response")><cfdump var="#arguments.response.getMemento()#" label="Response Object"></cfif>
+					<cfif isdefined("res")><cfdump var="#res#" label="function result"></cfif>
+				</cf_log4cf>
+			</cfcatch>
+			</cftry>
 		<cfelseif StructKeyExists(res, "ResponseCode") and (res.ResponseCode NEQ "0") AND (ArrayLen(lines) EQ 2)>
 			<!--- extra message on line two --->
 			<cfset arguments.response.setMessage(lines[2])>
@@ -618,22 +671,6 @@ HELPER FUNCTIONS
 	<cfset modline=modline.substring(1, modline.length()-1)>
 	<!--- split on the char 9 and return (use lineLen to include possible trailing empty values) --->
 	<cfreturn modline.split(chr(9), lineLen)>
-</cffunction>
-
-<!--- TODO: move this to base? --->
-<cffunction name="GetOption" output="false" access="private" returntype="any" hint="">
-	<cfargument name="Options" type="any" required="true"/>
-	<cfargument name="Key" type="any" required="true"/>
-	<cfargument name="ErrorIfNotFound" type="boolean" default="false"/>
-	<cfif isStruct(arguments.Options) and StructKeyExists(arguments.Options, arguments.Key)>
-		<cfreturn arguments.Options[arguments.Key] />
-	<cfelse>
-		<cfif arguments.ErrorIfNotFound>
-			<cfthrow message="Missing Option: #HTMLEditFormat(arguments.key)#" type="cfpayment.MissingParameter.Option">
-		<cfelse>
-			<cfreturn "" />
-		</cfif>
-	</cfif>
 </cffunction>
 
 </cfcomponent>

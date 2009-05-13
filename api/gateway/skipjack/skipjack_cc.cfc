@@ -14,6 +14,9 @@
 	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 	See the License for the specific language governing permissions and
 	limitations under the License.
+
+	UPDATES:
+		 3-FEB-2009-MBM: added check for order_id and szNewOrderNumber to payload in newcharge() method
 --->
 <cfcomponent displayname="SkipJack Credit Card Object" extends="skipjack" hint="Used for processing credit card payments via SkipJack" output="false">
 
@@ -83,6 +86,10 @@
 		<cfset var payload = StructNew() />
 		<cfset setGatewayAction("newcharge") />
 
+		<!--- check for required options --->
+		<cfset VerifyRequiredOptions(arguments.options, "order_id") /><!--- if order_id not passed, it will default to "1", which is likely undesireable--->
+
+		<cfset addInvoice(payload, arguments.options) />
 		<cfset addStatusAction(payload, variables.cfpayment.SKIPJACK_CHANGE_STATUS_NEWCHARGE) />
 		<cfset addForcedSettlement(payload, arguments.options) />
 		<cfset addTransactionId(payload, arguments.identification) />
@@ -108,12 +115,14 @@
 	</cffunction>
 
 	<cffunction name="recurring" output="false" access="public" returntype="any" hint="Perform an add/edit recurring transaction">
+		<cfargument name="mode" type="string" required="true" /><!--- must be one of: add, edit, delete, get --->
 		<cfargument name="money" type="any" required="false" />
 		<cfargument name="account" type="any" required="false" /><!--- credit card or eft object --->
 		<cfargument name="options" type="struct" default="#StructNew()#" />
 		<cfset var payload = StructNew() />
 		<cfset setGatewayAction("recurring") />
 
+		<!--- TODO: move arguments.mode to base and incorporate below and in calling code --->
 		<!--- recurring transaction mode --->
 		<cfif not StructKeyExists(arguments.options, "mode")><!--- add, edit, delete, get --->
 			<cfset arguments.options.mode="add">
@@ -255,6 +264,8 @@
 			<cfset arguments.payload["rtOrderNumber"]=GetOption(arguments.options, "order_id") />
 			<cfset arguments.payload["rtItemNumber"]=GetOption(arguments.options, "ItemNumber") />
 			<cfset arguments.payload["rtItemDescription"]=GetOption(arguments.options, "ItemDescription") />
+		<cfelseif ListFindNoCase("newcharge", getGatewayAction())>
+			<cfset arguments.payload["szNewOrderNumber"]=GetOption(arguments.options, "order_id") />
 		<cfelse>
 			<cfthrow message="Invalid GatewayAction Logic in AddInvoice" type="cfpayment.InvalidParameter" />
 		</cfif>
