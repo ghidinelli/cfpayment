@@ -122,14 +122,8 @@
 		<cfset var payload = StructNew() />
 		<cfset setGatewayAction("recurring") />
 
-		<!--- TODO: move arguments.mode to base and incorporate below and in calling code --->
-		<!--- recurring transaction mode --->
-		<cfif not StructKeyExists(arguments.options, "mode")><!--- add, edit, delete, get --->
-			<cfset arguments.options.mode="add">
-		</cfif>
-
 		<!--- setup payload --->
-		<cfif ListFindNoCase("add,edit", arguments.options.mode)>
+		<cfif ListFindNoCase("add,edit", arguments.mode)>
 			<cfif not StructKeyExists(arguments, "money")>
 				<cfthrow message="Money is a required parameter." type="cfpayment.MissingParameter.Money">
 			</cfif>
@@ -147,17 +141,17 @@
 			<cfset addMisc(payload, arguments.options) />
 			<cfset addCredentials(payload, arguments.options) />
 			<cfset addAmount(payload, arguments.money) />
-			<cfset addRecurringFields(payload, arguments.options) />
-		<cfelseif ListFindNoCase("delete,get", arguments.options.mode)>
+			<cfset addRecurringFields(payload, arguments.mode, arguments.options) />
+		<cfelseif ListFindNoCase("delete,get", arguments.mode)>
 			<!--- populate the payload --->
 			<cfset addCredentials(payload, arguments.options) />
-			<cfset addRecurringFields(payload, arguments.options) />
+			<cfset addRecurringFields(payload, arguments.mode, arguments.options) />
 		<cfelse>
 			<cfthrow message="Invalid Recurring Mode Logic" type="cfpayment">
 		</cfif>
 
 		<!--- append the mode to the gateway action so we can get at the proper gateway url --->
-		<cfset setGatewayAction("recurring_#arguments.options.mode#") />
+		<cfset setGatewayAction("recurring_#arguments.mode#") />
 		<cfreturn process(payload=payload, options=arguments.options) />
 	</cffunction>
 
@@ -455,13 +449,14 @@
 
 	<cffunction name="addRecurringFields" output="false" access="private" returntype="void" hint="">
 		<cfargument name="payload" type="any" required="true"/>
+		<cfargument name="mode" type="any" required="true"/>
 		<cfargument name="options" type="any" required="true"/>
-		<cfif ListFindNoCase("add", arguments.options.mode)>
+		<cfif ListFindNoCase("add", arguments.mode)>
 			<cfset arguments.payload["rtStartingDate"] = getOption(arguments.options, "StartingDate") />
 			<!--- frequency is stored as a normalized option named "periodicity" --->
 			<cfset arguments.payload["rtFrequency"] = getPeriodicityValue(getOption(arguments.options, "Periodicity")) />
 			<cfset arguments.payload["rtTotalTransactions"] = getOption(arguments.options, "TotalTransactions") />
-		<cfelseif ListFindNoCase("edit,delete,get", arguments.options.mode)>
+		<cfelseif ListFindNoCase("edit,delete,get", arguments.mode)>
 			<cfset arguments.payload["szPaymentId"] = getOption(arguments.options, "PaymentId") />
 			<!---
 				NOTE for edit:
