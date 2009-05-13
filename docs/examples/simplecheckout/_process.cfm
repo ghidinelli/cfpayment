@@ -19,7 +19,7 @@ $Id$
 <!--- for testing, set the gateway you want to use here --->
 <cftry>
 	<!--- create a config that is not in svn --->
-	<cfset gwParams = createObject("component", "cfpayment.localconfig.config").init() />
+	<cfset gwParams = createObject("component", "cfpayment.localconfig.config").init("developer") />
 <cfcatch>
 	<!--- if gwParams doesn't exist (or otherwise bombs), create a generic structure with blank values --->
 	<cfset gwParams = StructNew() />
