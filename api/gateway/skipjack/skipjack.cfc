@@ -273,33 +273,11 @@ PARSE RESPONSE
 		<cfelseif structKeyExists(ResponseMap, "szTransactionId")>
 			<cfset arguments.Response.setTransactionId(ResponseMap.szTransactionId)>
 		</cfif>
-		<cftry>
-			<!--- Skipjack will often return a zero AVS Response Code when the CVV fails, so we check for it and ignore it since it is an invalid value --->
-			<cfif trim(ResponseMap.szAVSResponseCode) NEQ "0">
-				<cfset arguments.Response.setAVSCode(ResponseMap.szAVSResponseCode)>
-			</cfif>
-		<cfcatch>
-			<!--- TODO: remove logging --->
-			<cf_log4cf level="error"><cfoutput>Error Setting AVS Response Code</cfoutput>
-				<cfdump var="#CFCatch#" label="CFCatch Scope">
-				<cfif isdefined("arguments") and structKeyExists(arguments, "response")><cfdump var="#arguments.response.getMemento()#" label="Response Object"></cfif>
-				<cfif isdefined("arguments")><cfdump var="#arguments#" label="Arguments Scope"></cfif>
-				<cfif isdefined("ResponseMap")><cfdump var="#ResponseMap#" label="ResponseMap"></cfif>
-			</cf_log4cf>
-		</cfcatch>
-		</cftry>
-		<cftry>
+		<!--- Skipjack will often return a zero AVS Response Code when the CVV fails, so we check for it and ignore it since it is an invalid value --->
+		<cfif trim(ResponseMap.szAVSResponseCode) NEQ "0">
+			<cfset arguments.Response.setAVSCode(ResponseMap.szAVSResponseCode)>
+		</cfif>
 		<cfset arguments.Response.setCVVCode(ResponseMap.szCVV2ResponseCode)>
-		<cfcatch>
-			<!--- TODO: remove logging --->
-			<cf_log4cf level="error"><cfoutput>Error Setting CVV Response Code</cfoutput>
-				<cfdump var="#CFCatch#" label="CFCatch Scope">
-				<cfif isdefined("arguments") and structKeyExists(arguments, "response")><cfdump var="#arguments.response.getMemento()#" label="Response Object"></cfif>
-				<cfif isdefined("arguments")><cfdump var="#arguments#" label="Arguments Scope"></cfif>
-				<cfif isdefined("ResponseMap")><cfdump var="#ResponseMap#" label="ResponseMap"></cfif>
-			</cf_log4cf>
-		</cfcatch>
-		</cftry>
 	<cfelseif ListFindNoCase("recurring", getGatewayAction())>
 		<cfif ListLast(getGatewayAction(shortaction=false), "_") eq "get">
 			<cfset ResponseMap=ParseGetRecurringResponse(argumentCollection=arguments)>
@@ -616,26 +594,15 @@ Parameter Missing: (szDeveloperSerialNumber)
 			<cfset res.ResultDataQuery=variables.cfpayment.csvutils.CSVtoQuery(CSV=dataList, FirstRowColumnNames=true, trim=true, trimData=true)>
 			<cfset res.ResultDataArray=duplicate(dataArray)>
 			<!--- if the result of this request returns a single record, see if there is an audit id; if so, set the response transaction id value to it (e.g. during a credit/newcharge call) --->
-			<cftry>
-				<cfif (res.ResultDataQuery.RecordCount EQ 1)>
-					<!--- change status request returns AuditId --->
-					<cfif ListFindNoCase(res.ResultDataQuery.ColumnList, "AuditID") AND len(res.ResultDataQuery.AuditID)>
-					<cfset arguments.Response.setTransactionId(res.ResultDataQuery.AuditID)>
-					<!--- get trans status request returns TransactionId --->
-					<cfelseif ListFindNoCase(res.ResultDataQuery.ColumnList, "TransactionID") AND len(res.ResultDataQuery.TransactionID)>
-						<cfset arguments.Response.setTransactionId(res.ResultDataQuery.TransactionID)>
-					</cfif>
+			<cfif (res.ResultDataQuery.RecordCount EQ 1)>
+				<!--- change status request returns AuditId --->
+				<cfif ListFindNoCase(res.ResultDataQuery.ColumnList, "AuditID") AND len(res.ResultDataQuery.AuditID)>
+				<cfset arguments.Response.setTransactionId(res.ResultDataQuery.AuditID)>
+				<!--- get trans status request returns TransactionId --->
+				<cfelseif ListFindNoCase(res.ResultDataQuery.ColumnList, "TransactionID") AND len(res.ResultDataQuery.TransactionID)>
+					<cfset arguments.Response.setTransactionId(res.ResultDataQuery.TransactionID)>
 				</cfif>
-			<cfcatch>
-				<!--- TODO: remove logging --->
-				<cf_log4cf level="error"><cfoutput>Error Setting Authorization from change transaction to result audit id</cfoutput>
-					<cfdump var="#CFCatch#" label="CFCatch Scope">
-					<cfif isdefined("arguments")><cfdump var="#arguments#" label="Arguments Scope"></cfif>
-					<cfif isdefined("arguments") and structKeyExists(arguments, "response")><cfdump var="#arguments.response.getMemento()#" label="Response Object"></cfif>
-					<cfif isdefined("res")><cfdump var="#res#" label="function result"></cfif>
-				</cf_log4cf>
-			</cfcatch>
-			</cftry>
+			</cfif>
 		<cfelseif StructKeyExists(res, "ResponseCode") and (res.ResponseCode NEQ "0") AND (ArrayLen(lines) EQ 2)>
 			<!--- extra message on line two --->
 			<cfset arguments.response.setMessage(lines[2])>
