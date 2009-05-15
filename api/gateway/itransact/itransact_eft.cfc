@@ -1,5 +1,5 @@
 <!---
-	$Id: creditcard.cfc 35 2008-11-10 00:29:24Z briang $
+	$Id$
 	
 	Copyright 2008 Brian Ghidinelli (http://www.ghidinelli.com/)
 	
