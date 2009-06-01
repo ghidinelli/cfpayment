@@ -1,6 +1,7 @@
 <!---
 
 	Copyright 2009 Joseph Lamoree (http://www.lamoree.com/)
+	Copyright 2008 Brian Ghidinelli (http://www.ghidinelli.com/)
 
 	Licensed under the Apache License, Version 2.0 (the "License"); you
 	may not use this file except in compliance with the License. You may
@@ -27,7 +28,6 @@
 		FraudManagement:				off (default) or on
 
 --->
-
 <cfcomponent extends="cfpayment.api.gateway.base" hint="Name-Value Pair API Gateway for PayPal Website Payments Pro" output="false">
 
 	<!--- cfpayment structure values override base class --->

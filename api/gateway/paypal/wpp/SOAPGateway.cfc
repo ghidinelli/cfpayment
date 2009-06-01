@@ -18,7 +18,6 @@
 	TODO: Everything
 
 --->
-
 <cfcomponent extents="cfpayment.api.gateway.base" hint="SOAP API Gateway for PayPal Website Payments Pro" output="false">
 
 	<!--- cfpayment structure values override base class --->
