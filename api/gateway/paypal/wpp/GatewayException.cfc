@@ -17,15 +17,23 @@
 --->
 <cfcomponent output="false">
 
+	<cfset variables.errorInfo = structNew() />
+
 	<cffunction name="init" returntype="GatewayException" access="public" output="false">
 		<cfargument name="exception" type="any" required="false" />
-		<cfargument name="type" type="any" required="false" />
+		<cfargument name="errorCode" type="string" required="false" />
+		<cfargument name="type" type="string" required="false" />
+		<cfargument name="message" type="string" required="false" />
+		<cfargument name="detail" type="string" required="false" />
 
 		<cfif structKeyExists(arguments, "exception")>
 			<cfset setException(arguments.exception) />
-		</cfif>
-		<cfif structKeyExists(arguments, "type")>
-			<cfset setType(arguments.type) />
+		<cfelseif structKeyExists(arguments, "errorCode")>
+			<cfset setErrorCode(getProperty(arguments, "errorCode")) />
+		<cfelse>
+			<cfset setType(getProperty(arguments, "type")) />
+			<cfset setMessage(getProperty(arguments, "message")) />
+			<cfset setDetail(getProperty(arguments, "detail")) />
 		</cfif>
 		<cfreturn this />
 	</cffunction>
@@ -43,13 +51,29 @@
 		<cfset variables.exception = arguments.exception />
 		<cfif n gt 0>
 			<cfset setErrorCode(n) />
-			<cfset setType(variables.errorInfo[n].type) />
-			<cfset setMessage(variables.errorInfo[n].message) />
-			<cfset setConst(variables.errorInfo[n].const) />
 		<cfelse>
-			<cfset setMessage(p) />
+			<cfset setType(getProperty(variables.exception, "type")) />
+			<cfset setMessage(getProperty(variables.exception, "message")) />
+			<cfset setDetail(getProperty(variables.exception, "detail")) />
 		</cfif>
-		<cfset setDetail(getProperty(arguments.exception, "detail")) />
+	</cffunction>
+
+	<cffunction name="setErrorCode" returntype="void" access="private" output="false">
+		<cfargument name="errorCode" type="any" required="true" />
+
+		<cfset var e = "null" />
+
+		<cfset variables.errorCode = arguments.errorCode />
+		<cfif structKeyExists(variables.errorInfo, variables.errorCode)>
+			<cfset e = variables.errorInfo[variables.errorCode] />
+			<cfset setType(e.type) />
+			<cfset setMessage(e.message) />
+			<cfset setDetail(e.message) />
+		<cfelse>
+			<cfset setType("UnknownGatewayException") />
+			<cfset setMessage("An unknown exception has been thrown.") />
+			<cfset setDetail("") />
+		</cfif>
 	</cffunction>
 
 	<cffunction name="getProperty" returntype="any" access="private" output="false">
@@ -65,12 +89,8 @@
 	</cffunction>
 
 
-	<cffunction name="getErrorCode" returntype="numeric" access="public" output="false">
+	<cffunction name="getErrorCode" returntype="string" access="public" output="false">
 		<cfreturn variables.errorCode />
-	</cffunction>
-	<cffunction name="setErrorCode" returntype="void" access="private" output="false">
-		<cfargument name="errorCode" type="numeric" required="true" />
-		<cfset variables.errorCode = arguments.errorCode />
 	</cffunction>
 
 	<cffunction name="getType" returntype="string" access="public" output="false">

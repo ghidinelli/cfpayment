@@ -145,7 +145,7 @@
 		<cfelseif getCredentialType() eq "certificate">
 			<cfset arguments.payload.CERTIFICATE = getCertificate() />
 		<cfelse>
-			<cfset createObject("component", "GatewayException").init(type="UnsupportedCredentialTypeException").doThrow() />
+			<cfset createObject("component", "GatewayException").init(type="UnsupportedCredentialTypeException", message="An unsupported credential type was specified.").doThrow() />
 		</cfif>
 	</cffunction>
 
@@ -154,7 +154,7 @@
 		<cfargument name="options" type="struct" required="true" />
 
 		<cfif not structKeyExists(arguments.options, "ipAddress")>
-			<cfset createObject("component", "GatewayException").init(type="RequiredParameterMissingException").doThrow() />
+			<cfset createObject("component", "GatewayException").init(type="RequiredParameterMissingException", message="The ipAddress is a required parameter.").doThrow() />
 		</cfif>
 		<cfset arguments.payload.IPADDRESS = arguments.options.ipAddress />
 	</cffunction>
@@ -201,7 +201,7 @@
 		<cfelseif a.getIsDiscover()>
 			<cfset p.CREDITCARDTYPE = "Discover" />
 		<cfelse>
-			<cfset createObject("component", "GatewayException").init(type="InvalidCardTypeException").doThrow() />
+			<cfset createObject("component", "GatewayException").init(type="UnsupportedCardTypeException", message="An unsupported credit card type was specified.").doThrow() />
 		</cfif>
 
 		<cfset p.ACCT = a.getAccount() />
