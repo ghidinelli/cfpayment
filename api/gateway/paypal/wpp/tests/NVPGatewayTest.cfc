@@ -15,150 +15,222 @@
 	See the License for the specific language governing permissions and
 	limitations under the License.
 
---->
-<cfcomponent name="NVPGatewayTest" extends="mxunit.framework.TestCase" output="false">
 
-	<cfset variables.cfpaymentCore = "null" />
+	Create gateway configuration file: NVPGatewayTest.properties (remove leading whitespace):
+		gateway.username=paypal_99999999_biz_api1.paypal.com
+		gateway.password=abc123xyz789
+		gateway.credentialType=signature
+		gateway.signature=random_character_string
+		gateway.certificate=
+		gateway.apiVersion=56.0
+
+		validCustomer.firstName=Jeff
+		validCustomer.lastName=Lebowski
+		validCustomer.address=609 Venenzia Ave.
+		validCustomer.city=Venice
+		validCustomer.region=CA
+		validCustomer.postalCode=90291
+
+		validCard.account=4111111111111111
+		validCard.expMonth=10
+		validCard.expYear=2010
+		validCard.verificationValue=000
+
+		invalidCard.account=4111111111111111
+		invalidCard.expMonth=10
+		invalidCard.expYear=2010
+		invalidCard.verificationValue=000
+
+		purchase.ammount=4995
+		purchase.bogusAmmount=0
+		purchase.currency=USD
+		purchase.bogusCurrency=XXX
+		purchase.ipAddress=10.1.1.1
+		purchase.bogusIPAddress=ipaddr
+--->
+<cfcomponent extends="mxunit.framework.TestCase">
+
+	<cfset variables.core = "null" />
 	<cfset variables.gateway = "null" />
+	<cfset variables.configFile = reReplaceNoCase(getMetaData(this).path, "\.cfc$", ".properties") />
 
 	<cffunction name="setUp" returntype="void" access="public">
+		<cfset var gatewayConfig = readProperties("gateway") />
 
-		<cfset var config = structNew() />
-
-		<cfscript>
-			config.path = "paypal.wpp.NVPGateway";
-			config.username = "paypal_1243142215_biz_api1.lamoree.com";
-			config.password = "1243142227";
-			config.signature = "AFcWxV21C7fd0v3bYYYRCpSSRl31AD632SuLIOLLihiymINoOCODKW62";
-			config.testmode = true;
-
-			variables.cfpaymentCore = createObject("component", "cfpayment.api.core").init(config=config);
-			variables.gateway = variables.cfpaymentCore.getGateway();
-		</cfscript>
+		<cfset gatewayConfig.path = "paypal.wpp.NVPGateway" />
+		<cfset variables.core = createObject("component", "cfpayment.api.core").init(config=gatewayConfig) />
+		<cfset variables.gateway = variables.core.getGateway() />
 	</cffunction>
 
-	<cffunction name="testPurchase" access="public" returntype="void" output="false">
-
-		<cfset var money = variables.cfpaymentCore.createMoney(cents=5000) />
-		<cfset var gw = variables.gateway />
+	<cffunction name="testPurchase" access="public" returntype="void">
+		<cfset var purchase = readProperties("purchase") />
 		<cfset var response = "null" />
+		<cfset var money = "null" />
 		<cfset var options = structNew() />
 
-		<cfset options.email = "unittest@lamoree.com" />
-		<cfset options.ipAddress = "64.81.35.1" />
-		<cfset options.company = "Lamoree Software" />
-		<cfset options.description = "Test Transaction" />
-
-		<cfset response = gw.purchase(money=money, account=createValidCard(), options=options) />
+		<!--- Valid card, proper ammount --->
+		<cfset options.ipAddress = purchase.ipAddress />
+		<cfset money = variables.core.createMoney(cents=purchase.ammount, currency=purchase.currency) />
+		<cfset response = variables.gateway.purchase(money=money, account=createValidCard(), options=options) />
 		<cfset assertTrue(response.getSuccess(), "The purchase should have succeeded.") />
 
-		<cfset response = gw.purchase(money=money, account=createInvalidCard(), options=options) />
+		<!--- Invalid card --->
+		<cfset response = variables.gateway.purchase(money=money, account=createInvalidCard(), options=options) />
 		<cfset assertTrue(not response.getSuccess(), "The purchase should not have succeeded, due to invalid credit card.") />
 
+		<!--- Bad IP Address --->
+		<cfset options.ipAddress = purchase.bogusIPAddress />
+		<cfset response = variables.gateway.purchase(money=money, account=createInvalidCard(), options=options) />
+		<cfset assertTrue(not response.getSuccess(), "The purchase should not have succeeded, due to a bogus IP address.") />
+
+		<!--- Bad purchase ammount --->
+		<cfset money = variables.core.createMoney(cents=purchase.bogusAmmount, currency=purchase.currency) />
+		<cfset response = variables.gateway.purchase(money=money, account=createInvalidCard(), options=options) />
+		<cfset assertTrue(not response.getSuccess(), "The purchase should not have succeeded, due to invalid ammount.") />
+
+		<!--- Bogus currency --->
+		<cfset money = variables.core.createMoney(cents=purchase.ammount, currency=purchase.bogusCurrency) />
+		<cfset response = variables.gateway.purchase(money=money, account=createInvalidCard(), options=options) />
+		<cfset assertTrue(not response.getSuccess(), "The purchase should not have succeeded, due to a bogus currency.") />
+
+		<!--- Duplicate Invoices --->
+
+		<!--- AVS Validation --->
+
+		<!--- CVV2 Validation --->
+
+		<!--- Expiration Validation --->
 	</cffunction>
 
-	<cffunction name="testAuthorizeOnly" access="public" returntype="void" output="false">
-
-		<cfset var money = variables.cfpaymentCore.createMoney(cents=5000) />
-		<cfset var gw = variables.gateway />
+	<cffunction name="testAuthorizeOnly" access="public" returntype="void">
+		<cfset var purchase = readProperties("purchase") />
 		<cfset var response = "null" />
+		<cfset var money = "null" />
 		<cfset var options = structNew() />
 
-		<cfset response = gw.authorize(money=money, account=createValidCard(), options=options) />
-		<cfset assertTrue(response.getSuccess(), "The authorization did not succeed") />
-
+		<cfset options.ipAddress = purchase.ipAddress />
+		<cfset money = variables.core.createMoney(cents=purchase.ammount, currency=purchase.currency) />
+		<cfset response = variables.gateway.authorize(money=money, account=createValidCard(), options=options) />
 	</cffunction>
 
-	<cffunction name="testAuthorizeThenCapture" access="public" returntype="void" output="false">
+	<cffunction name="testAuthorizeThenCapture" access="public" returntype="void">
 
-		<cfset var money = variables.cfpaymentCore.createMoney(cents=5000) />
-		<cfset var gw = variables.gateway />
+		<cfset var money = variables.core.createMoney(cents=5000) />
 		<cfset var response = "null" />
 		<cfset var options = structNew() />
 		<cfset var account = createValidCard() />
 
-		<cfset response = gw.authorize(money=money, account=account, options=options) />
+		<cfset response = variables.gateway.authorize(money=money, account=account, options=options) />
 		<cfset assertTrue(response.getSuccess(), "The authorization did not succeed") />
 
-		<cfset response = gw.capture(money=money, authorization=response.getTransactionId(), options=options) />
+		<cfset response = variables.gateway.capture(money=money, authorization=response.getTransactionId(), options=options) />
 		<cfset assertTrue(response.getSuccess(), "The capture did not succeed") />
 	</cffunction>
 
-	<cffunction name="testAuthorizeThenCredit" access="public" returntype="void" output="false">
+	<cffunction name="testAuthorizeThenCredit" access="public" returntype="void">
 
-		<cfset var money = variables.cfpaymentCore.createMoney(cents=5000) />
+		<cfset var money = variables.core.createMoney(cents=5000) />
 		<cfset var gw = variables.gateway />
 		<cfset var response = "null" />
 		<cfset var options = structNew() />
 		<cfset var account = createValidCard() />
 
-		<cfset response = gw.authorize(money=money, account=account, options=options) />
+		<cfset response = variables.gateway.authorize(money=money, account=account, options=options) />
 		<cfset assertTrue(response.getSuccess(), "The authorization did not succeed") />
 
-		<cfset response = gw.credit(transactionid=response.getTransactionID(), money=money, options=options) />
+		<cfset response = variables.gateway.credit(transactionid=response.getTransactionID(), money=money, options=options) />
 		<cfset assertTrue(NOT response.getSuccess(), "You cannot credit a preauth") />
 	</cffunction>
 
-	<cffunction name="testAuthorizeThenVoid" access="public" returntype="void" output="false">
+	<cffunction name="testAuthorizeThenVoid" access="public" returntype="void">
 
-		<cfset var money = variables.cfpaymentCore.createMoney(cents=5000) />
+		<cfset var money = variables.core.createMoney(cents=5000) />
 		<cfset var gw = variables.gateway />
 		<cfset var response = "null" />
 		<cfset var options = structNew() />
 		<cfset var account = createValidCard() />
 
-		<cfset response = gw.authorize(money=money, account=account, options=options) />
+		<cfset response = variables.gateway.authorize(money=money, account=account, options=options) />
 		<cfset assertTrue(response.getSuccess(), "The authorization did not succeed") />
 
-		<cfset response = gw.void(transactionid=response.getTransactionID(), options=options) />
+		<cfset response = variables.gateway.void(transactionid=response.getTransactionID(), options=options) />
 		<cfset assertTrue(NOT response.getSuccess(), "The void of an authorization did not succeed") />
 	</cffunction>
 
-	<cffunction name="testPurchaseThenCredit" access="public" returntype="void" output="false">
+	<cffunction name="testPurchaseThenCredit" access="public" returntype="void">
 
-		<cfset var money = variables.cfpaymentCore.createMoney(cents=5000) />
+		<cfset var money = variables.core.createMoney(cents=5000) />
 		<cfset var gw = variables.gateway />
 		<cfset var response = "null" />
 		<cfset var options = structNew() />
 		<cfset var account = createValidCard() />
 
-		<cfset response = gw.purchase(money=money, account=account, options=options) />
+		<cfset response = variables.gateway.purchase(money=money, account=account, options=options) />
 		<cfset assertTrue(response.getSuccess(), "The purchase did not succeed") />
 
-		<cfset response = gw.credit(transactionid=response.getTransactionID(), money=money, options=options) />
+		<cfset response = variables.gateway.credit(transactionid=response.getTransactionID(), money=money, options=options) />
 		<cfset assertTrue(response.getSuccess(), "The credit of a purchase did not succeed") />
 	</cffunction>
 
 
 
 	<cffunction name="createValidCard" access="private" returntype="any" output="false">
-		<!--- these values simulate a valid card with matching avs/cvv --->
-		<cfset var account = variables.cfpaymentCore.createCreditCard() />
-		<cfset account.setAccount(4940702861332472) />
-		<cfset account.setMonth(05) />
-		<cfset account.setYear(2019) />
-		<cfset account.setVerificationValue(999) />
-		<cfset account.setFirstName("John") />
-		<cfset account.setLastName("Doe") />
-		<cfset account.setAddress("888") />
-		<cfset account.setPostalCode("77777") />
+		<cfset var account = variables.core.createCreditCard() />
+		<cfset var validCustomer = readProperties("validCustomer") />
+		<cfset var validCard = readProperties("validCard") />
 
+		<cfset account.setAccount(validCard.account) />
+		<cfset account.setMonth(validCard.expMonth) />
+		<cfset account.setYear(validCard.expYear) />
+		<cfset account.setFirstName(validCustomer.firstName) />
+		<cfset account.setLastName(validCustomer.lastName) />
+		<cfset account.setAddress(validCustomer.address) />
+		<cfset account.setPostalCode(validCustomer.postalCode) />
 		<cfreturn account />
 	</cffunction>
 
 	<cffunction name="createInvalidCard" access="private" returntype="any" output="false">
-		<!--- these values simulate a valid card with matching avs/cvv --->
-		<cfset var account = variables.cfpaymentCore.createCreditCard() />
-		<cfset account.setAccount(4100000000000000) />
-		<cfset account.setMonth(10) />
-		<cfset account.setYear(2010) />
-		<cfset account.setVerificationValue(123) />
-		<cfset account.setFirstName("John") />
-		<cfset account.setLastName("Doe") />
-		<cfset account.setAddress("236 N. Santa Cruz") />
-		<cfset account.setPostalCode("95030") />
+		<cfset var account = variables.core.createCreditCard() />
+		<cfset var validCustomer = readProperties("validCustomer") />
+		<cfset var invalidCard = readProperties("invalidCard") />
 
+		<cfset account.setAccount(invalidCard.account) />
+		<cfset account.setMonth(invalidCard.expMonth) />
+		<cfset account.setYear(invalidCard.expYear) />
+		<cfset account.setFirstName(validCustomer.firstName) />
+		<cfset account.setLastName(validCustomer.lastName) />
+		<cfset account.setAddress(validCustomer.address) />
+		<cfset account.setPostalCode(validCustomer.postalCode) />
 		<cfreturn account />
 	</cffunction>
+
+
+	<cffunction name="readProperties" returntype="struct" access="private" output="false">
+		<cfargument name="prefix" type="string" required="false" default="" />
+
+		<cfset var file = variables.configFile />
+		<cfset var properties = structNew() />
+		<cfset var line = "" />
+		<cfset var name = "" />
+
+		<cfif not fileExists(file)>
+			<cfthrow type="FileNotFoundException" message="The properties file (#file#) was not found" />
+		</cfif>
+
+		<cfloop file="#file#" index="line">
+			<cfif reFindNoCase("^[\._a-z0-9]+=", line) eq 1>
+				<cfset name = listFirst(line, "=") />
+				<cfif arguments.prefix neq "">
+					<cfif findNoCase(arguments.prefix & ".", name) eq 1>
+						<cfset properties[listLast(name, ".")] = listRest(line, "=") />
+					</cfif>
+				<cfelse>
+					<cfset properties[name] = listRest(line, "=") />
+				</cfif>
+			</cfif>
+		</cfloop>
+		<cfreturn properties />
+	</cffunction>
+
 
 </cfcomponent>
