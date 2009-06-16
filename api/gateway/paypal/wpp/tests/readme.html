@@ -1,0 +1,84 @@
+<html>
+<head>
+	<title>cfpayment PayPal Website Payments Pro Gateway</title>
+	<style type="text/css">
+		body {
+			margin: 0;
+			padding: 0;
+			font-family: Helvetica, Arial, sans-serif;
+			font-size: 62.5%;
+		}
+	
+		div#page {
+			margin: 1em;
+			font-size: 1.4em;
+			line-height: 1.2em;
+		}
+		
+		ul {
+			margin: 1em 0;
+			padding: 0;
+			list-style: none;
+		}
+		
+		li {
+			margin: 1em;
+		}
+		
+		code {
+			white-space: pre;
+			margin: 0;
+			padding: 0 1em 1em 1em;
+			line-height: 1em;
+			border: 1px solid #666;
+			display: block;
+			overflow: auto;
+		}
+		
+		a {
+			color: #00c;
+			text-decoration: underline;
+		}
+	</style>
+</head>
+<body>
+
+<div id="page">
+<h1>cfpayment PayPal Website Payments Pro Gateway</h1>
+<p>
+	This page contains information on using and testing the two types of <a href="http://cfpayment.riaforge.org/">cfpayment</a> gateways used with PayPal: Name-Value Pair and SOAP. 
+</p>
+	
+<h2>Name-Value Pair API</h2>
+<p>
+	The cfpayment core is created with gateway configuration options like so:
+</p>
+<code>
+config = structNew();
+config.path = "paypal.wpp.NVPGateway";
+config.username = "paypal_99999999_biz_api1.paypal.com";
+config.password= "abc123xyz789";
+config.signature= "AbcDEfgHiJKlMNoPQrstUvWXYz0123456789";
+config.returnURL = "http://localhost/cfpayment/api/gateway/paypal/wpp/tests/NVPGatewayTest.cfc?method=testRemote&method=testCompleteExpressCheckout";
+config.cancelURL = "http://localhost/cfpayment/api/gateway/paypal/wpp/tests/NVPGatewayTest.cfc?method=testRemote&method=testCancelExpressCheckout";
+
+cfpayment = createObject("component", "cfpayment.api.core").init(config=config);
+gateway = cfpayment.getGateway();
+</code>
+
+<h2>SOAP API</h2>
+<p>
+	The PayPal SOAP API support is a big <kbd>TODO</kbd> right now.
+</p>
+
+<h2>Tests</h2>
+
+<p>The <kbd>NVPGatewayTest</kbd> MXUnit Test Case contains many individual tests, however it's best to call the two major test methods directly, as the Express Checkout process has a specific order. Before running the Express Checkout test, login to the <a href="https://developer.paypal.com/">PayPal Sandbox</a>.</p>
+<ul>
+	<li> <a href="NVPGatewayTest.cfc?method=runTestRemote&testMethod=testPurchase">NVPGatewayTest.testPurchase()</a>: Test the PayPal <strong>Direct Payment</strong> functionality of the gateway</li>
+	<li> <a href="NVPGatewayTest.cfc?method=runTestRemote&testMethod=testBeginExpressCheckout">NVPGatewayTest.testBeginExpressCheckout()</a>: Test the PayPal <strong>Express Checkout</strong> process. The test call the PayPal server with the <kbd>SetExpressCheckout</kbd> command. It then forwards the browser to PayPal to authenticate and confirm payment details. The return URL is to the portion of the test class that: 1) gets customer details, and 2) completes the payment.</li>
+</ul>
+</div>
+
+</body>
+</html>
