@@ -35,14 +35,18 @@
 	<cfset variables.cfpayment.GATEWAY_VERSION = "1.0" />
 	<cfset variables.cfpayment.GATEWAY_TEST_URL = "https://api-3t.sandbox.paypal.com/nvp" />
 	<cfset variables.cfpayment.GATEWAY_LIVE_URL = "https://api-3t.paypal.com/nvp" />
+	<cfset variables.cfpayment.GATEWAY_TEST_CLIENT_URL = "https://www.sandbox.paypal.com/cgi-bin/webscr" />
+	<cfset variables.cfpayment.GATEWAY_LIVE_CLIENT_URL = "https://www.paypal.com/cgi-bin/webscr" />
 	<cfset variables.cfpayment.GATEWAY_API_VERSION = "56.0" />
 	<cfset variables.cfpayment.GATEWAY_CREDENTIAL_TYPE = "signature" />
 	<cfset variables.cfpayment.GATEWAY_SIGNATURE = "" />
 	<cfset variables.cfpayment.GATEWAY_CERTIFICATE = "" />
 	<cfset variables.cfpayment.GATEWAY_FRAUD_MANAGEMENT = "off" />
+	<cfset variables.cfpayment.GATEWAY_RETURN_URL = "http://localhost/index.cfm?event=confirmPayPalOrder" />
+	<cfset variables.cfpayment.GATEWAY_CANCEL_URL = "http://localhost/index.cfm?event=cancelPayPalOrder" />
 
 
-	<cffunction name="purchase" output="false" access="public" returntype="any">
+	<cffunction name="purchase" returntype="any" access="public" output="false">
 		<cfargument name="money" type="any" required="true" />
 		<cfargument name="account" type="any" required="true" />
 		<cfargument name="options" type="struct" required="false" default="#structNew()#" />
@@ -52,39 +56,111 @@
 		<cfset post.AMT = arguments.money.getAmount() />
 		<cfset post.CURRENCYCODE = arguments.money.getCurrency() />
 		<cfset post.METHOD = "DoDirectPayment" />
-		<cfset post.PAYMENTACTION = "Sale" />
 		<cfset addCustomer(post=post, account=arguments.account, options=arguments.options) />
 		<cfset addCreditCard(post=post, account=arguments.account) />
+		<cfset addClient(post, arguments.options) />
+
+		<!--- TODO: Support Sale, Authorization, and Order? --->
+		<cfset post.PAYMENTACTION = "Sale" />
 
 		<cfreturn process(payload=post, options=arguments.options) />
 	</cffunction>
 
+	<cffunction name="setExpressCheckout" returntype="any" access="public" output="false">
+		<cfargument name="money" type="any" required="true" />
+		<cfargument name="options" type="struct" required="false" default="#structNew()#" />
 
-	<cffunction name="process" output="false" access="private" returntype="any">
+		<cfset var post = structNew() />
+
+		<cfset post.METHOD = "SetExpressCheckout" />
+		<cfset post.AMT = arguments.money.getAmount() />
+		<cfset post.CURRENCYCODE = arguments.money.getCurrency() />
+		<cfset post.RETURNURL = getReturnURL() />
+		<cfset post.CANCELURL = getCancelURL() />
+
+		<!--- TODO: Support Sale, Authorization, and Order? --->
+		<cfset post.PAYMENTACTION = "Sale" />
+
+		<cfreturn process(payload=post, options=arguments.options) />
+	</cffunction>
+
+	<cffunction name="getExpressCheckoutDetails" returntype="any" access="public" output="false">
+		<cfargument name="options" type="struct" required="false" default="#structNew()#" />
+
+		<cfset var post = structNew() />
+
+		<cfset post.METHOD = "GetExpressCheckoutDetails" />
+		<cfset post.TOKEN = arguments.options.tokenId />
+		<cfreturn process(payload=post, options=arguments.options) />
+	</cffunction>
+
+	<cffunction name="doExpressCheckoutPayment" returntype="any" access="public" output="false">
+		<cfargument name="money" type="any" required="true" />
+		<cfargument name="options" type="struct" required="false" default="#structNew()#" />
+
+		<cfset var post = structNew() />
+
+		<cfset post.METHOD = "DoExpressCheckoutPayment" />
+		<cfset post.AMT = arguments.money.getAmount() />
+		<cfset post.CURRENCYCODE = arguments.money.getCurrency() />
+		<cfset post.TOKEN = arguments.options.tokenId />
+		<cfset post.PAYERID = arguments.options.payerId />
+
+		<!--- TODO: Support Sale, Authorization, and Order? --->
+		<cfset post.PAYMENTACTION = "Sale" />
+
+		<cfreturn process(payload=post, options=arguments.options) />
+	</cffunction>
+
+	<cffunction name="cancelExpressCheckout" returntype="any" access="public" output="false">
+		<cfargument name="options" type="struct" required="false" default="#structNew()#" />
+
+		<cfset var result = structNew() />
+
+		<cfreturn result />
+	</cffunction>
+
+
+	<cffunction name="getExpressCheckoutForward" returntype="string" access="public" output="false">
+		<cfargument name="tokenId" type="string" required="true" />
+
+		<cfset var u = "" />
+
+		<cfif getTestMode()>
+			<cfset u = variables.cfpayment.GATEWAY_TEST_CLIENT_URL />
+		<cfelse>
+			<cfset u = variables.cfpayment.GATEWAY_LIVE_CLIENT_URL />
+		</cfif>
+		<cfset u = u & "?cmd=_express-checkout&token=" & urlEncodedFormat(arguments.tokenId) />
+		<cfreturn u />
+	</cffunction>
+
+
+	<cffunction name="process" returntype="any" access="private" output="false">
 		<cfargument name="payload" type="struct" required="true" />
 		<cfargument name="options" type="struct" required="true" />
 
 		<cfset var response = "null" />			<!--- An instance of cfpayment.api.model.Response --->
 		<cfset var results = structNew() />		<!--- The parsed and decoded fields from PayPal --->
-		<cfset var _payload = arguments.payload />
 
-		<cfset _payload.VERSION = getAPIVersion() />
-		<cfset addClient(_payload, arguments.options) />
-		<cfset addCredentials(_payload) />
-
-		<cfset response = super.process(payload=_payload) />
+		<cfset arguments.payload.VERSION = getAPIVersion() />
+		<cfset addCredentials(arguments.payload) />
+		<cfset response = super.process(payload=arguments.payload) />
 
 		<cfif response.hasError()>
+			<!--- Service did not receive an HTTP response --->
 			<cfset response.setStatus(getService().getStatusUnknown()) />
 		<cfelse>
 			<cfset results = parseResponse(response.getResult()) />
 			<cfset response.setParsedResult(results) />
 
-			<cfif structKeyExists(results, "AVSCODE")>
-				<cfset response.setAVSCode(results.AVSCODE) />
-			</cfif>
-			<cfif structKeyExists(results, "CVV2MATCH")>
-				<cfset response.setCVVCode(results.CVV2MATCH) />
+			<cfif arguments.payload.METHOD eq "DoDirectPayment">
+				<cfif structKeyExists(results, "AVSCODE")>
+					<cfset response.setAVSCode(results.AVSCODE) />
+				</cfif>
+				<cfif structKeyExists(results, "CVV2MATCH")>
+					<cfset response.setCVVCode(results.CVV2MATCH) />
+				</cfif>
 			</cfif>
 
 			<cfif results.ACK eq "Failure">
@@ -94,13 +170,19 @@
 				</cfif>
 			<cfelseif results.ACK eq "Success">
 				<cfset response.setStatus(getService().getStatusSuccessful()) />
-				<cfif _payload.PAYMENTACTION eq "Authorization">
-					<cfif structKeyExists(results, "TRANSACTIONID")>
-						<cfset response.setAuthorization(results.TRANSACTIONID) />
-					</cfif>
-				<cfelseif _payload.PAYMENTACTION eq "Sale">
-					<cfif structKeyExists(results, "TRANSACTIONID")>
-						<cfset response.setTransactionId(results.TRANSACTIONID) />
+
+				<cfif structKeyExists(arguments.payload, "PAYMENTACTION")>
+					<cfif arguments.payload.PAYMENTACTION eq "Authorization">
+						<cfif structKeyExists(results, "TRANSACTIONID")>
+							<cfset response.setAuthorization(results.TRANSACTIONID) />
+						</cfif>
+					<cfelseif arguments.payload.PAYMENTACTION eq "Sale">
+						<cfif structKeyExists(results, "TRANSACTIONID")>
+							<cfset response.setTransactionId(results.TRANSACTIONID) />
+						</cfif>
+						<cfif structKeyExists(results, "TOKEN")>
+							<cfset response.setTokenId(results.TOKEN) />
+						</cfif>
 					</cfif>
 				</cfif>
 			<cfelse>
@@ -176,10 +258,10 @@
 		<cfset p.COUNTRYCODE = a.getCountry() />
 		<cfset p.ZIP = a.getPostalCode() />
 		<cfset p.PHONENUM = a.getPhoneNumber() />
-		<cfif structKeyExists(arguments.options, "email")>
+		<cfif structKeyExists(arguments.options, "email") and arguments.options.email neq "">
 			<cfset p.EMAIL = arguments.options.email />
 		</cfif>
-		<cfif structKeyExists(arguments.options, "company")>
+		<cfif structKeyExists(arguments.options, "company") and arguments.options.company neq "">
 			<cfset p.BUSINESS = arguments.options.company />
 		</cfif>
 	</cffunction>
@@ -251,5 +333,20 @@
 		<cfset variables.cfpayment.GATEWAY_FRAUD_MANAGEMENT = arguments.fraudManagement />
 	</cffunction>
 
+	<cffunction name="getReturnURL" returntype="string" access="public" output="false">
+		<cfreturn variables.cfpayment.GATEWAY_RETURN_URL />
+	</cffunction>
+	<cffunction name="setReturnURL" returntype="void" access="public" output="false">
+		<cfargument name="returnURL" type="string" required="true" />
+		<cfset variables.cfpayment.GATEWAY_RETURN_URL = arguments.returnURL />
+	</cffunction>
+
+	<cffunction name="getCancelURL" returntype="string" access="public" output="false">
+		<cfreturn variables.cfpayment.GATEWAY_CANCEL_URL />
+	</cffunction>
+	<cffunction name="setCancelURL" returntype="void" access="public" output="false">
+		<cfargument name="cancelURL" type="string" required="true" />
+		<cfset variables.cfpayment.GATEWAY_CANCEL_URL = arguments.cancelURL />
+	</cffunction>
 
 </cfcomponent>
