@@ -25,7 +25,10 @@
 		CredentialType:					signature (default) or certificate
 		Signature:						required for signature credential authentication type
 		Certificate:					required for certificate credential authentication type
-		FraudManagement:				off (default) or on
+		FraudManagement:				off (default) or on; Enables robust fraud management, which is an optional PayPal service
+		Masking:						on (default) or off; Masks account data to comply with PCI DSS
+		ReturnURL						The URL that PayPal will use to return the customer
+		CancelURL						The URL that PayPal will use if a customer cancels the order
 
 --->
 <cfcomponent extends="cfpayment.api.gateway.base" hint="Name-Value Pair API Gateway for PayPal Website Payments Pro" output="false">
@@ -41,6 +44,7 @@
 	<cfset variables.cfpayment.GATEWAY_CREDENTIAL_TYPE = "signature" />
 	<cfset variables.cfpayment.GATEWAY_SIGNATURE = "" />
 	<cfset variables.cfpayment.GATEWAY_CERTIFICATE = "" />
+	<cfset variables.cfpayment.GATEWAY_MASKING = "on" />
 	<cfset variables.cfpayment.GATEWAY_FRAUD_MANAGEMENT = "off" />
 	<cfset variables.cfpayment.GATEWAY_RETURN_URL = "http://localhost/index.cfm?event=confirmPayPalOrder" />
 	<cfset variables.cfpayment.GATEWAY_CANCEL_URL = "http://localhost/index.cfm?event=cancelPayPalOrder" />
@@ -140,8 +144,10 @@
 		<cfargument name="payload" type="struct" required="true" />
 		<cfargument name="options" type="struct" required="true" />
 
-		<cfset var response = "null" />			<!--- An instance of cfpayment.api.model.Response --->
-		<cfset var results = structNew() />		<!--- The parsed and decoded fields from PayPal --->
+		<cfset var response = "null" />
+		<cfset var results = structNew() />
+		<cfset var rd = "null" />
+		<cfset var n = "" />
 
 		<cfset arguments.payload.VERSION = getAPIVersion() />
 		<cfset addCredentials(arguments.payload) />
@@ -171,6 +177,9 @@
 			<cfelseif results.ACK eq "Success">
 				<cfset response.setStatus(getService().getStatusSuccessful()) />
 
+
+
+				<!--- Credit Cards --->
 				<cfif structKeyExists(arguments.payload, "PAYMENTACTION")>
 					<cfif arguments.payload.PAYMENTACTION eq "Authorization">
 						<cfif structKeyExists(results, "TRANSACTIONID")>
@@ -188,6 +197,15 @@
 			<cfelse>
 				<cfset response.setStatus(getService().getStatusFailure()) />
 			</cfif>
+		</cfif>
+
+		<!--- Mask the request data --->
+		<cfif getMasking() eq "on">
+			<cfset rd = response.getRequestData() />
+			<cfloop collection="#rd#" item="n">
+				<cfset rd[n] = mask(n, rd[n]) />
+			</cfloop>
+			<cfset response.setRequestData(rd) />
 		</cfif>
 
 		<cfreturn response />
@@ -209,7 +227,11 @@
 			<cfelse>
 				<cfset value = "" />
 			</cfif>
-			<cfset parsed[name] = value />
+			<cfif getMasking() eq "on">
+				<cfset parsed[name] = mask(name, value) />
+			<cfelse>
+				<cfset parsed[name] = value />
+			</cfif>
 		</cfloop>
 		<cfreturn parsed />
 	</cffunction>
@@ -266,7 +288,6 @@
 		</cfif>
 	</cffunction>
 
-
 	<cffunction name="addCreditCard" returntype="void" access="private" output="false">
 		<cfargument name="post" type="struct" required="true" />
 		<cfargument name="account" type="any" required="true" />
@@ -291,6 +312,32 @@
 		<cfset p.CVV2 = a.getVerificationValue() />
 	</cffunction>
 
+	<cffunction name="mask" returntype="string" access="private" output="false">
+		<cfargument name="name" type="string" required="true" />
+		<cfargument name="value" type="string" required="true" />
+
+		<cfscript>
+			var r = "";
+			var n = arguments.name;
+			var v = arguments.value;
+
+			// Don't let any exceptions stop the transaction
+			try {
+				if (compareNoCase("ACCT", n) eq 0) {
+					r = repeatString("X", len(v) - 4) + right(v, 4);
+				} else if (listContainsNoCase("CVV2,PWD,SIGNATURE", n) gt 0) {
+					r = repeatString("X", len(v));
+				} else {
+					r = v;
+				}
+			}
+			catch(Any e) {
+				// Fail without disclosing any data
+				r = "MaskingException on #n#";
+			}
+			return r;
+		</cfscript>
+	</cffunction>
 
 
 	<cffunction name="getCredentialType" returntype="string" access="public" output="false">
@@ -331,6 +378,14 @@
 	<cffunction name="setFraudManagement" returntype="void" access="public" output="false">
 		<cfargument name="fraudManagement" type="string" required="true" />
 		<cfset variables.cfpayment.GATEWAY_FRAUD_MANAGEMENT = arguments.fraudManagement />
+	</cffunction>
+
+	<cffunction name="getMasking" returntype="string" access="public" output="false">
+		<cfreturn variables.cfpayment.GATEWAY_MASKING />
+	</cffunction>
+	<cffunction name="setMasking" returntype="void" access="public" output="false">
+		<cfargument name="masking" type="string" required="true" />
+		<cfset variables.cfpayment.GATEWAY_MASKING = arguments.masking />
 	</cffunction>
 
 	<cffunction name="getReturnURL" returntype="string" access="public" output="false">
