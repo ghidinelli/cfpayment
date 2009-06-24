@@ -20,6 +20,28 @@
 	</cffunction>
 
 
+	<cffunction name="testMoneyInCentsWithUnnamedParameters" access="public" returntype="void" output="false">
+		<!--- trying to test scenario reported by Joe Zack of unnamed parameters causing money not to be set --->
+		<cfset var money = variables.svc.createMoney(1000, "USD") />
+
+		<!--- verify some values --->
+		<cfset assertTrue(isNumeric(money.getCents()), "Cents should be numeric data") />
+		<cfset assertTrue(money.getCents() EQ "1000", "Cents should be an integer and 1000") />
+		<cfset assertTrue(money.getAmount() EQ "10.00", "Amount should divide by fraction of 100") />
+		<cfset assertTrue(money.getCurrency() EQ "USD", "Currency should be USD") />
+
+
+		<!--- try with only one param --->
+		<cfset money = variables.svc.createMoney(1000) />
+
+		<cfset assertTrue(isNumeric(money.getCents()), "Cents should be numeric data") />
+		<cfset assertTrue(money.getCents() EQ "1000", "Cents should be an integer and 1000") />
+		<cfset assertTrue(money.getAmount() EQ "10.00", "Amount should divide by fraction of 100") />
+		<cfset assertTrue(money.getCurrency() EQ "USD", "Currency should be USD") />
+
+	</cffunction>
+
+
 	<cffunction name="testMoneyInCentsViaSetters" access="public" returntype="void" output="false">
 
 		<cfset var money = variables.svc.createMoney() />
