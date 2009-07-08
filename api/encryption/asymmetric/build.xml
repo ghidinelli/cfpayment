@@ -7,7 +7,6 @@
       <property name="src" location="java/"/>
       <property name="dist" location="dist/"/>
       <property name="classes" location="build/"/>
-      <!-- should check this out from http://trac.pukkasoft.com/svn/external/bouncycastle/tags/136 for compiling -->
       <property name="bcjar" location="lib/"/>
 
 
