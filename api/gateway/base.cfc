@@ -85,7 +85,18 @@
 	<cfset variables.cfpayment.MerchantAccount = "" />
 	<cfset variables.cfpayment.Username = "" />
 	<cfset variables.cfpayment.Password = "" />
+	<cfset variables.cfpayment.Timeout = 300 />
 	<cfset variables.cfpayment.TestMode = true />
+	
+	<!--- it's possible access to internal java objects is disabled, so we account for that --->
+	<cftry>
+		<!--- use this java object to get at the current RequestTimeout value for a given request --->
+		<cfset variables.rcMonitor = createObject("java", "coldfusion.runtime.RequestMonitor") />
+		<cfset variables.rcMonitorEnabled = true />
+		<cfcatch type="any">
+			<cfset variables.rcMonitorEnabled = false />
+		</cfcatch>
+	</cftry>
 
 
 	<cffunction name="init" access="public" output="false" returntype="any">
@@ -125,6 +136,14 @@
 		<cfelse>
 			<cfreturn "" />
 		</cfif>
+	</cffunction>
+
+	<cffunction name="getTimeout" access="public" output="false" returntype="numeric">
+		<cfreturn variables.cfpayment.Timeout/>
+	</cffunction>
+	<cffunction name="setTimeout" access="public" output="false" returntype="void">
+		<cfargument name="Timeout" type="numeric" required="true"/>
+		<cfset variables.cfpayment.Timeout = arguments.Timeout/>
 	</cffunction>
 
 	<cffunction name="getTestMode" access="public" output="false" returntype="any" hint="">
@@ -181,7 +200,16 @@
 		<cfreturn variables.cfpayment.GATEWAYID />
 	</cffunction>
 
-
+	<!--- the current request timeout allows us to intelligently modify the overall page timeout based 
+		  upon whatever the current page context or configured timeout dictate.  It's possible to have
+		  acces to internal Java components disabled so we take that into account here. --->
+	<cffunction name="getCurrentRequestTimeout" output="false" access="private" returntype="numeric">
+		<cfif variables.rcMonitorEnabled>
+			<cfreturn variables.rcMonitor.getRequestTimeout() />
+		<cfelse>
+			<cfreturn 0 />
+		</cfif>
+	</cffunction>
 
 	<!--- manage transport and network/connection error handling; all gateways should send HTTP requests through this method --->
 	<cffunction name="process" output="false" access="package" returntype="any" hint="Robust HTTP get/post mechanism with error handling">
@@ -192,7 +220,6 @@
 		<cfset var response = getService().createResponse() />
 		<cfset var CFHTTP = "" />
 		<cfset var key = "" />
-		<cfset var timeout = 300 />
 		<cfset var status = "" />
 		<cfset var paramType = "" />
 		<cfset var RequestData = "" />
@@ -211,7 +238,7 @@
 		<cfset response.setTest(getTestMode()) />
 
 		<!--- enable a little extra time past the CFHTTP timeout so error handlers can run --->
-		<cfsetting requesttimeout="#timeout + 15#" />
+		<cfsetting requesttimeout="#max(getCurrentRequestTimeout(), getTimeout()) + 10#" />
 
 		<cfif ucase(arguments.method) EQ "GET">
 			<cfset paramType = "url" />
@@ -226,7 +253,7 @@
 			<cfset response.setStatus(getService().getStatusPending()) />
 
 			<!--- send request --->
-			<cfhttp url="#getGatewayURL(argumentCollection = arguments)#" method="#arguments.method#" timeout="#timeout#" throwonerror="yes">
+			<cfhttp url="#getGatewayURL(argumentCollection = arguments)#" method="#arguments.method#" timeout="#getTimeout()#" throwonerror="yes">
 				<cfloop collection="#arguments.payload#" item="key">
 					<!--- TODO: how do we support raw XML post (type=xml, supported back to CF 6.1) here?  Do any gateways use this? --->
 					<cfif isSimpleValue(arguments.payload[key])>
