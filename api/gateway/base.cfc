@@ -238,7 +238,7 @@
 		<cfset response.setTest(getTestMode()) />
 
 		<!--- enable a little extra time past the CFHTTP timeout so error handlers can run --->
-		<cfsetting requesttimeout="#max(getCurrentRequestTimeout(), getTimeout()) + 10#" />
+		<cfsetting requesttimeout="#max(getCurrentRequestTimeout(), getTimeout() + 10)#" />
 
 		<cfif ucase(arguments.method) EQ "GET">
 			<cfset paramType = "url" />
