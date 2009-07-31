@@ -124,7 +124,7 @@
 
 	
 		<!--- braintree requires lower case parameters (per Katrina in support on 3/25/09), so force case --->
-		<cfloop collection="p" item="ii">
+		<cfloop collection="#p#" item="ii">
 			<cfset p[lcase(ii)] = p[ii] />
 		</cfloop>
 
