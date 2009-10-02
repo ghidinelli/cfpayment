@@ -214,7 +214,8 @@
 	<!--- manage transport and network/connection error handling; all gateways should send HTTP requests through this method --->
 	<cffunction name="process" output="false" access="package" returntype="any" hint="Robust HTTP get/post mechanism with error handling">
 		<cfargument name="method" type="any" required="false" default="post" />
-		<cfargument name="payload" type="struct" required="true" />
+		<cfargument name="payload" type="any" required="true" /><!--- can be xml or a struct of key-value pairs --->
+		<cfargument name="headers" type="struct" required="false" default="#structNew()#" />
 
 		<!--- prepare response before attempting to send over wire --->
 		<cfset var response = getService().createResponse() />
@@ -245,7 +246,7 @@
 		<cfelseif ucase(arguments.method) EQ "POST">
 			<cfset paramType = "formfield" />
 		<cfelse>
-			<cfthrow message="Invalid Method" type="cfpayment.InvalidParameter.Method">
+			<cfthrow message="Invalid Method" type="cfpayment.InvalidParameter.Method" />
 		</cfif>
 
 		<cftry>
@@ -254,28 +255,45 @@
 
 			<!--- send request --->
 			<cfhttp url="#getGatewayURL(argumentCollection = arguments)#" method="#arguments.method#" timeout="#getTimeout()#" throwonerror="yes">
-				<cfloop collection="#arguments.payload#" item="key">
-					<!--- TODO: how do we support raw XML post (type=xml, supported back to CF 6.1) here?  Do any gateways use this? --->
-					<cfif isSimpleValue(arguments.payload[key])>
-						<cfhttpparam name="#key#" value="#arguments.payload[key]#" type="#paramType#" />
-					<cfelseif isStruct(arguments.payload[key])>
-						<!--- loop over structure (check for _keylist to use a pre-determined output order) --->
-						<cfif structKeyExists(arguments.payload[key], "_keylist")>
-							<cfset keylist=arguments.payload[key]._keylist />
-						<cfelse>
-							<cfset keylist=StructKeyList(arguments.payload[key]) />
-						</cfif>
-						<cfloop list="#keylist#" index="skey">
-							<cfif ucase(skey) NEQ "_KEYLIST">
-								<cfhttpparam name="#skey#" value="#arguments.payload[key][skey]#" type="#paramType#" />
-							</cfif>
-						</cfloop>
-					<cfelse>
-						<cfset response.setMessage("Invalid data type for #key#") />
-						<cfset response.setStatus(getService().getStatusFailure()) />
-						<cfreturn response />
-					</cfif>
+				<!--- pass along any extra headers, like Accept or Authorization or Content-Type --->
+				<cfloop collection="#arguments.headers#" item="key">
+					<cfhttpparam name="#key#" value="#arguments.headers[key]#" type="header" />
 				</cfloop>
+				
+				<cfif isStruct(arguments.payload)>
+				
+					<cfloop collection="#arguments.payload#" item="key">
+						<cfif isSimpleValue(arguments.payload[key])>
+							<cfhttpparam name="#key#" value="#arguments.payload[key]#" type="#paramType#" />
+						<cfelseif isStruct(arguments.payload[key])>
+							<!--- loop over structure (check for _keylist to use a pre-determined output order) --->
+							<cfif structKeyExists(arguments.payload[key], "_keylist")>
+								<cfset keylist = arguments.payload[key]._keylist />
+							<cfelse>
+								<cfset keylist = structKeyList(arguments.payload[key]) />
+							</cfif>
+							<cfloop list="#keylist#" index="skey">
+								<cfif ucase(skey) NEQ "_KEYLIST">
+									<cfhttpparam name="#skey#" value="#arguments.payload[key][skey]#" type="#paramType#" />
+								</cfif>
+							</cfloop>
+						<cfelse>
+							<cfset response.setMessage("Invalid data type for #key#") />
+							<cfset response.setStatus(getService().getStatusFailure()) />
+							<cfreturn response />
+						</cfif>
+					</cfloop>
+					
+				<cfelseif isSimpleValue(arguments.payload)>
+
+					<!--- some services may need a Content-Type header of application/xml, pass it in as part of the headers array instead --->
+					<cfhttpparam value="#arguments.payload#" type="body" />
+
+				<cfelse>
+
+					<cfthrow message="The payload must be either XML/JSON/string or a struct" type="cfpayment.InvalidParameter.Payload" />
+
+				</cfif>
 			</cfhttp>
 
 			<!--- begin result handling --->
@@ -376,11 +394,11 @@
 		  PRIVATE HELPER METHODS FOR DEVELOPERS
 
 		  ------------------------------------------------------------------------- --->
-	<cffunction name="GetOption" output="false" access="private" returntype="any" hint="">
-		<cfargument name="Options" type="any" required="true"/>
-		<cfargument name="Key" type="any" required="true"/>
-		<cfargument name="ErrorIfNotFound" type="boolean" default="false"/>
-		<cfif isStruct(arguments.Options) and StructKeyExists(arguments.Options, arguments.Key)>
+	<cffunction name="getOption" output="false" access="private" returntype="any" hint="">
+		<cfargument name="Options" type="any" required="true" />
+		<cfargument name="Key" type="any" required="true" />
+		<cfargument name="ErrorIfNotFound" type="boolean" default="false" />
+		<cfif isStruct(arguments.Options) and structKeyExists(arguments.Options, arguments.Key)>
 			<cfreturn arguments.Options[arguments.Key] />
 		<cfelse>
 			<cfif arguments.ErrorIfNotFound>
