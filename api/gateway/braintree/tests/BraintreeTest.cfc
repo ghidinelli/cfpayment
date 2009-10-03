@@ -94,6 +94,51 @@
 	</cffunction>
 
 
+	<cffunction name="testValidate" access="public" returntype="void" output="false">
+	
+		<cfset var money = variables.svc.createMoney(5000) /><!--- in cents, $50.00 --->
+		<cfset var response = "" />
+		<cfset var options = structNew() />
+		
+		<cfset response = gw.validate(money = money, account = createValidCard(), options = options) />
+		<cfset assertTrue(response.getSuccess(), "The authorization did not succeed") />
+		<cfset assertTrue(response.getAVSCode() EQ "Y", "Exact match (street + zip) should be found") />
+
+		<!--- this will be rejected by gateway because the card number is not valid --->
+		<cfset response = gw.validate(money = money, account = createInvalidCard(), options = options) />
+		<cfset assertTrue(NOT response.getSuccess(), "The invalid card validation did succeed") />
+
+		<cfset response = gw.validate(money = money, account = createValidCardWithoutCVV(), options = options) />
+		<cfset assertTrue(response.getSuccess(), "The card without cvv validation did not succeed") />
+		<cfset assertTrue(response.getCVVCode() EQ "", "No CVV was passed so no answer should be provided but was: '#response.getCVVCode()#'") />
+
+		<cfset response = gw.validate(money = money, account = createValidCardWithBadCVV(), options = options) />
+		<cfset assertTrue(response.getSuccess(), "The card with bad cvv validation did not succeed") />
+		<cfset assertTrue(response.getCVVCode() EQ "N", "Bad CVV was passed so non-matching answer should be provided but was: '#response.getCVVCode()#'") />
+
+		<cfset response = gw.validate(money = money, account = createValidCardWithoutStreetMatch(), options = options) />
+		<cfset assertTrue(response.getSuccess(), "The card without street match validation did not succeed") />
+		<cfset assertTrue(response.getAVSCode() EQ "Z", "AVS Zip match only should be found") />
+
+		<cfset response = gw.validate(money = money, account = createValidCardWithoutZipMatch(), options = options) />
+		<cfset assertTrue(response.getSuccess(), "The card without zip match validation did not succeed") />
+		<cfset assertTrue(response.getAVSCode() EQ "A", "AVS Street match only should be found") />
+
+	</cffunction>
+
+
+	<cffunction name="testValidateFailsEFT" access="public" returntype="void" output="false" mxunit:expectedException="cfpayment.MethodNotImplemented">
+	
+		<cfset var money = variables.svc.createMoney(5000) /><!--- in cents, $50.00 --->
+		<cfset var response = "" />
+		<cfset var options = structNew() />
+		
+		<!--- test the validate method for EFT - should fail --->
+		<cfset response = gw.validate(money = money, account = createValidEFT(), options = options) />
+
+	</cffunction>
+
+
 	<cffunction name="testAuthorizeOnly" access="public" returntype="void" output="false">
 	
 		<cfset var money = variables.svc.createMoney(5000) /><!--- in cents, $50.00 --->
@@ -135,6 +180,18 @@
 		<cfset assertTrue(response.getSuccess(), "The authorization did not succeed") />
 		<cfset debug(response.getAVSMessage()) />
 		<cfset assertTrue(response.getAVSCode() EQ "A", "AVS Street match only should be found") />
+
+	</cffunction>
+
+
+	<cffunction name="testAuthorizeFailsEFT" access="public" returntype="void" output="false" mxunit:expectedException="cfpayment.MethodNotImplemented">
+	
+		<cfset var money = variables.svc.createMoney(5000) /><!--- in cents, $50.00 --->
+		<cfset var response = "" />
+		<cfset var options = structNew() />
+		
+		<!--- test the authorize method for EFT - should fail --->
+		<cfset response = gw.authorize(money = money, account = createValidEFT(), options = options) />
 
 	</cffunction>
 
