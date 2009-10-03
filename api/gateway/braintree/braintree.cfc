@@ -301,6 +301,39 @@
 	</cffunction>	
 	
 
+	<cffunction name="validate" output="false" access="public" returntype="any" hint="Validate (only) a credit card without incurring Visa/MC network abuse fees">
+		<cfargument name="money" type="any" required="true" />
+		<cfargument name="account" type="any" required="true" />
+		<cfargument name="options" type="struct" required="false" default="#structNew()#" />
+
+		<cfset var post = structNew() />
+		
+		<!--- set general values --->
+		<cfset post["amount"] = "0.00" />
+		<cfset post["type"] = "validate" />
+
+
+		<cfswitch expression="#lcase(listLast(getMetaData(arguments.account).fullname, "."))#">
+			<cfcase value="creditcard">
+				<!--- copy in name and customer details --->
+				<cfset post = addCustomer(post = post, account = arguments.account) />
+				<cfset post = addCreditCard(post = post, account = arguments.account, options = arguments.options) />
+			</cfcase>
+			<cfcase value="eft">
+				<cfthrow message="Validate not implemented for E-checks; use purchase instead." type="cfpayment.MethodNotImplemented" />
+			</cfcase>
+			<cfcase value="token">
+				<cfthrow message="Validate not implemented for vault tokens; use authorize instead." type="cfpayment.MethodNotImplemented" />
+			</cfcase>
+			<cfdefaultcase>
+				<cfthrow type="cfpayment.Invalid.AccountType" message="The account type #lcase(listLast(getMetaData(arguments.account).fullname, "."))# is not supported by this gateway." />
+			</cfdefaultcase>
+		</cfswitch>
+
+		<cfreturn process(payload = post, options = options) />
+	</cffunction>	
+	
+
 	<cffunction name="capture" output="false" access="public" returntype="any" hint="Add a previous authorization to be settled">
 		<cfargument name="money" type="any" required="true" />
 		<cfargument name="authorization" type="any" required="true" />
