@@ -302,7 +302,7 @@
 				<cfset response.setResult(CFHTTP.fileContent) />
 			<cfelse>
 				<!--- an unknown failure here where the response doesn't exist somehow or is malformed --->
-				<cfset response.setStatus(getStatusUnknown()) />
+				<cfset response.setStatus(getService().getStatusUnknown()) />
 			</cfif>
 
 
