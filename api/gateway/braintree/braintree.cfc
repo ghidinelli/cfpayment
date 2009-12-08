@@ -588,4 +588,113 @@
 	</cffunction>
 
 
+	<cffunction name="getResponseFromStatus" output="false" access="public" returntype="any" hint="Converts previous transaction statuses into regular response as returned from purchase()">
+
+		<cfset var status = status(argumentCollection = arguments) />
+		<cfset var arrResponse = arrayNew(1) />
+		<cfset var response = getService().createResponse() />
+		<cfset var xml = status.getParsedResult() />
+		<cfset var results = "" />
+		<cfset var ii = "" />
+		<cfset var len = "" />
+		
+		<!--- we do some meta-checks for gateway-level errors (as opposed to auth/decline errors) --->
+		<cfif status.hasError()>
+		
+			<!--- we don't return the errorneous status response because it might be interpreted as the original 
+				  transaction we're trying to report on (which may have been successful for all we know at this stage); instead throw an error --->
+			<cfthrow type="cfpayment.Gateway.Error" message="Status Check Failed" detail="Failed to obtain the original transaction details" />
+
+		<!--- now populate response with results of status query --->
+		<cfelseif isXML(xml) AND arrayLen(xml.xmlRoot.xmlChildren) GT 0>
+		
+			<!--- 99% of time, this will be just a single transaction record but we support n --->
+			<cfset len = arrayLen(xml.xmlRoot.xmlChildren) />
+			
+			<cfloop from="1" to="#len#" index="ii">
+			
+				<!--- this gives us a base of the "transaction" node so everything is right below it --->
+				<cfset results = xml.xmlRoot.xmlChildren[ii] />
+				<cfset response = getService().createResponse() />
+
+				<!--- store parsed result --->
+				<cfset response.setParsedResult(status.getParsedResult()) />
+						
+				<!--- check returned XML for success/failure --->
+				<cfif structKeyExists(results, "error_response")>
+					<cfset response.setStatus(getService().getStatusFailure()) />
+				<cfelse>
+					<cfset response.setStatus(getService().getStatusSuccessful()) />
+				</cfif>
+						
+		
+				<!--- handle common response fields --->
+				<cfif structKeyExists(results, "action")>
+				
+					<cfif structKeyExists(results.action, "response_text")>
+						<cfset response.setMessage(results.action.response_text.xmlText) />
+					</cfif>
+	
+					<!--- see if the response was successful --->
+					<cfif structKeyExists(results.action, "success")>
+					
+						<cfif results.action.success.xmlText EQ "1">
+			
+							<cfset response.setStatus(getService().getStatusSuccessful()) />
+				
+						<cfelseif results.action.success.xmlText EQ "0">
+				
+							<cfset response.setStatus(getService().getStatusDeclined()) />
+				
+						<cfelse>
+							
+							<!--- only other known state is 3 meaning, "error in transaction data or system error" --->
+							<cfset response.setStatus(getService().getStatusFailure()) />
+							
+						</cfif>
+						
+					</cfif>
+	
+				</cfif>
+				
+				<cfif structKeyExists(results, "transaction_id")>
+					<cfset response.setTransactionID(results.transaction_id.xmlText) />
+				</cfif>
+				<cfif structKeyExists(results, "authorization_code")>
+					<cfset response.setAuthorization(results.authorization_code.xmlText) />
+				</cfif>
+				<cfif structKeyExists(results, "customer_vault_id")>
+					<cfset response.setTokenID(results.customer_vault_id.xmlText) />
+				</cfif>
+				
+				<!--- handle common "success" fields --->
+				<cfif structKeyExists(results, "avs_response")>
+					<cfset response.setAVSCode(results.avs_response.xmlText) />
+				</cfif>
+				<cfif structKeyExists(results, "csc_response")>
+					<cfset response.setCVVCode(results.csc_response.xmlText) />
+				</cfif>				
+			
+				<!--- append to array --->
+				<cfset arrayAppend(arrResponse, response) />
+				
+			</cfloop>
+		
+		<cfelseif arrayLen(xml.xmlRoot.xmlChildren) EQ 0>
+
+			<!--- payment not found, return the blank response object set as unprocessed --->
+			<cfset arrayAppend(arrResponse, response) />
+					
+		<cfelse>
+		
+			<!--- something bad happened here --->
+			<cfset response.setStatus(getService().getStatusUnknown()) />
+			<cfset arrayAppend(arrResponse, response) />
+
+		</cfif>
+	
+		<cfreturn arrResponse />
+		
+	</cffunction>
+
 </cfcomponent>
