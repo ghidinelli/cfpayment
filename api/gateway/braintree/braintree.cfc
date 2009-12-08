@@ -70,7 +70,7 @@
 		<cfset var results = structNew() />
 		<cfset var pairs = "" />
 		<cfset var ii = "" />
-		<cfset p = arguments.payload /><!--- shortcut (by reference) --->
+		<cfset var p = arguments.payload /><!--- shortcut (by reference) --->
 
 
 		<!--- create structure of URL parameters; swap in test parameters if necessary --->
@@ -617,8 +617,8 @@
 				<cfset results = xml.xmlRoot.xmlChildren[ii] />
 				<cfset response = getService().createResponse() />
 
-				<!--- store parsed result --->
-				<cfset response.setParsedResult(status.getParsedResult()) />
+				<!--- store (complete) parsed result for this transaction --->
+				<cfset response.setParsedResult(results) />
 						
 				<!--- check returned XML for success/failure --->
 				<cfif structKeyExists(results, "error_response")>
