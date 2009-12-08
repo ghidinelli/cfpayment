@@ -21,7 +21,6 @@
 
 	<cffunction name="testCoreService" access="public" returntype="void" output="false">
 	
-		<cfset assertTrue(true, "Verify instantiation works") />
 		<cfset assertTrue(isObject(variables.svc.createCreditCard()), "Credit card fails") />
 		<cfset assertTrue(isObject(variables.svc.createEFT()), "EFT fails") />
 		<cfset assertTrue(isObject(variables.svc.getGateway()), "Gateway failed") />
@@ -34,20 +33,11 @@
 
 	<cffunction name="testBogusGateway" access="public" returntype="void" output="false">
 	
-		<cfset var cc = variables.svc.createCreditCard() />
+		<cfset var cc = getValidCreditCard() />
 		<cfset var gw = variables.svc.getGateway() />
 		<cfset var money = variables.svc.createMoney(5000) /><!--- in cents, $50.00 --->
 		<cfset var response = "" />
 		<cfset var options = structNew() />
-		
-		<cfset cc.setAccount(5454545454545454) />
-		<cfset cc.setMonth(12) />
-		<cfset cc.setYear(year(now())+1) />
-		<cfset cc.setVerificationValue(123) />
-		<cfset cc.setFirstName("John") />
-		<cfset cc.setLastName("Doe") />
-		<cfset cc.setAddress("236 N. Santa Cruz Ave") />
-		<cfset cc.setPostalCode("95030") />
 		
 		<!--- verify this is a legit CC --->
 		<cfset assertTrue(arrayLen(cc.validate()) EQ 0) />
@@ -88,5 +78,22 @@
 		<cfset debug("Gateway ID: #variables.svc.getGateway().getGatewayID()#") />
 
 	</cffunction>
+
+
+	<cffunction name="getValidCreditCard" output="false" access="private" returntype="any">
+		<cfset var cc = variables.svc.createCreditCard() />
+		
+		<cfset cc.setAccount(5454545454545454) />
+		<cfset cc.setMonth(12) />
+		<cfset cc.setYear(year(now())+1) />
+		<cfset cc.setVerificationValue(123) />
+		<cfset cc.setFirstName("John") />
+		<cfset cc.setLastName("Doe") />
+		<cfset cc.setAddress("236 N. Santa Cruz Ave") />
+		<cfset cc.setPostalCode("95030") />
+		
+		<cfreturn cc />
+	</cffunction>
+
 
 </cfcomponent>
