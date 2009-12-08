@@ -139,11 +139,11 @@
 	</cffunction>
 
 	<cffunction name="getTimeout" access="public" output="false" returntype="numeric">
-		<cfreturn variables.cfpayment.Timeout/>
+		<cfreturn variables.cfpayment.Timeout />
 	</cffunction>
 	<cffunction name="setTimeout" access="public" output="false" returntype="void">
-		<cfargument name="Timeout" type="numeric" required="true"/>
-		<cfset variables.cfpayment.Timeout = arguments.Timeout/>
+		<cfargument name="Timeout" type="numeric" required="true" />
+		<cfset variables.cfpayment.Timeout = arguments.Timeout />
 	</cffunction>
 
 	<cffunction name="getTestMode" access="public" output="false" returntype="any" hint="">
@@ -213,19 +213,16 @@
 
 	<!--- manage transport and network/connection error handling; all gateways should send HTTP requests through this method --->
 	<cffunction name="process" output="false" access="package" returntype="any" hint="Robust HTTP get/post mechanism with error handling">
-		<cfargument name="method" type="any" required="false" default="post" />
+		<cfargument name="method" type="string" required="false" default="post" />
 		<cfargument name="payload" type="any" required="true" /><!--- can be xml or a struct of key-value pairs --->
-		<cfargument name="headers" type="struct" required="false" default="#structNew()#" />
+		<cfargument name="headers" type="struct" required="false" />
 
 		<!--- prepare response before attempting to send over wire --->
 		<cfset var response = getService().createResponse() />
 		<cfset var CFHTTP = "" />
-		<cfset var key = "" />
 		<cfset var status = "" />
 		<cfset var paramType = "" />
 		<cfset var RequestData = "" />
-		<cfset var skey = "" />
-		<cfset var keylist = "" />
 
 		<!--- TODO: NOTE: THIS INTERNAL DATA REFERENCE MAY GO AWAY, DO NOT RELY UPON IT!!! --->
 		<!--- store payload for reference --->
@@ -241,60 +238,13 @@
 		<!--- enable a little extra time past the CFHTTP timeout so error handlers can run --->
 		<cfsetting requesttimeout="#max(getCurrentRequestTimeout(), getTimeout() + 10)#" />
 
-		<cfif ucase(arguments.method) EQ "GET">
-			<cfset paramType = "url" />
-		<cfelseif ucase(arguments.method) EQ "POST">
-			<cfset paramType = "formfield" />
-		<cfelse>
-			<cfthrow message="Invalid Method" type="cfpayment.InvalidParameter.Method" />
-		</cfif>
-
 		<cftry>
 			<!--- change status to pending --->
 			<cfset response.setStatus(getService().getStatusPending()) />
 
-			<!--- send request --->
-			<cfhttp url="#getGatewayURL(argumentCollection = arguments)#" method="#arguments.method#" timeout="#getTimeout()#" throwonerror="yes">
-				<!--- pass along any extra headers, like Accept or Authorization or Content-Type --->
-				<cfloop collection="#arguments.headers#" item="key">
-					<cfhttpparam name="#key#" value="#arguments.headers[key]#" type="header" />
-				</cfloop>
-				
-				<cfif isStruct(arguments.payload)>
-				
-					<cfloop collection="#arguments.payload#" item="key">
-						<cfif isSimpleValue(arguments.payload[key])>
-							<cfhttpparam name="#key#" value="#arguments.payload[key]#" type="#paramType#" />
-						<cfelseif isStruct(arguments.payload[key])>
-							<!--- loop over structure (check for _keylist to use a pre-determined output order) --->
-							<cfif structKeyExists(arguments.payload[key], "_keylist")>
-								<cfset keylist = arguments.payload[key]._keylist />
-							<cfelse>
-								<cfset keylist = structKeyList(arguments.payload[key]) />
-							</cfif>
-							<cfloop list="#keylist#" index="skey">
-								<cfif ucase(skey) NEQ "_KEYLIST">
-									<cfhttpparam name="#skey#" value="#arguments.payload[key][skey]#" type="#paramType#" />
-								</cfif>
-							</cfloop>
-						<cfelse>
-							<cfset response.setMessage("Invalid data type for #key#") />
-							<cfset response.setStatus(getService().getStatusFailure()) />
-							<cfreturn response />
-						</cfif>
-					</cfloop>
-					
-				<cfelseif isSimpleValue(arguments.payload)>
-
-					<!--- some services may need a Content-Type header of application/xml, pass it in as part of the headers array instead --->
-					<cfhttpparam value="#arguments.payload#" type="body" />
-
-				<cfelse>
-
-					<cfthrow message="The payload must be either XML/JSON/string or a struct" type="cfpayment.InvalidParameter.Payload" />
-
-				</cfif>
-			</cfhttp>
+			<cfset CFHTTP = doHttpCall(url = getGatewayURL(argumentCollection = arguments)
+										,timeout = getTimeout()
+										,argumentCollection = arguments) />
 
 			<!--- begin result handling --->
 			<cfif isDefined("CFHTTP") AND isStruct(CFHTTP) AND structKeyExists(CFHTTP, "fileContent")>
@@ -340,6 +290,12 @@
 				coldfusion.runtime.RequestTimedOutException - i know this works, tested against itransact
 			--->
 
+			<!--- implementation exceptions, we rethrow here to break the call as this may happen during development --->
+			<cfcatch type="cfpayment">
+				<cfrethrow />
+			</cfcatch>
+
+			<!--- runtime exceptions; we set status and return --->
 			<cfcatch type="COM.Allaire.ColdFusion.HTTPFailure">
 				<!--- "Connection Failure" - ColdFusion wasn't able to connect successfully.  This can be an expired, not legit or self-signed SSL cert. --->
 				<cfset response.setMessage("Gateway was not successfully reached and the transaction was not processed (100)") />
@@ -394,6 +350,75 @@
 		  PRIVATE HELPER METHODS FOR DEVELOPERS
 
 		  ------------------------------------------------------------------------- --->
+	<cffunction name="doHttpCall" access="private" hint="wrapper around the http call - improves testing" returntype="struct">
+		<cfargument name="url" type="string" required="true" hint="URL to get/post" />
+		<cfargument name="method" type="string" required="false" hint="the http request method. use 'get' or 'post'" default="get" />
+		<cfargument name="timeout" type="numeric" required="true" />
+		<cfargument name="headers" type="struct" required="false" default="#structNew()#" />
+		<cfargument name="payload" type="struct" required="false" default="#structNew()#" />
+
+		<cfset var CFHTTP = "" />
+		<cfset var key = "" />
+		<cfset var keylist = "" />
+		<cfset var skey = "" />
+		<cfset var paramType = "" />
+
+		<cfif ucase(arguments.method) EQ "GET">
+			<cfset paramType = "url" />
+		<cfelseif ucase(arguments.method) EQ "POST">
+			<cfset paramType = "formfield" />
+		<cfelse>
+			<cfthrow message="Invalid Method" type="cfpayment.InvalidParameter.Method" />
+		</cfif>
+
+		<!--- send request --->
+		<cfhttp url="#arguments.url#" method="#arguments.method#" timeout="#arguments.timeout#" throwonerror="yes">
+			<!--- pass along any extra headers, like Accept or Authorization or Content-Type --->
+			<cfloop collection="#arguments.headers#" item="key">
+				<cfhttpparam name="#key#" value="#arguments.headers[key]#" type="header" />
+			</cfloop>
+			
+			<!--- accept nested structures including ordered structs (required for skipjack) --->
+			<cfif isStruct(arguments.payload)>
+			
+				<cfloop collection="#arguments.payload#" item="key">
+					<cfif isSimpleValue(arguments.payload[key])>
+						<!--- most common param is simple value --->
+						<cfhttpparam name="#key#" value="#arguments.payload[key]#" type="#paramType#" />
+					<cfelseif isStruct(arguments.payload[key])>
+						<!--- loop over structure (check for _keylist to use a pre-determined output order) --->
+						<cfif structKeyExists(arguments.payload[key], "_keylist")>
+							<cfset keylist = arguments.payload[key]._keylist />
+						<cfelse>
+							<cfset keylist = structKeyList(arguments.payload[key]) />
+						</cfif>
+						<cfloop list="#keylist#" index="skey">
+							<cfif ucase(skey) NEQ "_KEYLIST">
+								<cfhttpparam name="#skey#" value="#arguments.payload[key][skey]#" type="#paramType#" />
+							</cfif>
+						</cfloop>
+					<cfelse>
+						<cflog file="application" text="throwing error 1" />
+						<cfthrow message="Invalid data type for #key#" detail="The payload must be either XML/JSON/string or a struct" type="cfpayment.InvalidParameter.Payload" />
+					</cfif>
+				</cfloop>
+				
+			<cfelseif isSimpleValue(arguments.payload)>
+
+				<!--- some services may need a Content-Type header of application/xml, pass it in as part of the headers array instead --->
+				<cfhttpparam value="#arguments.payload#" type="body" />
+
+			<cfelse>
+
+				<cflog file="application" text="throwing error 2" />
+				<cfthrow message="The payload must be either XML/JSON/string or a struct" type="cfpayment.InvalidParameter.Payload" />
+
+			</cfif>
+		</cfhttp>
+
+		<cfreturn CFHTTP />
+	</cffunction>
+
 	<cffunction name="getOption" output="false" access="private" returntype="any" hint="">
 		<cfargument name="Options" type="any" required="true" />
 		<cfargument name="Key" type="any" required="true" />
