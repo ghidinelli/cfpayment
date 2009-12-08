@@ -28,7 +28,7 @@
 		<cfset var gw = structNew() />
 
 		<cfscript>  
-			variables.svc = createObject("component", "cfpaymenttests.api.core");
+			variables.svc = createObject("component", "cfpayment.api.core");
 			
 			gw.path = "braintree.braintree";
 			gw.Username = 'demo';
@@ -670,7 +670,7 @@
 	<cffunction name="testReportFirstDirectDeposit" access="public" returntype="void" output="false">
 	
 		<cfset var response = "" />
-		<cfset var transactionId = 1124798756 /><!--- run testPurchase() and grab the ID from there --->
+		<cfset var transactionId = 1146695977  /><!--- run testEFTDirectDeposit() and grab the ID from there --->
 		<cfset var options = { } />
 
 		<!--- get masked details --->
