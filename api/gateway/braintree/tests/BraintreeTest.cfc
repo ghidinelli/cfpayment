@@ -33,6 +33,8 @@
 			gw.path = "braintree.braintree";
 			gw.Username = 'demo';
 			gw.Password = 'password';
+			gw.SecurityKey = 'zjhh9UAS7d4UkBVqa6sagBvpeT733U88';
+			gw.SecurityKeyID = '1084547';
 			gw.TestMode = true;		// defaults to true anyways
 
 			// create gw and get reference			
@@ -748,6 +750,10 @@
 	</cffunction>
 
 
+	<cffunction name="check_braintree_setters" output="false" access="public" returntype="any">
+		<cfset assertTrue(gw.getSecurityKey() EQ 'zjhh9UAS7d4UkBVqa6sagBvpeT733U88', "The security key was not set through the init config object") />
+		<cfset assertTrue(gw.getSecurityKeyID() EQ '1084547', "The security key id was not set through the init config object") />
+	</cffunction>
 
 
 </cfcomponent>
