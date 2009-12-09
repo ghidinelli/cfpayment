@@ -559,6 +559,153 @@
 	</cffunction>	
 --->
 	
+	<cffunction name="testReportFirstDirectDeposit" access="public" returntype="void" output="false">
+	
+		<cfset var response = "" />
+		<cfset var transactionId = 1146695977  /><!--- run testEFTDirectDeposit() and grab the ID from there --->
+		<cfset var options = structNew() />
+
+		<!--- get masked details --->
+		<cfset response = gw.status(transactionId = transactionId, options = options) />
+		<cfset debug(response.getParsedResult()) />
+		<cfset assertTrue(response.getSuccess(), "The status report did not succeed, get a new transaction Id from EFTDirectDeposit?") />
+		<cfset assertTrue(arrayLen(response.getParsedResult().xmlRoot.xmlChildren) GT 0, "No record was returned from gateway, get a new transaction Id from EFTDirectDeposit?") />
+
+	</cffunction>
+
+
+	<cffunction name="testReportFirstVault" access="public" returntype="void" output="false">
+	
+		<cfset var response = "" />
+		<cfset var options = { tokenId = '3E9A2107-1D72-822B-795B7BC564D749BF' } /><!--- the id of our GGC test token --->
+
+		<!--- get masked details --->
+		<cfset response = gw.status(options = options) />
+		<cfset debug(response.getParsedResult()) />
+		<cfset assertTrue(gw.hasTransaction(response.getParsedResult()), "The tokenId should generate a vault record (but may not under demo account which has different permissions)") />
+
+	</cffunction>
+
+
+	<cffunction name="responseFromStatus_success" access="public" returntype="void" output="false">
+	
+		<cfset var response = "" />
+		<cfset var transactionId = 1146421977 /><!--- run testPurchase() and grab the ID from there --->
+		<cfset var options = structNew() />
+
+		<!--- get masked details --->
+		<cfset response = gw.getResponseFromStatus(transactionId = transactionId, options = options) />
+		<cfset assertTrue(isArray(response) AND arrayLen(response) EQ 1, "The result was not an array or had no children") />
+		
+		<cfset response = response[1] />
+		<cfset debug(response.getMemento()) />
+		<cfset assertTrue(response.getStatus() NEQ variables.svc.getStatusUnprocessed(), "Transaction wasn't processed meaning the ID wasn't found at Braintree - re-run purchase() and get a new ID since Braintree cleans out their test db frequently") />
+		<cfset assertTrue(response.hasError() EQ false, "There should not be a transaction error") />
+		<cfset assertTrue(response.getSuccess(), "The (original) transaction should have succeeded but didn't") />
+		<cfset assertTrue(response.getAVSCode() EQ "Y" AND len(response.getAVSMessage()), "AVS should have returned a 'Y' with 888/77777 values passed") />
+
+	</cffunction>
+
+
+	<cffunction name="responseFromStatus_decline" access="public" returntype="void" output="false">
+	
+		<cfset var response = "" />
+		<cfset var transactionId = 1146422020 /><!--- run testPurchase() and grab the ID from there --->
+		<cfset var options = structNew() />
+
+		<!--- get masked details --->
+		<cfset response = gw.getResponseFromStatus(transactionId = transactionId, options = options) />
+		<cfset assertTrue(isArray(response) AND arrayLen(response) EQ 1, "The result was not an array or had no children") />
+		
+		<cfset response = response[1] />
+		<cfset debug(response.getMemento()) />
+		<cfset assertTrue(response.getStatus() NEQ variables.svc.getStatusUnprocessed(), "Transaction wasn't processed meaning the ID wasn't found at Braintree - re-run purchase() and get a new ID since Braintree cleans out their test db frequently") />
+		<cfset assertTrue(response.hasError() EQ false, "There should not be a transaction error") />
+		<cfset assertTrue(response.getStatus() EQ variables.svc.getStatusDeclined(), "The (original) transaction should have been declined") />
+
+	</cffunction>
+
+
+	<cffunction name="responseFromStatus_error" access="public" returntype="void" output="false" mxunit:expectedException="cfpayment.Gateway.Error">
+	
+		<cfset var response = "" />
+		<cfset var transactionId = 1139955126 /><!--- run testPurchase() and grab the ID from there --->
+		<cfset var options = { } />
+
+		<!--- get masked details --->
+		<cfset gw.setTestMode(false) /><!--- should error out here since this transaction id doesn't exist for this user --->
+		<cfset response = gw.getResponseFromStatus(transactionId = transactionId, options = options) />
+
+		<!--- no assertions, using mxunit:expectedException --->
+
+	</cffunction>
+
+
+	<cffunction name="check_braintree_setters" output="false" access="public" returntype="any">
+		<cfset assertTrue(gw.getSecurityKey() EQ 'zjhh9UAS7d4UkBVqa6sagBvpeT733U88', "The security key was not set through the init config object") />
+		<cfset assertTrue(gw.getSecurityKeyID() EQ '1084547', "The security key id was not set through the init config object") />
+	</cffunction>
+
+
+	<cffunction name="test_date_conversion" output="false" access="public" returntype="void">
+		<cfset var dte = createDateTime(2009, 12, 7, 16, 0, 0) />
+		<cfset var conv = gw.dateToBraintree(dte) />
+		<cfset assertEquals(dte, gw.braintreeToDate(conv), "The converted date didn't match (#dte# != #conv#)") />
+	</cffunction>
+
+
+	<cffunction name="test_hash_compare" output="false" access="public" returntype="void">
+		<cfset var res = "" />
+		
+		<cfset res = gw.verifyHash(orderId = '6BB3F54A-1D72-822B-79A10EF9D945F308'
+									,amount = 2.50
+									,response = '1' <!--- response, NOT responsetext 'SUCCESS' --->
+									,transactionid = '1145735536'
+									,avsresponse = 'Y'
+									,cvvresponse = ''
+									,time = '20091208003338'
+									,hash = '68ef3051c3ffb0c106499ccd87ab5db3') />
+		<cfset assertTrue(res, "The provided hash was a valid transaction and should calculate properly") />
+	
+		<!--- now make it fail --->
+		<cfset res = gw.verifyHash(orderId = '6BB3F54A-1D72-822B-79A10EF9D945F308'
+									,amount = 1.50
+									,response = '1'
+									,transactionid = '1145735536'
+									,avsresponse = 'Y'
+									,cvvresponse = ''
+									,time = '20091208003338'
+									,hash = '68ef3051c3ffb0c106499ccd87ab5db3') />
+		<cfset assertTrue(NOT res, "Changing one character of the input values should break the hash (1.50 instead of 2.50)") />
+
+	</cffunction>
+
+
+	<cffunction name="test_hash_generate" output="false" access="public" returntype="any">
+		<cfset var id = createUUID() />
+		<cfset var notoken = gw.generateHash(orderId = id
+										,amount = 2.50
+										,date = createDateTime(2009, 12, 7, 16, 0, 0)) />
+		<cfset var withtoken = gw.generateHash(orderId = id
+										,amount = 2.50
+										,date = createDateTime(2009, 12, 7, 16, 0, 0)
+										,tokenId = 5023023) />
+										
+		<cfset assertTrue(len(notoken) AND len(withtoken), "Both versions should generate a hash") />
+		<cfset assertTrue(notoken NEQ withtoken, "Hashes should not be equal") />
+		
+		<cfset withtoken = gw.generateHash(orderId = id
+										,amount = 2.50
+										,date = createDateTime(2009, 12, 7, 16, 0, 0)) />
+		<cfset assertTrue(notoken EQ withtoken, "The same inputs should generate the same hash multiple times") />
+	
+	</cffunction>
+
+
+
+
+
+	<!--- PRIVATE HELPERS, MOCKS, ETC --->
 
 	<cffunction name="createValidCard" access="private" returntype="any">
 		<!--- these values simulate a valid card with matching avs/cvv --->
@@ -668,92 +815,5 @@
 		<cfreturn account />	
 	</cffunction>
 	
-
-	<cffunction name="testReportFirstDirectDeposit" access="public" returntype="void" output="false">
-	
-		<cfset var response = "" />
-		<cfset var transactionId = 1146695977  /><!--- run testEFTDirectDeposit() and grab the ID from there --->
-		<cfset var options = { } />
-
-		<!--- get masked details --->
-		<cfset response = gw.status(transactionId = transactionId, options = options) />
-		<cfset debug(response.getParsedResult()) />
-		<cfset assertTrue(response.getSuccess(), "The status report did not succeed") />
-		<cfset assertTrue(arrayLen(response.getParsedResult().xmlRoot.xmlChildren) GT 0, "No record was returned from gateway") />
-
-	</cffunction>
-
-
-	<cffunction name="testReportFirstVault" access="public" returntype="void" output="false">
-	
-		<cfset var response = "" />
-		<cfset var options = { tokenId = '3E9A2107-1D72-822B-795B7BC564D749BF' } /><!--- the id of our GGC test token --->
-
-		<!--- get masked details --->
-		<cfset response = gw.status(options = options) />
-		<cfset debug(response.getParsedResult()) />
-
-	</cffunction>
-
-
-	<cffunction name="responseFromStatus_success" access="public" returntype="void" output="false">
-	
-		<cfset var response = "" />
-		<cfset var transactionId = 1146421977 /><!--- run testPurchase() and grab the ID from there --->
-		<cfset var options = { } />
-
-		<!--- get masked details --->
-		<cfset response = gw.getResponseFromStatus(transactionId = transactionId, options = options) />
-		<cfset assertTrue(isArray(response) AND arrayLen(response) EQ 1, "The result was not an array or had no children") />
-		
-		<cfset response = response[1] />
-		<cfset debug(response.getMemento()) />
-		<cfset assertTrue(response.getStatus() NEQ variables.svc.getStatusUnprocessed(), "Transaction wasn't processed meaning the ID wasn't found at Braintree - re-run purchase() and get a new ID since Braintree cleans out their test db frequently") />
-		<cfset assertTrue(response.hasError() EQ false, "There should not be a transaction error") />
-		<cfset assertTrue(response.getSuccess(), "The (original) transaction should have succeeded but didn't") />
-		<cfset assertTrue(response.getAVSCode() EQ "Y" AND len(response.getAVSMessage()), "AVS should have returned a 'Y' with 888/77777 values passed") />
-
-	</cffunction>
-
-
-	<cffunction name="responseFromStatus_decline" access="public" returntype="void" output="false">
-	
-		<cfset var response = "" />
-		<cfset var transactionId = 1146422020 /><!--- run testPurchase() and grab the ID from there --->
-		<cfset var options = { } />
-
-		<!--- get masked details --->
-		<cfset response = gw.getResponseFromStatus(transactionId = transactionId, options = options) />
-		<cfset assertTrue(isArray(response) AND arrayLen(response) EQ 1, "The result was not an array or had no children") />
-		
-		<cfset response = response[1] />
-		<cfset debug(response.getMemento()) />
-		<cfset assertTrue(response.getStatus() NEQ variables.svc.getStatusUnprocessed(), "Transaction wasn't processed meaning the ID wasn't found at Braintree - re-run purchase() and get a new ID since Braintree cleans out their test db frequently") />
-		<cfset assertTrue(response.hasError() EQ false, "There should not be a transaction error") />
-		<cfset assertTrue(response.getStatus() EQ variables.svc.getStatusDeclined(), "The (original) transaction should have been declined") />
-
-	</cffunction>
-
-
-	<cffunction name="responseFromStatus_error" access="public" returntype="void" output="false" mxunit:expectedException="cfpayment.Gateway.Error">
-	
-		<cfset var response = "" />
-		<cfset var transactionId = 1139955126 /><!--- run testPurchase() and grab the ID from there --->
-		<cfset var options = { } />
-
-		<!--- get masked details --->
-		<cfset gw.setTestMode(false) /><!--- should error out here since this transaction id doesn't exist for this user --->
-		<cfset response = gw.getResponseFromStatus(transactionId = transactionId, options = options) />
-
-		<!--- no assertions, using mxunit:expectedException --->
-
-	</cffunction>
-
-
-	<cffunction name="check_braintree_setters" output="false" access="public" returntype="any">
-		<cfset assertTrue(gw.getSecurityKey() EQ 'zjhh9UAS7d4UkBVqa6sagBvpeT733U88', "The security key was not set through the init config object") />
-		<cfset assertTrue(gw.getSecurityKeyID() EQ '1084547', "The security key id was not set through the init config object") />
-	</cffunction>
-
 
 </cfcomponent>

@@ -60,6 +60,23 @@
 	<cfset variables.braintree["461"] = "Unsupported card type" />
 
 
+	<!--- make a way of setting the key/key id used in hash calculations --->
+	<cffunction name="getSecurityKey" access="public" output="false" returntype="string">
+		<cfreturn variables.SecurityKey />
+	</cffunction>
+	<cffunction name="setSecurityKey" access="public" output="false" returntype="void">
+		<cfargument name="SecurityKey" type="string" required="true" />
+		<cfset variables.SecurityKey = arguments.SecurityKey />
+	</cffunction>
+
+	<cffunction name="getSecurityKeyID" access="public" output="false" returntype="numeric">
+		<cfreturn variables.SecurityKeyID />
+	</cffunction>
+	<cffunction name="setSecurityKeyID" access="public" output="false" returntype="void">
+		<cfargument name="SecurityKeyID" type="numeric" required="true" />
+		<cfset variables.SecurityKeyID = arguments.SecurityKeyID />
+	</cffunction>
+
 
 	<!--- process wrapper with gateway/transaction error handling --->
 	<cffunction name="process" output="false" access="private" returntype="any">
@@ -700,6 +717,114 @@
 	
 		<cfreturn arrResponse />
 		
+	</cffunction>
+
+
+	<!--- HELPER FUNCTIONS TO MAKE LIFE EASIER IN COLDFUSION LAND --->
+	<cffunction name="generateHash" output="false" access="public" returntype="string">
+		<cfargument name="orderId" type="uuid" required="true" />
+		<cfargument name="amount" type="numeric" required="true" />
+		<cfargument name="date" type="date" required="true" hint="A date/time object that is also passed in the form to Braintree; it must be the same value!" />
+		<cfargument name="tokenId" type="numeric" required="false" />
+
+		<cfset var time = dateToBraintree(arguments.date) />		
+		<cfset var key = getSecurityKey() />
+		<cfset var src = "" />
+	
+		<cfif structKeyExists(arguments, "tokenId")>
+			<!--- with vault:	orderid|amount|customer_vault_id|time|Key --->
+			<cfset src = arguments.orderId & "|" & decimalFormat(arguments.amount) & "|" & arguments.tokenId & "|" & time & "|" & key />
+		<cfelse>
+			<!--- no vault:		orderid|amount|time|Key --->
+			<cfset src = arguments.orderId & "|" & decimalFormat(arguments.amount) & "|" & time & "|" & key />
+		</cfif>
+
+		<!--- md5 and return --->
+		<cfreturn hash(src) />	
+	</cffunction>
+	
+	
+	<cffunction name="verifyHash" output="false" access="public" returntype="boolean" hint="Arguments are all as passed back from Braintree; function verifies they are not tampered with by calculating the hash">
+		<cfargument name="orderid" type="string" required="true" />
+		<cfargument name="amount" type="numeric" required="true" />
+		<cfargument name="response" type="string" required="true" />
+		<cfargument name="transactionid" type="string" required="true" />
+		<cfargument name="avsresponse" type="string" required="false" default="" />
+		<cfargument name="cvvresponse" type="string" required="false" default="" />
+		<cfargument name="tokenId" type="string" required="false" default="" />
+		<cfargument name="time" type="string" required="true" />
+		<cfargument name="hash" type="string" required="true" />
+		
+		<!---
+		// with vault:	orderid|amount|response|transactionid|avsresponse|cvvresponse|customer_vault_id|time|key
+		// no vault:	orderid|amount|response|transactionid|avsresponse|cvvresponse|time|key
+		res = hash(orderid & "|" & amount & "|" & response & "|" & transactionid & "|" & avsresponse & "|" & cvvresponse & "|" & time & "|" & vchBraintreeKey);
+		--->
+
+		<cfset var key = getSecurityKey() />
+		<cfset var res = "" />
+		
+		<cfif len(arguments.tokenId) AND isNumeric(arguments.tokenId)>
+			<cfset res = arguments.orderId & "|" & 
+									arguments.amount & "|" &
+									arguments.response & "|" &
+									arguments.transactionid & "|" &
+									arguments.avsresponse & "|" &
+									arguments.cvvresponse & "|" &
+									arguments.tokenId & "|" &
+									arguments.time & "|" &
+									key />
+		<cfelse>
+			<cfset res = arguments.orderId & "|" & 
+									arguments.amount & "|" &
+									arguments.response & "|" &
+									arguments.transactionid & "|" &
+									arguments.avsresponse & "|" &
+									arguments.cvvresponse & "|" &
+									arguments.time & "|" &
+									key />
+		</cfif>
+		
+		<cfreturn lcase(hash(res)) EQ lcase(arguments.hash) />
+	</cffunction>
+
+
+	<cffunction name="dateToBraintree" output="false" access="public" returntype="date" hint="Take a date/time object and convert it to Braintree format in GMT">
+		<cfargument name="date" type="date" required="true" />
+		<cfargument name="localTZ" type="boolean" required="false" default="true" hint="Convert from local server time?" />
+
+		<cfif arguments.localTZ>
+			<cfset arguments.date = dateAdd("s", getTimeZoneInfo().UTCTotalOffset, arguments.date) />
+		</cfif>
+		
+		<cfreturn dateFormat(arguments.date, "yyyymmdd") & timeFormat(arguments.date, "HHmmss") />
+	</cffunction>
+
+
+	<cffunction name="braintreeToDate" output="false" access="public" returntype="date" hint="Take a GMT Braintree timestamp and convert it to a ColdFusion date object">
+		<cfargument name="date" type="string" required="true" hint="string looks like 20090602120000 or yyyymmddhhmmss" />
+		<cfargument name="localTZ" type="boolean" required="false" default="true" hint="Convert to local server time?" />
+
+		<!--- string format is yyyymmddhhmmss --->
+		<cfset var dteGMT = createDateTime(left(arguments.date, 4), mid(arguments.date, 5, 2), mid(arguments.date, 7, 2), mid(arguments.date, 9, 2), mid(arguments.date, 11, 2), mid(arguments.date, 13, 2)) />
+
+		<cfif arguments.localTZ>
+			<cfset dteGMT = dateAdd("s", -getTimeZoneInfo().UTCTotalOffset, dteGMT) />
+		</cfif>
+		
+		<cfreturn dteGMT />
+	</cffunction>
+
+
+	<cffunction name="hasTransaction" output="false" access="public" returntype="boolean" hint="Pass in the results of a status() call and see if a transaction was returned">
+		<cfargument name="status" type="any" required="true" />
+
+		<cfif NOT isXML(arguments.status)>
+			<cfset arguments.status = xmlParse(arguments.status) />
+		</cfif>
+		
+		<!--- XML looks like <nm_response><transaction>...</transaction><transaction>...</transaction></nm_response> --->
+		<cfreturn arrayLen(arguments.status.xmlRoot.xmlChildren) GT 0 />
 	</cffunction>
 
 </cfcomponent>
