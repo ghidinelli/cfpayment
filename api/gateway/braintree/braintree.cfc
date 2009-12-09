@@ -419,6 +419,10 @@
 			<cfset post["transaction_id"] = arguments.transactionid />
 		</cfif>
 
+		<cfif structKeyExists(arguments, "orderid")>
+			<cfset post["order_id"] = arguments.orderid />
+		</cfif>
+
 		<!---
 			email (recommended) 
 			orderid (optional) 
@@ -618,6 +622,7 @@
 				<cfset response = getService().createResponse() />
 
 				<!--- store (complete) parsed result for this transaction --->
+				<cfset response.setResult(toString(results)) />
 				<cfset response.setParsedResult(results) />
 						
 				<!--- check returned XML for success/failure --->
