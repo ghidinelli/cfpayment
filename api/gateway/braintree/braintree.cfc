@@ -740,7 +740,7 @@
 		</cfif>
 
 		<!--- md5 and return --->
-		<cfreturn hash(src) />	
+		<cfreturn lcase(hash(src)) />	
 	</cffunction>
 	
 	
