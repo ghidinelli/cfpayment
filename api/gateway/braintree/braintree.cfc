@@ -62,7 +62,11 @@
 
 	<!--- make a way of setting the key/key id used in hash calculations --->
 	<cffunction name="getSecurityKey" access="public" output="false" returntype="string">
-		<cfreturn variables.SecurityKey />
+		<cfif getTestMode()>
+			<cfreturn "zjhh9UAS7d4UkBVqa6sagBvpeT733U88" />
+		<cfelse>
+			<cfreturn variables.SecurityKey />
+		</cfif>
 	</cffunction>
 	<cffunction name="setSecurityKey" access="public" output="false" returntype="void">
 		<cfargument name="SecurityKey" type="string" required="true" />
@@ -70,7 +74,11 @@
 	</cffunction>
 
 	<cffunction name="getSecurityKeyID" access="public" output="false" returntype="numeric">
-		<cfreturn variables.SecurityKeyID />
+		<cfif getTestMode()>
+			<cfreturn 1084547 />
+		<cfelse>
+			<cfreturn variables.SecurityKeyID />
+		</cfif>
 	</cffunction>
 	<cffunction name="setSecurityKeyID" access="public" output="false" returntype="void">
 		<cfargument name="SecurityKeyID" type="numeric" required="true" />
@@ -723,22 +731,28 @@
 	<!--- HELPER FUNCTIONS TO MAKE LIFE EASIER IN COLDFUSION LAND --->
 	<cffunction name="generateHash" output="false" access="public" returntype="string">
 		<cfargument name="orderId" type="uuid" required="true" />
-		<cfargument name="amount" type="numeric" required="true" />
+		<cfargument name="amount" type="any" required="true" />
 		<cfargument name="date" type="date" required="true" hint="A date/time object that is also passed in the form to Braintree; it must be the same value!" />
 		<cfargument name="tokenId" type="numeric" required="false" />
 
 		<cfset var time = dateToBraintree(arguments.date) />		
 		<cfset var key = getSecurityKey() />
 		<cfset var src = "" />
+		<cfset var amt = "" />
+	
+		<!--- the amount may be blank in certain hashes like for validate or vault storage --->
+		<cfif len(arguments.amount) AND isNumeric(arguments.amount)>
+			<cfset amt = decimalFormat(arguments.amount) />
+		</cfif>
 	
 		<cfif structKeyExists(arguments, "tokenId")>
 			<!--- with vault:	orderid|amount|customer_vault_id|time|Key --->
-			<cfset src = arguments.orderId & "|" & decimalFormat(arguments.amount) & "|" & arguments.tokenId & "|" & time & "|" & key />
+			<cfset src = arguments.orderId & "|" & amt & "|" & arguments.tokenId & "|" & time & "|" & key />
 		<cfelse>
 			<!--- no vault:		orderid|amount|time|Key --->
-			<cfset src = arguments.orderId & "|" & decimalFormat(arguments.amount) & "|" & time & "|" & key />
+			<cfset src = arguments.orderId & "|" & amt & "|" & time & "|" & key />
 		</cfif>
-
+		
 		<!--- md5 and return --->
 		<cfreturn lcase(hash(src)) />	
 	</cffunction>
@@ -746,12 +760,12 @@
 	
 	<cffunction name="verifyHash" output="false" access="public" returntype="boolean" hint="Arguments are all as passed back from Braintree; function verifies they are not tampered with by calculating the hash">
 		<cfargument name="orderid" type="string" required="true" />
-		<cfargument name="amount" type="numeric" required="true" />
+		<cfargument name="amount" type="string" required="true" /><!--- can be blank in case of validate --->
 		<cfargument name="response" type="string" required="true" />
 		<cfargument name="transactionid" type="string" required="true" />
 		<cfargument name="avsresponse" type="string" required="false" default="" />
 		<cfargument name="cvvresponse" type="string" required="false" default="" />
-		<cfargument name="tokenId" type="string" required="false" default="" />
+		<cfargument name="customer_vault_id" type="string" required="false" default="" />
 		<cfargument name="time" type="string" required="true" />
 		<cfargument name="hash" type="string" required="true" />
 		
@@ -764,14 +778,14 @@
 		<cfset var key = getSecurityKey() />
 		<cfset var res = "" />
 		
-		<cfif len(arguments.tokenId) AND isNumeric(arguments.tokenId)>
+		<cfif len(arguments.customer_vault_id) AND isNumeric(arguments.customer_vault_id)>
 			<cfset res = arguments.orderId & "|" & 
 									arguments.amount & "|" &
 									arguments.response & "|" &
 									arguments.transactionid & "|" &
 									arguments.avsresponse & "|" &
 									arguments.cvvresponse & "|" &
-									arguments.tokenId & "|" &
+									arguments.customer_vault_id & "|" &
 									arguments.time & "|" &
 									key />
 		<cfelse>
@@ -784,7 +798,6 @@
 									arguments.time & "|" &
 									key />
 		</cfif>
-		
 		<cfreturn lcase(hash(res)) EQ lcase(arguments.hash) />
 	</cffunction>
 
