@@ -742,7 +742,7 @@
 	
 		<!--- the amount may be blank in certain hashes like for validate or vault storage --->
 		<cfif len(arguments.amount) AND isNumeric(arguments.amount)>
-			<cfset amt = decimalFormat(arguments.amount) />
+			<cfset amt = trim(numberFormat(arguments.amount, '-.__')) />
 		</cfif>
 	
 		<cfif structKeyExists(arguments, "tokenId")>
