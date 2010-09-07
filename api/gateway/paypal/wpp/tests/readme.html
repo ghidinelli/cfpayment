@@ -59,8 +59,8 @@ config.path = "paypal.wpp.NVPGateway";
 config.username = "paypal_99999999_biz_api1.paypal.com";
 config.password= "abc123xyz789";
 config.signature= "AbcDEfgHiJKlMNoPQrstUvWXYz0123456789";
-config.returnURL = "http://localhost/cfpayment/api/gateway/paypal/wpp/tests/NVPGatewayTest.cfc?method=testRemote&method=testCompleteExpressCheckout";
-config.cancelURL = "http://localhost/cfpayment/api/gateway/paypal/wpp/tests/NVPGatewayTest.cfc?method=testRemote&method=testCancelExpressCheckout";
+config.returnURL = "http://localhost/cfpayment/api/gateway/paypal/wpp/tests/NVPGatewayTest.cfc?method=runTestRemote&method=testCompleteExpressCheckout";
+config.cancelURL = "http://localhost/cfpayment/api/gateway/paypal/wpp/tests/NVPGatewayTest.cfc?method=runTestRemote&method=testCancelExpressCheckout";
 
 cfpayment = createObject("component", "cfpayment.api.core").init(config=config);
 gateway = cfpayment.getGateway();

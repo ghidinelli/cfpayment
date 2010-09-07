@@ -158,7 +158,7 @@
 		<cfset var options = structNew() />
 
 		<cfset options.tokenId = URL.token />
-		<cfset assertTrue(tokenId neq "", "The token should be passed in as a URL parameter.") />
+		<cfset assertTrue(options.tokenId neq "", "The token should be passed in as a URL parameter.") />
 		<cfset variables.gateway.cancelExpressCheckout(options) />
 	</cffunction>
 
