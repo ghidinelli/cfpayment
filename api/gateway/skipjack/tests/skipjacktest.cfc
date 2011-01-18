@@ -23,7 +23,7 @@
 	<cfset testdata="">
 	<cfset gwParams = "" />
 
- 	<cffunction name="setUp" returntype="void" access="public">
+	<cffunction name="setUp" returntype="void" access="public" output="false">
 		<cftry>
 			<!--- create a config that is not in svn --->
 			<cfset gwParams = createObject("component", "cfpayment.localconfig.config").init() />

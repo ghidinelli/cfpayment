@@ -61,7 +61,7 @@
 	<cfset variables.gateway = "null" />
 	<cfset variables.configFile = reReplaceNoCase(getMetaData(this).path, "\.cfc$", ".properties") />
 
-	<cffunction name="setUp" returntype="void" access="public">
+	<cffunction name="setUp" returntype="void" access="public" output="false">
 		<cfset var gatewayConfig = readProperties("gateway") />
 
 		<cfset gatewayConfig.path = "paypal.wpp.NVPGateway" />
@@ -69,7 +69,7 @@
 		<cfset variables.gateway = variables.core.getGateway() />
 	</cffunction>
 
-	<cffunction name="testPurchase" returntype="void" access="public">
+	<cffunction name="testPurchase" returntype="void" access="public" output="false">
 		<cfset var purchase = readProperties("purchase") />
 		<cfset var response = "null" />
 		<cfset var money = "null" />
@@ -112,7 +112,7 @@
 
 
 
-	<cffunction name="testBeginExpressCheckout" returntype="void" access="public">
+	<cffunction name="testBeginExpressCheckout" returntype="void" access="public" output="false">
 		<cfset var purchase = readProperties("purchase") />
 		<cfset var response = "null" />
 		<cfset var money = "null" />
@@ -126,7 +126,7 @@
 		<cflocation url="#variables.gateway.getExpressCheckoutForward(tokenId)#" addtoken="false" />
 	</cffunction>
 
-	<cffunction name="testCompleteExpressCheckout" returntype="void" access="public">
+	<cffunction name="testCompleteExpressCheckout" returntype="void" access="public" output="false">
 		<cfset var purchase = readProperties("purchase") />
 		<cfset var customer = readProperties("paypalCustomer") />
 		<cfset var response = "null" />
@@ -154,7 +154,7 @@
 		<cfset assertTrue(response.getTransactionId() neq "", "The response transactionId should not be an empty string.") />
 	</cffunction>
 
-	<cffunction name="testCancelExpressCheckout" returntype="void" access="public">
+	<cffunction name="testCancelExpressCheckout" returntype="void" access="public" output="false">
 		<cfset var options = structNew() />
 
 		<cfset options.tokenId = URL.token />
@@ -162,7 +162,7 @@
 		<cfset variables.gateway.cancelExpressCheckout(options) />
 	</cffunction>
 
-	<cffunction name="testAuthorizeOnly" access="public" returntype="void">
+	<cffunction name="testAuthorizeOnly" access="public" returntype="void" output="false">
 		<cfset var purchase = readProperties("purchase") />
 		<cfset var response = "null" />
 		<cfset var money = "null" />
@@ -174,7 +174,7 @@
 		<cfset assertTrue(response.getSuccess(), "The authorize did not succeed") />
 	</cffunction>
 
-	<cffunction name="testAuthorizeThenCapture" access="public" returntype="void">
+	<cffunction name="testAuthorizeThenCapture" access="public" returntype="void" output="false">
 		<cfset var purchase = readProperties("purchase") />
 		<cfset var money = "null" />
 		<cfset var response = "null" />
@@ -189,7 +189,7 @@
 		<cfset assertTrue(response.getSuccess(), "The capture did not succeed") />
 	</cffunction>
 
-	<cffunction name="testAuthorizeThenCredit" access="public" returntype="void">
+	<cffunction name="testAuthorizeThenCredit" access="public" returntype="void" output="false">
 		<cfset var purchase = readProperties("purchase") />
 		<cfset var money = "null" />
 		<cfset var response = "null" />
@@ -204,7 +204,7 @@
 		<cfset assertTrue(NOT response.getSuccess(), "You cannot credit a preauth") />
 	</cffunction>
 
-	<cffunction name="testAuthorizeThenVoid" access="public" returntype="void">
+	<cffunction name="testAuthorizeThenVoid" access="public" returntype="void" output="false">
 		<cfset var purchase = readProperties("purchase") />
 		<cfset var money = "null" />
 		<cfset var response = "null" />
@@ -220,7 +220,7 @@
 		<cfset assertTrue(NOT response.getSuccess(), "The void of an authorization did not succeed") />
 	</cffunction>
 
-	<cffunction name="testPurchaseThenCredit" access="public" returntype="void">
+	<cffunction name="testPurchaseThenCredit" access="public" returntype="void" output="false">
 		<cfset var purchase = readProperties("purchase") />
 		<cfset var money = "null" />
 		<cfset var response = "null" />

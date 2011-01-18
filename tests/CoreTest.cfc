@@ -1,6 +1,6 @@
 <cfcomponent name="CoreTest" extends="mxunit.framework.TestCase" output="false">
 
-	<cffunction name="setUp" returntype="void" access="public">	
+	<cffunction name="setUp" returntype="void" access="public" output="false">	
 
 		<cfset var gw = structNew() />
 

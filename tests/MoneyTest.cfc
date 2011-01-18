@@ -1,6 +1,6 @@
 <cfcomponent name="MoneyTest" extends="mxunit.framework.TestCase" output="false">
 
-	<cffunction name="setUp" returntype="void" access="public">
+	<cffunction name="setUp" returntype="void" access="public" output="false">
 		<cfscript>
 			variables.svc = createObject("component", "cfpayment.api.core");
 		</cfscript>
