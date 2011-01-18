@@ -1,6 +1,6 @@
 <cfcomponent name="CoreTest" extends="mxunit.framework.TestCase" output="false">
 
-	<cffunction name="setUp" returntype="void" access="public">	
+	<cffunction name="setUp" returntype="void" access="public" output="false">	
 
 		<cfset var gw = structNew() />
 
@@ -19,7 +19,7 @@
 	</cffunction>
 
 
-	<cffunction name="dohttpcall_fails_with_array_payload" access="public" mxunit:expectedException="cfpayment.InvalidParameter.Payload">
+	<cffunction name="dohttpcall_fails_with_array_payload" access="public" mxunit:expectedException="cfpayment.InvalidParameter.Payload" output="false">
 		<cfset var gw = variables.svc.getGateway() />
 		<cfset var options = structNew() />
 		<cfset options["invalidType"] = arrayNew(1) />
@@ -31,7 +31,7 @@
 	</cffunction>
 
 
-	<cffunction name="dohttpcall_fails_without_get_or_post" access="public" mxunit:expectedException="cfpayment.InvalidParameter.Method">
+	<cffunction name="dohttpcall_fails_without_get_or_post" access="public" mxunit:expectedException="cfpayment.InvalidParameter.Method" output="false">
 		<cfset var gw = variables.svc.getGateway() />
 		<cfset makePublic(gw, "doHttpCall") />
 		
@@ -40,7 +40,7 @@
 	</cffunction>
 	
 	
-	<cffunction name="process_cfhttp_broken" access="public">
+	<cffunction name="process_cfhttp_broken" access="public" output="false">
 		<cfset var response = "" />
 		<cfset var gw = variables.svc.getGateway() />
 		<cfset makePublic(gw, "process") />
@@ -52,7 +52,7 @@
 	</cffunction>
 
 
-	<cffunction name="process_cfhttp_undefined" access="public">
+	<cffunction name="process_cfhttp_undefined" access="public" output="false">
 		<cfset var response = "" />
 		<cfset var gw = variables.svc.getGateway() />
 		<cfset makePublic(gw, "process") />
@@ -64,7 +64,7 @@
 	</cffunction>
 
 
-	<cffunction name="process_http_status_code_200_ok" access="public">
+	<cffunction name="process_http_status_code_200_ok" access="public" output="false">
 		<cfset var response = "" />
 		<cfset var gw = variables.svc.getGateway() />
 		<cfset makePublic(gw, "process") />
@@ -75,7 +75,7 @@
 		<cfset assertTrue(response.getResult() EQ "<test />", "The result should only include our mocked </test>") />
 	</cffunction>
 
-	<cffunction name="process_http_status_code_404" access="public">
+	<cffunction name="process_http_status_code_404" access="public" output="false">
 		<cfset var response = "" />
 		<cfset var gw = variables.svc.getGateway() />
 		<cfset makePublic(gw, "process") />
@@ -85,7 +85,7 @@
 		<cfset assertTrue(response.getStatus() EQ variables.svc.getStatusFailure(), "Status should be failure for 404") />
 	</cffunction>
 
-	<cffunction name="process_empty_http_status_code" access="public">
+	<cffunction name="process_empty_http_status_code" access="public" output="false">
 		<cfset var response = "" />
 		<cfset var gw = variables.svc.getGateway() />
 		<cfset makePublic(gw, "process") />
@@ -95,7 +95,7 @@
 		<cfset assertTrue(response.getStatus() EQ variables.svc.getStatusUnknown(), "Unknown HTTP status code so unknown payment status") />
 	</cffunction>
 
-	<cffunction name="process_httpfailure" access="public">
+	<cffunction name="process_httpfailure" access="public" output="false">
 		<cfset var response = "" />
 		<cfset var gw = variables.svc.getGateway() />
 		<cfset makePublic(gw, "process") />
@@ -105,7 +105,7 @@
 		<cfset assertTrue(response.getStatus() EQ variables.svc.getStatusFailure(), "Status should be failure for unsuccessfully reaching gateway") />
 	</cffunction>
 	
-	<cffunction name="process_requesttimeout" access="public">
+	<cffunction name="process_requesttimeout" access="public" output="false">
 		<cfset var response = "" />
 		<cfset var gw = variables.svc.getGateway() />
 		<cfset makePublic(gw, "process") />
@@ -115,7 +115,7 @@
 		<cfset assertTrue(response.getStatus() EQ variables.svc.getStatusTimeout(), "Status should be timeout") />
 	</cffunction>
 
-	<cffunction name="process_http404" access="public">
+	<cffunction name="process_http404" access="public" output="false">
 		<cfset var response = "" />
 		<cfset var gw = variables.svc.getGateway() />
 		<cfset makePublic(gw, "process") />
@@ -125,7 +125,7 @@
 		<cfset assertTrue(response.getStatus() EQ variables.svc.getStatusFailure(), "Status should be failure for 404") />
 	</cffunction>
 
-	<cffunction name="process_http302" access="public">
+	<cffunction name="process_http302" access="public" output="false">
 		<cfset var response = "" />
 		<cfset var gw = variables.svc.getGateway() />
 		<cfset makePublic(gw, "process") />
@@ -135,7 +135,7 @@
 		<cfset assertTrue(response.getStatus() EQ variables.svc.getStatusFailure(), "Status should be failure for 302 permanently moved (CF won't follow this, so it's like a 404)") />
 	</cffunction>
 
-	<cffunction name="process_http503" access="public">
+	<cffunction name="process_http503" access="public" output="false">
 		<cfset var response = "" />
 		<cfset var gw = variables.svc.getGateway() />
 		<cfset makePublic(gw, "process") />
@@ -145,7 +145,7 @@
 		<cfset assertTrue(response.getStatus() EQ variables.svc.getStatusFailure(), "Status should be failure for service unavailable (HTTP 503)") />
 	</cffunction>
 
-	<cffunction name="process_error_http500" access="public">
+	<cffunction name="process_error_http500" access="public" output="false">
 		<cfset var response = "" />
 		<cfset var gw = variables.svc.getGateway() />
 		<cfset makePublic(gw, "process") />
@@ -155,7 +155,7 @@
 		<cfset assertTrue(response.getStatus() EQ variables.svc.getStatusUnknown(), "Status should be unknown for a 500 server error (we don't know if the transaction finished or not)") />
 	</cffunction>
 
-	<cffunction name="process_error_unknown" access="public">
+	<cffunction name="process_error_unknown" access="public" output="false">
 		<cfset var response = "" />
 		<cfset var gw = variables.svc.getGateway() />
 		<cfset makePublic(gw, "process") />
@@ -167,7 +167,7 @@
 
 
 	<!--- test RequestTimeOut manipulation --->
-	<cffunction name="manipulate_timeout" access="public">
+	<cffunction name="manipulate_timeout" access="public" output="false">
 		<cfset var response = "" />
 		<cfset var gw = variables.svc.getGateway() />
 
@@ -225,34 +225,34 @@
 	</cffunction>
 
  
-	<cffunction name="undefined_purchase" access="public" mxunit:expectedException="cfpayment.MethodNotImplemented">
+	<cffunction name="undefined_purchase" access="public" mxunit:expectedException="cfpayment.MethodNotImplemented" output="false">
 		<cfset variables.svc.getGateway().purchase(money = '', account = '') />
 	</cffunction>
-	<cffunction name="undefined_authorize" access="public" mxunit:expectedException="cfpayment.MethodNotImplemented">
+	<cffunction name="undefined_authorize" access="public" mxunit:expectedException="cfpayment.MethodNotImplemented" output="false">
 		<cfset variables.svc.getGateway().authorize(money = '', account = '') />
 	</cffunction>
-	<cffunction name="undefined_capture" access="public" mxunit:expectedException="cfpayment.MethodNotImplemented">
+	<cffunction name="undefined_capture" access="public" mxunit:expectedException="cfpayment.MethodNotImplemented" output="false">
 		<cfset variables.svc.getGateway().capture(money = '', authorization = '') />
 	</cffunction>
-	<cffunction name="undefined_credit" access="public" mxunit:expectedException="cfpayment.MethodNotImplemented">
+	<cffunction name="undefined_credit" access="public" mxunit:expectedException="cfpayment.MethodNotImplemented" output="false">
 		<cfset variables.svc.getGateway().credit(money = '', transactionid = '') />
 	</cffunction>
-	<cffunction name="undefined_void" access="public" mxunit:expectedException="cfpayment.MethodNotImplemented">
+	<cffunction name="undefined_void" access="public" mxunit:expectedException="cfpayment.MethodNotImplemented" output="false">
 		<cfset variables.svc.getGateway().void(transactionid = '') />
 	</cffunction>
-	<cffunction name="undefined_search" access="public" mxunit:expectedException="cfpayment.MethodNotImplemented">
+	<cffunction name="undefined_search" access="public" mxunit:expectedException="cfpayment.MethodNotImplemented" output="false">
 		<cfset variables.svc.getGateway().search(options = structNew()) />
 	</cffunction>
-	<cffunction name="undefined_status" access="public" mxunit:expectedException="cfpayment.MethodNotImplemented">
+	<cffunction name="undefined_status" access="public" mxunit:expectedException="cfpayment.MethodNotImplemented" output="false">
 		<cfset variables.svc.getGateway().status(transactionid = '') />
 	</cffunction>
-	<cffunction name="undefined_recurring" access="public" mxunit:expectedException="cfpayment.MethodNotImplemented">
+	<cffunction name="undefined_recurring" access="public" mxunit:expectedException="cfpayment.MethodNotImplemented" output="false">
 		<cfset variables.svc.getGateway().recurring(mode = '', money = '', account = '', options = structNew()) />
 	</cffunction>
-	<cffunction name="undefined_settle" access="public" mxunit:expectedException="cfpayment.MethodNotImplemented">
+	<cffunction name="undefined_settle" access="public" mxunit:expectedException="cfpayment.MethodNotImplemented" output="false">
 		<cfset variables.svc.getGateway().settle() />
 	</cffunction>
-	<cffunction name="undefined_supports" access="public" mxunit:expectedException="cfpayment.MethodNotImplemented">
+	<cffunction name="undefined_supports" access="public" mxunit:expectedException="cfpayment.MethodNotImplemented" output="false">
 		<cfset variables.svc.getGateway().supports(type = '') />
 	</cffunction>
 
@@ -286,25 +286,25 @@
 
 
 	
-	<cffunction name="mock_error_httpfailure" access="private">
+	<cffunction name="mock_error_httpfailure" access="private" output="false">
 		<cfthrow type="COM.Allaire.ColdFusion.HTTPFailure" message="COM.Allaire.ColdFusion.HTTPFailure" detail="Unit Test Exception" />
 	</cffunction>
-	<cffunction name="mock_error_requesttimeout" access="private">
+	<cffunction name="mock_error_requesttimeout" access="private" output="false">
 		<cfthrow type="coldfusion.runtime.RequestTimedOutException" message="coldfusion.runtime.RequestTimedOutException" detail="Unit Test Exception" />
 	</cffunction>
-	<cffunction name="mock_error_http404" access="private">
+	<cffunction name="mock_error_http404" access="private" output="false">
 		<cfthrow type="COM.Allaire.ColdFusion.HTTPNotFound" message="COM.Allaire.ColdFusion.HTTPNotFound" detail="Unit Test Exception" />
 	</cffunction>
-	<cffunction name="mock_error_http302" access="private">
+	<cffunction name="mock_error_http302" access="private" output="false">
 		<cfthrow type="COM.Allaire.ColdFusion.HTTPMovedTemporarily" message="COM.Allaire.ColdFusion.HTTPMovedTemporarily" detail="Unit Test Exception" />
 	</cffunction>
-	<cffunction name="mock_error_http503" access="private">
+	<cffunction name="mock_error_http503" access="private" output="false">
 		<cfthrow type="COM.Allaire.ColdFusion.HTTPServiceUnavailable" message="COM.Allaire.ColdFusion.HTTPServiceUnavailable" detail="Unit Test Exception" />
 	</cffunction>
-	<cffunction name="mock_error_http500" access="private">
+	<cffunction name="mock_error_http500" access="private" output="false">
 		<cfthrow type="COM.Allaire.ColdFusion.HTTPServerError" message="COM.Allaire.ColdFusion.HTTPServerError" detail="Unit Test Exception" />
 	</cffunction>
-	<cffunction name="mock_error_unknown" access="private">
+	<cffunction name="mock_error_unknown" access="private" output="false">
 		<cfthrow type="COM.Allaire.ColdFusion.SomeOtherError" message="COM.Allaire.ColdFusion.SomeOtherError" detail="Unit Test Exception" />
 	</cffunction>
 

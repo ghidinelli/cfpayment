@@ -350,7 +350,7 @@
 		  PRIVATE HELPER METHODS FOR DEVELOPERS
 
 		  ------------------------------------------------------------------------- --->
-	<cffunction name="doHttpCall" access="private" hint="wrapper around the http call - improves testing" returntype="struct">
+	<cffunction name="doHttpCall" access="private" hint="wrapper around the http call - improves testing" returntype="struct" output="false">
 		<cfargument name="url" type="string" required="true" hint="URL to get/post" />
 		<cfargument name="method" type="string" required="false" hint="the http request method. use 'get' or 'post'" default="get" />
 		<cfargument name="timeout" type="numeric" required="true" />

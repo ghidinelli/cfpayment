@@ -84,8 +84,8 @@
 
 
 	<!--- PRIVATE ENCRYPTION WRAPPERS --->
-	<cffunction name="hasEncryptionService" access="private" returntype="any"><cfreturn variables.instance.hasEncryptionService /></cffunction>
-	<cffunction name="getEncryptionService" access="private" returntype="any"><cfreturn variables.instance.encryptionService /></cffunction>
+	<cffunction name="hasEncryptionService" access="private" returntype="any" output="false"><cfreturn variables.instance.hasEncryptionService /></cffunction>
+	<cffunction name="getEncryptionService" access="private" returntype="any" output="false"><cfreturn variables.instance.encryptionService /></cffunction>
 	
 	<cffunction name="getEncryptedMemento" access="private" output="false" returntype="any">
 		<cfargument name="account" type="any" required="true" />

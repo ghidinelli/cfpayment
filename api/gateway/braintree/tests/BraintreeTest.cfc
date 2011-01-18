@@ -23,7 +23,7 @@
 	To simulate a CVV Match, pass 999 in the cvv field. 
 
 --->
-	<cffunction name="setUp" returntype="void" access="public">	
+	<cffunction name="setUp" returntype="void" access="public" output="false">	
 
 		<cfset var gw = structNew() />
 
@@ -707,7 +707,7 @@
 
 	<!--- PRIVATE HELPERS, MOCKS, ETC --->
 
-	<cffunction name="createValidCard" access="private" returntype="any">
+	<cffunction name="createValidCard" access="private" returntype="any" output="false">
 		<!--- these values simulate a valid card with matching avs/cvv --->
 		<cfset var account = variables.svc.createCreditCard() />
 		<cfset account.setAccount(4111111111111111) />
@@ -722,7 +722,7 @@
 		<cfreturn account />	
 	</cffunction>
 
-	<cffunction name="createInvalidCard" access="private" returntype="any">
+	<cffunction name="createInvalidCard" access="private" returntype="any" output="false">
 		<!--- these values simulate a valid card with matching avs/cvv --->
 		<cfset var account = variables.svc.createCreditCard() />
 		<cfset account.setAccount(4100000000000000) />
@@ -737,7 +737,7 @@
 		<cfreturn account />	
 	</cffunction>
 
-	<cffunction name="createValidCardWithoutCVV" access="private" returntype="any">
+	<cffunction name="createValidCardWithoutCVV" access="private" returntype="any" output="false">
 		<!--- these values simulate a valid card with matching avs/cvv --->
 		<cfset var account = variables.svc.createCreditCard() />
 		<cfset account.setAccount(4111111111111111) />
@@ -752,7 +752,7 @@
 		<cfreturn account />	
 	</cffunction>
 
-	<cffunction name="createValidCardWithBadCVV" access="private" returntype="any">
+	<cffunction name="createValidCardWithBadCVV" access="private" returntype="any" output="false">
 		<!--- these values simulate a valid card with matching avs/cvv --->
 		<cfset var account = variables.svc.createCreditCard() />
 		<cfset account.setAccount(4111111111111111) />
@@ -767,7 +767,7 @@
 		<cfreturn account />	
 	</cffunction>
 	
-	<cffunction name="createValidCardWithoutStreetMatch" access="private" returntype="any">
+	<cffunction name="createValidCardWithoutStreetMatch" access="private" returntype="any" output="false">
 		<!--- these values simulate a valid card with matching avs/cvv --->
 		<cfset var account = variables.svc.createCreditCard() />
 		<cfset account.setAccount(4111111111111111) />
@@ -782,7 +782,7 @@
 		<cfreturn account />	
 	</cffunction>
 
-	<cffunction name="createValidCardWithoutZipMatch" access="private" returntype="any">
+	<cffunction name="createValidCardWithoutZipMatch" access="private" returntype="any" output="false">
 		<!--- these values simulate a valid card with matching avs/cvv --->
 		<cfset var account = variables.svc.createCreditCard() />
 		<cfset account.setAccount(4111111111111111) />
@@ -799,7 +799,7 @@
 
 
 
-	<cffunction name="createValidEFT" access="private" returntype="any">
+	<cffunction name="createValidEFT" access="private" returntype="any" output="false">
 		<!--- these values simulate a valid eft with matching avs/cvv --->
 		<cfset var account = variables.svc.createEFT() />
 		<cfset account.setAccount("123123123") />
