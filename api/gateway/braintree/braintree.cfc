@@ -63,7 +63,7 @@
 	<!--- make a way of setting the key/key id used in hash calculations --->
 	<cffunction name="getSecurityKey" access="public" output="false" returntype="string">
 		<cfif getTestMode()>
-			<cfreturn "zjhh9UAS7d4UkBVqa6sagBvpeT733U88" />
+			<cfreturn "844wfNN5FGuGS7wtKfQsY6k6ZxAv6Ff7" />
 		<cfelse>
 			<cfreturn variables.SecurityKey />
 		</cfif>
@@ -75,7 +75,7 @@
 
 	<cffunction name="getSecurityKeyID" access="public" output="false" returntype="numeric">
 		<cfif getTestMode()>
-			<cfreturn 1084547 />
+			<cfreturn 1247307 />
 		<cfelse>
 			<cfreturn variables.SecurityKeyID />
 		</cfif>
@@ -260,7 +260,8 @@
 	<!--- implement primary methods --->
 	<cffunction name="purchase" output="false" access="public" returntype="any" hint="Authorize + Capture in one step">
 		<cfargument name="money" type="any" required="true" />
-		<cfargument name="account" type="any" required="true" />
+		<cfargument name="account" type="any" required="false" />
+		<cfargument name="transactionId" type="any" required="false" />
 		<cfargument name="options" type="struct" required="false" default="#structNew()#" />
 
 		<cfset var post = structNew() />
@@ -269,25 +270,39 @@
 		<cfset post["amount"] = arguments.money.getAmount() />
 		<cfset post["type"] = "sale" />
 
-		<cfswitch expression="#lcase(listLast(getMetaData(arguments.account).fullname, "."))#">
-			<cfcase value="creditcard">
-				<!--- copy in name and customer details --->
-				<cfset post = addCustomer(post = post, account = arguments.account) />
-				<cfset post = addCreditCard(post = post, account = arguments.account, options = arguments.options) />
-			</cfcase>
-			<cfcase value="eft">
-				<!--- copy in name and customer details --->
-				<cfset post = addCustomer(post = post, account = arguments.account) />
-				<cfset post = addEFT(post = post, account = arguments.account, options = arguments.options) />
-			</cfcase>
-			<cfcase value="token">
-				<!--- tokens don't need customer info --->
-				<cfset post = addToken(post = post, account = arguments.account, options = arguments.options) />
-			</cfcase>
-			<cfdefaultcase>
-				<cfthrow type="cfpayment.InvalidAccount" message="The account type #lcase(listLast(getMetaData(arguments.account).fullname, "."))# is not supported by this gateway." />
-			</cfdefaultcase>
-		</cfswitch>
+		<!--- API will allow a new sale using the transactionid from a previous sale/auth/validate transaction --->
+		<cfif structKeyExists(arguments, "transactionId")>
+		
+			<cfset post["transactionid"] = arguments.transactionId />
+		
+		<cfelseif structKeyExists(arguments, "account")>
+
+			<cfswitch expression="#lcase(listLast(getMetaData(arguments.account).fullname, "."))#">
+				<cfcase value="creditcard">
+					<!--- copy in name and customer details --->
+					<cfset post = addCustomer(post = post, account = arguments.account) />
+					<cfset post = addCreditCard(post = post, account = arguments.account, options = arguments.options) />
+				</cfcase>
+				<cfcase value="eft">
+					<!--- copy in name and customer details --->
+					<cfset post = addCustomer(post = post, account = arguments.account) />
+					<cfset post = addEFT(post = post, account = arguments.account, options = arguments.options) />
+				</cfcase>
+				<cfcase value="token">
+					<!--- tokens don't need customer info --->
+					<cfset post = addToken(post = post, account = arguments.account, options = arguments.options) />
+				</cfcase>
+				<cfdefaultcase>
+					<cfthrow type="cfpayment.InvalidAccount" message="The account type #lcase(listLast(getMetaData(arguments.account).fullname, "."))# is not supported by this gateway." />
+				</cfdefaultcase>
+			</cfswitch>
+
+		<cfelse>
+
+			<!--- either a previous transactionId or account must be provided --->		
+			<cfthrow type="cfpayment.Gateway.Error" message="Missing Argument" detail="One of the following arguments are required: account, transactionId" />
+		
+		</cfif>
 
 		<cfreturn process(payload = post, options = options) />
 	</cffunction>
@@ -295,7 +310,8 @@
 	
 	<cffunction name="authorize" output="false" access="public" returntype="any" hint="Authorize (only) a credit card">
 		<cfargument name="money" type="any" required="true" />
-		<cfargument name="account" type="any" required="true" />
+		<cfargument name="account" type="any" required="false" />
+		<cfargument name="transactionId" type="any" required="false" />
 		<cfargument name="options" type="struct" required="false" default="#structNew()#" />
 
 		<cfset var post = structNew() />
@@ -304,23 +320,36 @@
 		<cfset post["amount"] = arguments.money.getAmount() />
 		<cfset post["type"] = "auth" />
 
+		<!--- API will allow a new auth using the transactionid from a previous sale/auth/validate transaction --->
+		<cfif structKeyExists(arguments, "transactionId")>
+		
+			<cfset post["transactionid"] = arguments.transactionId />
+		
+		<cfelseif structKeyExists(arguments, "account")>
+	
+			<cfswitch expression="#lcase(listLast(getMetaData(arguments.account).fullname, "."))#">
+				<cfcase value="creditcard">
+					<!--- copy in name and customer details --->
+					<cfset post = addCustomer(post = post, account = arguments.account) />
+					<cfset post = addCreditCard(post = post, account = arguments.account, options = arguments.options) />
+				</cfcase>
+				<cfcase value="eft">
+					<cfthrow message="Authorize not implemented for E-checks; use purchase instead." type="cfpayment.MethodNotImplemented" />
+				</cfcase>
+				<cfcase value="token">
+					<cfset post = addToken(post = post, account = arguments.account, options = arguments.options) />
+				</cfcase>
+				<cfdefaultcase>
+					<cfthrow type="cfpayment.Invalid.AccountType" message="The account type #lcase(listLast(getMetaData(arguments.account).fullname, "."))# is not supported by this gateway." />
+				</cfdefaultcase>
+			</cfswitch>
 
-		<cfswitch expression="#lcase(listLast(getMetaData(arguments.account).fullname, "."))#">
-			<cfcase value="creditcard">
-				<!--- copy in name and customer details --->
-				<cfset post = addCustomer(post = post, account = arguments.account) />
-				<cfset post = addCreditCard(post = post, account = arguments.account, options = arguments.options) />
-			</cfcase>
-			<cfcase value="eft">
-				<cfthrow message="Authorize not implemented for E-checks; use purchase instead." type="cfpayment.MethodNotImplemented" />
-			</cfcase>
-			<cfcase value="token">
-				<cfset post = addToken(post = post, account = arguments.account, options = arguments.options) />
-			</cfcase>
-			<cfdefaultcase>
-				<cfthrow type="cfpayment.Invalid.AccountType" message="The account type #lcase(listLast(getMetaData(arguments.account).fullname, "."))# is not supported by this gateway." />
-			</cfdefaultcase>
-		</cfswitch>
+		<cfelse>
+
+			<!--- either a previous transactionId or account must be provided --->		
+			<cfthrow type="cfpayment.Gateway.Error" message="Missing Argument" detail="One of the following arguments are required: account, transactionId" />
+		
+		</cfif>
 
 		<cfreturn process(payload = post, options = options) />
 	</cffunction>	
@@ -328,7 +357,8 @@
 
 	<cffunction name="validate" output="false" access="public" returntype="any" hint="Validate (only) a credit card without incurring Visa/MC network abuse fees">
 		<cfargument name="money" type="any" required="true" />
-		<cfargument name="account" type="any" required="true" />
+		<cfargument name="account" type="any" required="false" />
+		<cfargument name="transactionId" type="any" required="false" />
 		<cfargument name="options" type="struct" required="false" default="#structNew()#" />
 
 		<cfset var post = structNew() />
@@ -337,23 +367,36 @@
 		<cfset post["amount"] = "0.00" />
 		<cfset post["type"] = "validate" />
 
+		<!--- API will allow a new validate using the transactionid from a previous sale/auth/validate transaction --->
+		<cfif structKeyExists(arguments, "transactionId")>
+		
+			<cfset post["transactionid"] = arguments.transactionId />
+		
+		<cfelseif structKeyExists(arguments, "account")>
 
-		<cfswitch expression="#lcase(listLast(getMetaData(arguments.account).fullname, "."))#">
-			<cfcase value="creditcard">
-				<!--- copy in name and customer details --->
-				<cfset post = addCustomer(post = post, account = arguments.account) />
-				<cfset post = addCreditCard(post = post, account = arguments.account, options = arguments.options) />
-			</cfcase>
-			<cfcase value="eft">
-				<cfthrow message="Validate not implemented for E-checks; use purchase instead." type="cfpayment.MethodNotImplemented" />
-			</cfcase>
-			<cfcase value="token">
-				<cfthrow message="Validate not implemented for vault tokens; use authorize instead." type="cfpayment.MethodNotImplemented" />
-			</cfcase>
-			<cfdefaultcase>
-				<cfthrow type="cfpayment.Invalid.AccountType" message="The account type #lcase(listLast(getMetaData(arguments.account).fullname, "."))# is not supported by this gateway." />
-			</cfdefaultcase>
-		</cfswitch>
+			<cfswitch expression="#lcase(listLast(getMetaData(arguments.account).fullname, "."))#">
+				<cfcase value="creditcard">
+					<!--- copy in name and customer details --->
+					<cfset post = addCustomer(post = post, account = arguments.account) />
+					<cfset post = addCreditCard(post = post, account = arguments.account, options = arguments.options) />
+				</cfcase>
+				<cfcase value="eft">
+					<cfthrow message="Validate not implemented for E-checks; use purchase instead." type="cfpayment.MethodNotImplemented" />
+				</cfcase>
+				<cfcase value="token">
+					<cfthrow message="Validate not implemented for vault tokens; use authorize instead." type="cfpayment.MethodNotImplemented" />
+				</cfcase>
+				<cfdefaultcase>
+					<cfthrow type="cfpayment.Invalid.AccountType" message="The account type #lcase(listLast(getMetaData(arguments.account).fullname, "."))# is not supported by this gateway." />
+				</cfdefaultcase>
+			</cfswitch>
+
+		<cfelse>
+
+			<!--- either a previous transactionId or account must be provided --->		
+			<cfthrow type="cfpayment.Gateway.Error" message="Missing Argument" detail="One of the following arguments are required: account, transactionId" />
+		
+		</cfif>
 
 		<cfreturn process(payload = post, options = options) />
 	</cffunction>	
@@ -387,7 +430,23 @@
 
 
 	<!--- refund all or part of a previous settled transaction --->
-	<cffunction name="credit" output="false" access="public" returntype="any" hint="Credit all or part of a previous transaction">
+	<cffunction name="refund" output="false" access="public" returntype="any" hint="Refund all or part of a previous transaction">
+		<cfargument name="money" type="any" required="true" />
+		<cfargument name="transactionid" type="any" required="true" />
+		<cfargument name="options" type="struct" required="false" default="#structNew()#" />
+
+		<cfset var post = structNew() />
+		
+		<!--- set general values; note that refunding EFTs requires "payment=check" to be passed --->
+		<cfset post["amount"] = arguments.money.getAmount() />
+		<cfset post["type"] = "refund" />
+		<cfset post["transactionid"] = arguments.transactionid />
+
+		<cfreturn process(payload = post, options = options) />
+	</cffunction>
+
+	
+	<cffunction name="credit" output="false" access="public" returntype="any" hint="Credit an account">
 		<cfargument name="money" type="any" required="true" />
 		<cfargument name="transactionid" type="any" required="false" />
 		<cfargument name="account" type="any" required="false" />
