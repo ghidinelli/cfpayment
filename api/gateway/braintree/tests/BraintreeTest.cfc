@@ -23,7 +23,7 @@
 	To simulate a CVV Match, pass 999 in the cvv field. 
 
 --->
-	<cffunction name="setUp" returntype="void" access="public" output="false">	
+	<cffunction name="setUp" returntype="void" access="public">	
 
 		<cfset var gw = structNew() />
 
@@ -31,8 +31,8 @@
 			variables.svc = createObject("component", "cfpayment.api.core");
 			
 			gw.path = "braintree.braintree";
-			gw.Username = 'demo';
-			gw.Password = 'password';
+			gw.Username = 'testapi';
+			gw.Password = 'password1';
 			gw.SecurityKey = 'zjhh9UAS7d4UkBVqa6sagBvpeT733U88';
 			gw.SecurityKeyID = '1084547';
 			gw.TestMode = true;		// defaults to true anyways
@@ -296,6 +296,71 @@
 	</cffunction>
 
 
+	<cffunction name="testSecondTransUsingTransactionID" access="public" returntype="void" output="false">
+	
+		<cfset var money = variables.svc.createMoney(5000) /><!--- in cents, $50.00 --->
+		<cfset var response = "" />
+		<cfset var options = structNew() />
+		<cfset var txid = "" />
+		
+		<!--- PURCHASE, then auth / purchase / validate --->
+		<cfset response = gw.purchase(money = money, account = createValidCard(), options = options) />
+		<cfset txid = response.getTransactionID() />
+		<cfset assertTrue(response.getSuccess(), "The authorization did not succeed") />
+
+		<cfset response = gw.validate(money = money, transactionID = txid, options = options) />
+		<cfset assertTrue(response.getSuccess(), "The purchase + validate did not succeed") />
+
+		<cfset response = gw.authorize(money = money, transactionID = txid, options = options) />
+		<cfset assertTrue(response.getSuccess(), "The purchase + authorization did not succeed") />
+
+		<cfset response = gw.purchase(money = money, transactionID = txid, options = options) />
+		<cfset assertTrue(response.getSuccess(), "The purchase + purchase did not succeed") />
+
+
+		<!--- AUTH, then auth / purchase / validate --->
+		<cfset response = gw.authorize(money = money, account = createValidCard(), options = options) />
+		<cfset txid = response.getTransactionID() />
+		<cfset assertTrue(response.getSuccess(), "The authorization did not succeed") />
+
+		<cfset response = gw.validate(money = money, transactionID = txid, options = options) />
+		<cfset assertTrue(response.getSuccess(), "The auth + validate did not succeed") />
+
+		<cfset response = gw.authorize(money = money, transactionID = txid, options = options) />
+		<cfset assertTrue(response.getSuccess(), "The auth + authorization did not succeed") />
+
+		<cfset response = gw.purchase(money = money, transactionID = txid, options = options) />
+		<cfset assertTrue(response.getSuccess(), "The auth + purchase did not succeed") />
+
+
+		<!--- VALIDATE, then auth / purchase / validate --->
+		<cfset response = gw.validate(money = money, account = createValidCard(), options = options) />
+		<cfset txid = response.getTransactionID() />
+		<cfset assertTrue(response.getSuccess(), "The validate did not succeed") />
+
+		<cfset response = gw.validate(money = money, transactionID = txid, options = options) />
+		<cfset assertTrue(response.getSuccess(), "The validate + validate did not succeed") />
+
+		<cfset response = gw.authorize(money = money, transactionID = txid, options = options) />
+		<cfset assertTrue(response.getSuccess(), "The validate + authorization did not succeed") />
+
+		<cfset response = gw.purchase(money = money, transactionID = txid, options = options) />
+		<cfset assertTrue(response.getSuccess(), "The validate + purchase did not succeed") />
+
+	</cffunction>
+
+
+	<cffunction name="testMissingArgumentsThrowsException" access="public" returntype="void" output="false" mxunit:expectedException="cfpayment.Gateway.Error">
+	
+		<cfset var money = variables.svc.createMoney(5000) /><!--- in cents, $50.00 --->
+		<cfset var options = structNew() />
+		
+		<cfset response = gw.purchase(money = money, options = options) />
+		<cfset assertTrue(false, "The error was not thrown") />
+
+	</cffunction>
+		
+
 	<!--- confirm authorize throws error --->
 	<cffunction name="testAuthorizeThrowsException" access="public" returntype="void" output="false">
 	
@@ -415,7 +480,48 @@
 		<cfset assertTrue(response.getSuccess(), "You can credit a purchase") />
 
 	</cffunction>
+
+
+	<cffunction name="testPurchaseThenRefund" access="public" returntype="void" output="false">
 	
+		<cfset var account = createValidCard() />
+		<cfset var money = variables.svc.createMoney(5000) /><!--- in cents, $50.00 --->
+		<cfset var response = "" />
+		<cfset var transId = "" />
+		<cfset var report = "" />
+		<cfset var options = structNew() />
+
+		
+		<cfset response = gw.purchase(money = money, account = account, options = options) />
+		<cfset debug(response.getMemento()) />
+		<cfset assertTrue(response.getSuccess(), "The purchase did not succeed") />
+
+		<cfset response = gw.refund(transactionid = response.getTransactionID(), money = money, options = options) />
+		<cfset debug(response.getMemento()) />
+		<cfset assertTrue(response.getSuccess(), "You can refund a purchase in full") />
+
+
+		<!--- try partial refunds and overage --->
+		<cfset response = gw.purchase(money = money, account = account, options = options) />
+		<cfset transId = response.getTransactionID() />
+		<cfset debug(response.getMemento()) />
+		<cfset assertTrue(response.getSuccess(), "The purchase did not succeed") />
+
+		<cfset money = variables.svc.createMoney(2500) />
+		<cfset response = gw.refund(transactionid = transId, money = money, options = options) />
+		<cfset debug(response.getMemento()) />
+		<cfset assertTrue(response.getSuccess(), "You should be able to partially refund a purchase ($25)") />
+
+		<cfset response = gw.refund(transactionid = transId, money = money, options = options) />
+		<cfset debug(response.getMemento()) />
+		<cfset assertTrue(response.getSuccess(), "You should be able to partially refund second part of a purchase ($25)") />
+
+		<cfset response = gw.refund(transactionid = transId, money = money, options = options) />
+		<cfset debug(response.getMemento()) />
+		<cfset assertTrue(NOT response.getSuccess(), "You can't refund a purchase more than the original price") />
+
+	</cffunction>
+		
 
 	<cffunction name="testPurchaseThenVoidThenReport" access="public" returntype="void" output="false">
 	
@@ -503,6 +609,49 @@
 		<cfset response = gw.credit(account = account, money = money, options = options) />
 		<cfset debug(response.getMemento()) />
 		<cfset assertTrue(response.getSuccess(), "You can credit a purchase") />
+
+	</cffunction>
+
+
+	<cffunction name="testPurchaseThenRefundEFT" access="public" returntype="void" output="false">
+	
+		<cfset var account = createValidEFT() />
+		<cfset var money = variables.svc.createMoney(randRange(40, 100) * 100) /><!--- in cents, $50.00 --->
+		<cfset var response = "" />
+		<cfset var report = "" />
+		<cfset var transId = "" />
+		<cfset var options = structNew() />
+		<cfset options["payment"] = "check" />
+
+		
+		<cfset response = gw.purchase(money = money, account = account, options = options) />
+		<cfset debug(response.getMemento()) />
+		<cfset assertTrue(response.getSuccess(), "The purchase did not succeed") />
+
+		<cfset response = gw.refund(transactionid = response.getTransactionID(), money = money, options = options) />
+		<cfset debug(response.getMemento()) />
+		<cfset assertTrue(response.getSuccess(), "You can refund a purchase") />
+
+
+		<!--- try multi-partial refund and overage --->
+		<cfset money = variables.svc.createMoney(randRange(40, 100) * 100) />
+		<cfset response = gw.purchase(money = money, account = account, options = options) />
+		<cfset transId = response.getTransactionID() />
+		<cfset debug(response.getMemento()) />
+		<cfset assertTrue(response.getSuccess(), "The purchase did not succeed") />
+
+		<cfset money = variables.svc.createMoney(money.getAmount()*100/2) />
+		<cfset response = gw.refund(transactionid = transID, money = money, options = options) />
+		<cfset debug(response.getMemento()) />
+		<cfset assertTrue(response.getSuccess(), "You can partially refund a purchase") />
+
+		<cfset response = gw.refund(transactionid = transID, money = money, options = options) />
+		<cfset debug(response.getMemento()) />
+		<cfset assertTrue(response.getSuccess(), "You can partial refund the remaining balance of a purchase") />
+
+		<cfset response = gw.refund(transactionid = transID, money = money, options = options) />
+		<cfset debug(response.getMemento()) />
+		<cfset assertTrue(NOT response.getSuccess(), "You can't refund for more than the original charge") />
 
 	</cffunction>
 
@@ -701,6 +850,16 @@
 	
 	</cffunction>
 
+
+	<cffunction name="testArbitraryReport" access="public" returntype="void" output="false">
+	
+		<cfset var report = "" />
+
+		<cfset report = gw.status(transactionid = '1239899682') />
+		<cfset debug(report.getMemento()) />
+		<cfset assertTrue(report.getSuccess() AND arrayLen(report.getParsedResult().xmlRoot.xmlChildren) GT 0, "Transactionid should result in matches") />
+
+	</cffunction>	
 
 
 
