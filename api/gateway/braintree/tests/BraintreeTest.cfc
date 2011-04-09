@@ -386,7 +386,8 @@
 		<cfset var money = variables.svc.createMoney(5000) /><!--- in cents, $50.00 --->
 		<cfset var response = "" />
 		<cfset var report = "" />
-		<cfset var options = structNew() />
+		<cfset var oid = createUUID() />
+		<cfset var options = { orderId = oid } />
 		<cfset var tid = "" />
 		
 
@@ -401,13 +402,20 @@
 
 		<!--- now run a detail report on this transaction --->
 		<cfset report = gw.status(transactionid = response.getTransactionID()) />
-		<cfset debug(report.getMemento()) />
 		<cfset assertTrue(report.getSuccess() AND NOT report.hasError(), "Successful transactionid should have success = true") />
+
+		<!--- look up by orderid --->
+		<cfset report = gw.status(orderId = oid) />
+		<cfset assertTrue(report.getSuccess() AND NOT report.hasError(), "Valid orderid should result in returned match") />
+		<cfset debug(report.getMemento()) />
+		<cfset assertTrue(arrayLen(report.getParsedResult().xmlRoot.xmlChildren) GT 0, "Valid orderid should result in returned match") />
+
 		
 		<!--- pass a non-existent id to see how error is handled --->
 		<cfset report = gw.status(transactionid = "11111111") />
 		<cfset debug(report.getMemento()) />
 		<cfset assertTrue(report.getSuccess() AND arrayLen(report.getParsedResult().xmlRoot.xmlChildren) EQ 0, "Invalid transactionid should result in no returned matches") />
+
 
 		<!--- use a broken request to see how error is handled
 		<cfset options["condition"] = 'unknown' />
