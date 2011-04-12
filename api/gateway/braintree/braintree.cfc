@@ -754,6 +754,8 @@
 				</cfif>
 				<cfif structKeyExists(results, "customer_vault_id")>
 					<cfset response.setTokenID(results.customer_vault_id.xmlText) />
+				<cfelseif structKeyExists(results, "customerid")>
+					<cfset response.setTokenID(results.customerid.xmlText) />
 				</cfif>
 				
 				<!--- handle common "success" fields --->
