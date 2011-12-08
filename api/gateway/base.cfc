@@ -398,7 +398,6 @@
 							</cfif>
 						</cfloop>
 					<cfelse>
-						<cflog file="application" text="throwing error 1" />
 						<cfthrow message="Invalid data type for #key#" detail="The payload must be either XML/JSON/string or a struct" type="cfpayment.InvalidParameter.Payload" />
 					</cfif>
 				</cfloop>
@@ -410,7 +409,6 @@
 
 			<cfelse>
 
-				<cflog file="application" text="throwing error 2" />
 				<cfthrow message="The payload must be either XML/JSON/string or a struct" type="cfpayment.InvalidParameter.Payload" />
 
 			</cfif>
