@@ -167,7 +167,7 @@
 	<!--- manage transport and network/connection error handling; all gateways should send HTTP requests through this method --->
 	<cffunction name="process" output="false" access="package" returntype="any" hint="Robust HTTP get/post mechanism with error handling">
 		<cfargument name="method" type="string" required="false" default="post" />
-		<cfargument name="payload" type="any" required="true" /><!--- can be xml or a struct of key-value pairs --->
+		<cfargument name="payload" type="any" required="true" /><!--- can be xml (simplevalue) or a struct of key-value pairs --->
 		<cfargument name="headers" type="struct" required="false" />
 
 		<!--- prepare response before attempting to send over wire --->
@@ -175,17 +175,17 @@
 		<cfset var CFHTTP = "" />
 		<cfset var status = "" />
 		<cfset var paramType = "" />
-		<cfset var RequestData = "" />
+		<cfset var RequestData = structNew() />
 
 		<!--- TODO: NOTE: THIS INTERNAL DATA REFERENCE MAY GO AWAY, DO NOT RELY UPON IT!!! --->
-		<!--- store payload for reference --->
-		<cfset RequestData = duplicate(arguments.payload) />
+		<!--- store payload for reference (can be simplevalue OR structure) --->
+		<cfset RequestData.PAYLOAD = duplicate(arguments.payload) />
 		<cfset RequestData.GATEWAY_URL = getGatewayURL(argumentCollection = arguments) />
 		<cfset RequestData.HTTP_METHOD = arguments.method />
 
-		<cfset response.setRequestData(RequestData) /><!--- TODO: should this be another duplicate? --->
+		<cfset response.setRequestData(RequestData) />
 
-		<!--- tell response if this a test transaction? --->
+		<!--- tell response if this a test transaction --->
 		<cfset response.setTest(getTestMode()) />
 
 		<!--- enable a little extra time past the CFHTTP timeout so error handlers can run --->
@@ -308,7 +308,7 @@
 		<cfargument name="method" type="string" required="false" hint="the http request method. use 'get' or 'post'" default="get" />
 		<cfargument name="timeout" type="numeric" required="true" />
 		<cfargument name="headers" type="struct" required="false" default="#structNew()#" />
-		<cfargument name="payload" type="struct" required="false" default="#structNew()#" />
+		<cfargument name="payload" type="any" required="false" default="#structNew()#" />
 
 		<cfset var CFHTTP = "" />
 		<cfset var key = "" />
