@@ -202,8 +202,8 @@
 		<!--- Mask the request data --->
 		<cfif getMasking() eq "on">
 			<cfset rd = response.getRequestData() />
-			<cfloop collection="#rd#" item="n">
-				<cfset rd[n] = mask(n, rd[n]) />
+			<cfloop collection="#rd.PAYLOAD#" item="n">
+				<cfset rd.PAYLOAD[n] = mask(n, rd.PAYLOAD[n]) />
 			</cfloop>
 			<cfset response.setRequestData(rd) />
 		</cfif>
