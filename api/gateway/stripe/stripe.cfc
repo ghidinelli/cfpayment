@@ -1,5 +1,5 @@
 <!---
-	stripe.cfc 
+	$Id$
 	
 	Copyright 2011 Phil Cruz (http://www.philcruz.com/)
 	
