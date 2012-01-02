@@ -2,6 +2,7 @@
 	$Id: creditcard.cfc 152 2011-01-18 00:23:34Z briang $
 
 	Copyright 2007 Brian Ghidinelli (http://www.ghidinelli.com/)
+	Copyright 2011 Shawn Mckee (http://www.clinicapps.com)
 
 	Licensed under the Apache License, Version 2.0 (the "License"); you
 	may not use this file except in compliance with the License. You may
