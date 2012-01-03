@@ -178,7 +178,7 @@
 		<cfset arguments.options.operationType = "sale" /> <!--- used in process method --->
 		<cfset local.payload = '<FIELD KEY="order_id">#arguments.options.order_ID#</FIELD>
 			            <FIELD KEY="total">#numberFormat(arguments.money.getAmount(),'9999.99')#</FIELD>
-			            <FIELD KEY="card_name">#arguments.account.getCardType().shortName#</FIELD>
+			            <FIELD KEY="card_name">#getCardType(arguments.account).shortName#</FIELD>
 			            <FIELD KEY="card_number">#arguments.account.getAccount()#</FIELD>
 			            <FIELD KEY="card_exp"> #numberFormat(arguments.account.getMonth(), "00")##right(arguments.account.getYear(), 2)#</FIELD>
 			            <FIELD KEY="owner_name">#arguments.account.getFirstName()# #arguments.account.getLastName()#</FIELD>
@@ -208,7 +208,7 @@
 		<cfset arguments.options.operationType = "auth" /> <!--- used in process method --->
 		<cfset local.payload = '<FIELD KEY="order_id">#arguments.options.order_ID#</FIELD>
 			            <FIELD KEY="total">#numberFormat(arguments.money.getAmount(),'9999.99')#</FIELD>
-			            <FIELD KEY="card_name">#arguments.account.getCardType().shortName#</FIELD>
+			            <FIELD KEY="card_name">#getCardType(arguments.account).shortName#</FIELD>
 			            <FIELD KEY="card_number">#arguments.account.getAccount()#</FIELD>
 			            <FIELD KEY="card_exp"> #numberFormat(arguments.account.getMonth(), "00")##right(arguments.account.getYear(), 2)#</FIELD>
 			            <FIELD KEY="owner_name">#arguments.account.getFirstName()# #arguments.account.getLastName()#</FIELD>
@@ -277,6 +277,101 @@
 	<!--- this is a credit card gateway --->
 	<cffunction name="getIsCCEnabled" output="false" access="public" returntype="boolean" hint="determine whether or not this gateway can accept credit card transactions">
 		<cfreturn true />
+	</cffunction>
+
+
+	<!---
+		// CardTypes              Prefix          Width
+		// American Express       34, 37            15
+		// Diners Club            300 to 305, 36    14
+		// Carte Blanche          38                14
+		// Discover               6011              16
+		// EnRoute                2014, 2149        15
+		// JCB                    3                 16
+		// JCB                    2131, 1800        15
+		// Master Card            51 to 55          16
+		// Visa                   4                 13, 16
+		// http://www.beachnet.com/~hstiles/cardtype.html
+		// http://www.ros-soft.net/otros/cakephp_blog/creditcard.php.txt
+		// http://www.rgagnon.com/javadetails/java-0034.html
+
+		// Most comprehensive seems to be Wikipedia: http://en.wikipedia.org/wiki/Credit_card_number
+	--->
+	<cffunction name="getCardType" access="private" returntype="struct" output="false" hint="Card Type short/long name required by GoEmerchant gateway">
+		<cfargument name="account" type="any" required="true" />
+		
+		<cfscript>
+			var local = structNew(); 
+			local.ccNum = arguments.account.getAccount();
+			switch(len(local.ccNum))
+			{
+				case 16:
+					if(left(local.ccNum, 1) == 4)
+					{
+						local.returnStruct.shortName = "Visa";
+						local.returnStruct.longName = "Visa";
+					}
+					else if(listFind("51,52,53,54,55", left(local.ccNum, 2)))
+					{
+						local.returnStruct.shortName = "MasterCard";
+						local.returnStruct.longName = "Master Card";
+					}
+					else if(left(local.ccNum, 4) == 6011)
+					{
+						local.returnStruct.shortName = "JCB";
+						local.returnStruct.longName = "JCB";
+					}
+					else if(left(local.ccNum, 1) == 3)
+					{
+						local.returnStruct.shortName = "JCB";
+						local.returnStruct.longName = "JCB";
+					}
+				break;
+
+				case 15:
+					if(listFind("34,37", left(local.ccNum, 2)))
+					{
+						local.returnStruct.shortName = "Amex";
+						local.returnStruct.longName = "American Express";
+					}
+					else if(listFind("2131,1800", left(local.ccNum, 4)))
+					{
+						local.returnStruct.shortName = "JCB";
+						local.returnStruct.longName = "JCB";
+					}
+					else if(listFind("2014,2149", left(local.ccNum, 4)))
+					{
+						local.returnStruct.shortName = "EnRoute";
+						local.returnStruct.longName = "EnRoute";
+					}
+				break;
+
+				case 14:
+					if(left(local.ccNum, 2) == 36 OR listFind("301,302,303,304,305", left(local.ccNum, 3)))
+					{
+						local.returnStruct.shortName = "DinersClub";
+						local.returnStruct.longName = "Diners Club";
+					}
+					else if(left(local.ccNum, 2) == 38)
+					{
+						local.returnStruct.shortName = "CarteBlanche";
+						local.returnStruct.longName = "Carte Blanche";
+					}
+				break;
+
+				case 13:
+					if(left(local.ccNum, 1) == 4)
+					{
+						local.returnStruct.shortName = "Visa";
+						local.returnStruct.longName = "Visa";
+					}
+				break;
+			}
+
+			return local.returnStruct;
+
+		</cfscript>
+
 	</cffunction>
 
 </cfcomponent>
