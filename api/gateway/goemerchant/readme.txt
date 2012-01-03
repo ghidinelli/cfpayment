@@ -1,0 +1,1 @@
+The GoEMerchant code is currently non-functional pending decisions about the overall architecture of cfpayment.
