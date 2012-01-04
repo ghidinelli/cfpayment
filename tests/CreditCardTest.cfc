@@ -14,7 +14,7 @@
 		
 		<cfset cc.setAccount(5454545454545454) />
 		<cfset cc.setMonth(12) />
-		<cfset cc.setYear(2009) />
+		<cfset cc.setYear(year(now())+1) />
 		<!--- also test the jquery-like return 'this' --->
 		<cfset cc.setVerificationValue(123).setFirstName("John").setLastName("Doe") />
 

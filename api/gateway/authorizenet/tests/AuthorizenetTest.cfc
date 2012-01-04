@@ -259,7 +259,7 @@
 		<cfset var account = variables.svc.createCreditCard() />
 		<cfset account.setAccount(4111111111111111) />
 		<cfset account.setMonth(10) />
-		<cfset account.setYear(10) />
+		<cfset account.setYear(year(now())+1) />
 		<cfset account.setVerificationValue(999) />
 		<cfset account.setFirstName("John") />
 		<cfset account.setLastName("Doe") />
@@ -273,7 +273,7 @@
 		<cfset var account = variables.svc.createCreditCard() />
 		<cfset account.setAccount(4222222222222) />
 		<cfset account.setMonth(10) />
-		<cfset account.setYear(10) />
+		<cfset account.setYear(year(now())+1) />
 		<cfset account.setVerificationValue(999) />
 		<cfset account.setFirstName("John") />
 		<cfset account.setLastName("Doe") />
@@ -288,7 +288,7 @@
 		<cfset var account = variables.svc.createCreditCard() />
 		<cfset account.setAccount(4100000000000000) />
 		<cfset account.setMonth(10) />
-		<cfset account.setYear(10) />
+		<cfset account.setYear(year(now())+1) />
 		<cfset account.setVerificationValue(123) />
 		<cfset account.setFirstName("John") />
 		<cfset account.setLastName("Doe") />
@@ -303,7 +303,7 @@
 		<cfset var account = variables.svc.createCreditCard() />
 		<cfset account.setAccount(4111111111111111) />
 		<cfset account.setMonth(10) />
-		<cfset account.setYear(10) />
+		<cfset account.setYear(year(now())+1) />
 		<cfset account.setVerificationValue() />
 		<cfset account.setFirstName("John") />
 		<cfset account.setLastName("Doe") />
@@ -318,7 +318,7 @@
 		<cfset var account = variables.svc.createCreditCard() />
 		<cfset account.setAccount(4111111111111111) />
 		<cfset account.setMonth(10) />
-		<cfset account.setYear(10) />
+		<cfset account.setYear(year(now())+1) />
 		<cfset account.setVerificationValue(111) />
 		<cfset account.setFirstName("John") />
 		<cfset account.setLastName("Doe") />
@@ -333,7 +333,7 @@
 		<cfset var account = variables.svc.createCreditCard() />
 		<cfset account.setAccount(4111111111111111) />
 		<cfset account.setMonth(10) />
-		<cfset account.setYear(10) />
+		<cfset account.setYear(year(now())+1) />
 		<cfset account.setVerificationValue() />
 		<cfset account.setFirstName("John") />
 		<cfset account.setLastName("Doe") />
@@ -348,7 +348,7 @@
 		<cfset var account = variables.svc.createCreditCard() />
 		<cfset account.setAccount(4111111111111111) />
 		<cfset account.setMonth(10) />
-		<cfset account.setYear(10) />
+		<cfset account.setYear(year(now())+1) />
 		<cfset account.setVerificationValue() />
 		<cfset account.setFirstName("John") />
 		<cfset account.setLastName("Doe") />

@@ -41,6 +41,7 @@
 	<cfset variables.cfpayment.Timeout = 300 />
 	<cfset variables.cfpayment.TestMode = true />
 	
+	
 	<!--- it's possible access to internal java objects is disabled, so we account for that --->
 	<cftry>
 		<!--- use this java object to get at the current RequestTimeout value for a given request --->
@@ -152,6 +153,10 @@
 	<cffunction name="getGatewayID" access="public" output="false" returntype="any">
 		<cfreturn variables.cfpayment.GATEWAYID />
 	</cffunction>
+	<cffunction name="setGATEWAYID" access="public" output="false" returntype="void">
+		<cfargument name="GATEWAYID" required="true" type="any" />
+		<cfset variables.cfpayment.GATEWAYID = arguments.GATEWAYID />
+	</cffunction>
 
 	<!--- the current request timeout allows us to intelligently modify the overall page timeout based 
 		  upon whatever the current page context or configured timeout dictate.  It's possible to have
@@ -165,36 +170,37 @@
 	</cffunction>
 
 	<!--- manage transport and network/connection error handling; all gateways should send HTTP requests through this method --->
-	<cffunction name="process" output="false" access="package" returntype="any" hint="Robust HTTP get/post mechanism with error handling">
+	<cffunction name="process" output="false" access="package" returntype="struct" hint="Robust HTTP get/post mechanism with error handling">
 		<cfargument name="method" type="string" required="false" default="post" />
 		<cfargument name="payload" type="any" required="true" /><!--- can be xml (simplevalue) or a struct of key-value pairs --->
 		<cfargument name="headers" type="struct" required="false" />
 
 		<!--- prepare response before attempting to send over wire --->
-		<cfset var response = getService().createResponse() />
 		<cfset var CFHTTP = "" />
 		<cfset var status = "" />
 		<cfset var paramType = "" />
-		<cfset var RequestData = structNew() />
-
-		<!--- TODO: NOTE: THIS INTERNAL DATA REFERENCE MAY GO AWAY, DO NOT RELY UPON IT!!! --->
-		<!--- store payload for reference (can be simplevalue OR structure) --->
-		<cfset RequestData.PAYLOAD = duplicate(arguments.payload) />
-		<cfset RequestData.GATEWAY_URL = getGatewayURL(argumentCollection = arguments) />
-		<cfset RequestData.HTTP_METHOD = arguments.method />
-
-		<cfset response.setRequestData(RequestData) />
-
-		<!--- tell response if this a test transaction --->
-		<cfset response.setTest(getTestMode()) />
+		<cfset var ResponseData = { Status = getService().getStatusPending()
+									,StatusCode = ""
+									,Result = ""
+									,Message = ""
+									,RequestData = {}
+									,TestMode = getTestMode()
+									} />
+									
+									
+		<!--- TODO: NOTE: THIS INTERNAL DATA REFERENCE MAY GO AWAY, DO NOT RELY UPON IT!!!  DEVELOPMENT PURPOSES ONLY!!! --->
+		<!--- store payload for reference during development (can be simplevalue OR structure) --->
+		<cfif getTestMode()>
+			<cfset ResponseData.RequestData = { PAYLOAD = duplicate(arguments.payload)
+												,GATEWAY_URL = getGatewayURL(argumentCollection = arguments)
+												,HTTP_METHOD = arguments.method
+												} />
+		</cfif>									
 
 		<!--- enable a little extra time past the CFHTTP timeout so error handlers can run --->
 		<cfsetting requesttimeout="#max(getCurrentRequestTimeout(), getTimeout() + 10)#" />
 
 		<cftry>
-			<!--- change status to pending --->
-			<cfset response.setStatus(getService().getStatusPending()) />
-
 			<cfset CFHTTP = doHttpCall(url = getGatewayURL(argumentCollection = arguments)
 										,timeout = getTimeout()
 										,argumentCollection = arguments) />
@@ -202,99 +208,64 @@
 			<!--- begin result handling --->
 			<cfif isDefined("CFHTTP") AND isStruct(CFHTTP) AND structKeyExists(CFHTTP, "fileContent")>
 				<!--- duplicate the non-struct data from CFHTTP for our response --->
-				<cfset response.setResult(CFHTTP.fileContent) />
+				<cfset ResponseData.Result = CFHTTP.fileContent />
 			<cfelse>
 				<!--- an unknown failure here where the response doesn't exist somehow or is malformed --->
-				<cfset response.setStatus(getService().getStatusUnknown()) />
+				<cfset ResponseData.Status = getService().getStatusUnknown() />
 			</cfif>
 
 
 			<!--- make decisions based on the HTTP status code --->
-			<cfset status = reReplace(cfhttp.statusCode, "[^0-9]", "", "ALL") />
+			<cfset ResponseData.StatusCode = reReplace(CFHTTP.statusCode, "[^0-9]", "", "ALL") />
 
-			<cfif status NEQ "200">
-
-				<cfswitch expression="#status#">
-					<cfcase value="404">
-						<!--- 404 error, obviously transaction wasn't processed unless response was faked --->
-						<cfset response.setMessage("Gateway returned #cfhttp.statusCode#: #cfhttp.errorDetail#") />
-						<cfset response.setStatus(getService().getStatusFailure()) />
-					</cfcase>
-					<cfdefaultcase>
-						<cfset response.setMessage("Gateway returned unknown response: #cfhttp.statusCode#: #cfhttp.errorDetail#") />
-						<cfset response.setStatus(getService().getStatusUnknown()) />
-						<cfreturn response />
-					</cfdefaultcase>
-				</cfswitch>
-				
-			</cfif>
-
-			<!---
+			<!--- Errors that are thrown even when CFHTTP throwonerror = no:
 				catch (COM.Allaire.ColdFusion.HTTPFailure postError) - invalid ssl / self-signed ssl / expired ssl
 				catch (coldfusion.runtime.RequestTimedOutException postError) - tag timeout like cfhttp timeout or page timeout
-				COM.Allaire.ColdFusion.HTTPAuthFailure: Thrown by CFHTTP when the Web page specified in the URL attribute requires different username/passwords to be provided.
-				COM.Allaire.ColdFusion.HTTPFailure: Thrown by CFHTTP when the Web server specified in the URL attribute cannot be reached
-				COM.Allaire.ColdFusion.HTTPMovedTemporarily: Thrown by CFHTTP when the Web server specified in the URL attribute is reporting the request page as having been moved
-				COM.Allaire.ColdFusion.HTTPNotFound: Thrown by CFHTTP when the Web server specified in the URL cannot be found  (404)
-				COM.Allaire.ColdFusion.HTTPServerError - error 500 from the server
-
-				are these the same?
-				COM.Allaire.ColdFusion.Request.Timeout - untested
-				coldfusion.runtime.RequestTimedOutException - i know this works, tested against itransact
+				See http://www.ghidinelli.com/2012/01/03/cfhttp-error-handling-http-status-codes for all others (handled by HTTP status code below)
 			--->
 
-			<!--- implementation exceptions, we rethrow here to break the call as this may happen during development --->
+			<!--- implementation and runtime exceptions --->
 			<cfcatch type="cfpayment">
+				<!--- we rethrow here to break the call as this may happen during development --->
 				<cfrethrow />
 			</cfcatch>
-
-			<!--- runtime exceptions; we set status and return --->
 			<cfcatch type="COM.Allaire.ColdFusion.HTTPFailure">
-				<!--- "Connection Failure" - ColdFusion wasn't able to connect successfully.  This can be an expired, not legit or self-signed SSL cert. --->
-				<cfset response.setMessage("Gateway was not successfully reached and the transaction was not processed (100)") />
-				<cfset response.setStatus(getService().getStatusFailure()) />
-				<cfreturn response />
+				<!--- "Connection Failure" - ColdFusion wasn't able to connect successfully.  This can be an expired, not legit, wildcard or self-signed SSL cert. --->
+				<cfset ResponseData.Message = "Gateway was not successfully reached and the transaction was not processed (100)" />
+				<cfset ResponseData.Status = getService().getStatusFailure() />
+				<cfreturn ResponseData />
 			</cfcatch>
 			<cfcatch type="coldfusion.runtime.RequestTimedOutException">
-				<cfset response.setMessage("The bank did not respond to our request.  Please wait a few moments and try again. (101)") />
-				<cfset response.setStatus(getService().getStatusTimeout()) />
-				<cfreturn response />
-			</cfcatch>
-			<cfcatch type="COM.Allaire.ColdFusion.HTTPNotFound">
-				<!--- 404 error, obviously transaction wasn't processed unless response was faked --->
-				<cfset response.setMessage("Gateway was not successfully reached and the transaction was not processed (404)") />
-				<cfset response.setStatus(getService().getStatusFailure()) />
-				<cfreturn response />
-			</cfcatch>
-			<cfcatch type="COM.Allaire.ColdFusion.HTTPMovedTemporarily">
-				<!--- 302 response, CF doesn't follow so this is like a 404 --->
-				<cfset response.setMessage("Gateway was not successfully reached and the transaction was not processed (302)") />
-				<cfset response.setStatus(getService().getStatusFailure()) />
-				<cfreturn response />
-			</cfcatch>
-			<cfcatch type="COM.Allaire.ColdFusion.HTTPServiceUnavailable">
-				<!--- 503 response, "503 Service Unavailable"; highly unlikely the other end processes --->
-				<cfset response.setMessage("Gateway was not successfully reached and the transaction was not processed (503)") />
-				<cfset response.setStatus(getService().getStatusFailure()) />
-				<cfreturn response />
-			</cfcatch>
-			<cfcatch type="COM.Allaire.ColdFusion.HTTPServerError">
-				<!--- 500 response, this is an unknown answer since the other end might have processed --->
-				<cfset response.setMessage("Gateway did not respond as expected and the transaction may have been processed (500)") />
-				<cfset response.setStatus(getService().getStatusUnknown()) />
-				<cfreturn response />
+				<cfset ResponseData.Message = "The bank did not respond to our request.  Please wait a few moments and try again. (101)" />
+				<cfset ResponseData.Status = getService().getStatusTimeout() />
+				<cfreturn ResponseData />
 			</cfcatch>
 			<cfcatch type="any">
-				<!--- something we don't yet have an exception for --->
-				<cfset response.setStatus(getService().getStatusUnknown()) />
-				<cfset response.setMessage(cfcatch.Message) />
-				<cfreturn response />
+				<!--- convert the CFCATCH.message into the HTTP Status Code --->
+				<cfset ResponseData.StatusCode = reReplace(CFCATCH.message, "[^0-9]", "", "ALL") />
+				<cfset ResponseData.Status = getService().getStatusUnknown() />
+				<cfset ResponseData.Message = CFCATCH.Message & "   (" & cfcatch.Type & ")" />
+				<!--- let it fall through so we can attempt to handle the status code --->
 			</cfcatch>
-
 		</cftry>
 
+		<cfif len(ResponseData.StatusCode) AND ResponseData.StatusCode NEQ "200">
+			<cfswitch expression="#ResponseData.StatusCode#">
+				<cfcase value="404,302,503"><!--- coldfusion doesn't follow 302s, so acts like a 404 --->
+					<cfset ResponseData.Message = "Gateway was not successfully reached and the transaction was not processed" />
+					<cfset ResponseData.Status = getService().getStatusFailure() />
+				</cfcase>
+				<cfcase value="500">
+					<cfset ResponseData.Message = "Gateway did not respond as expected and the transaction may have been processed" />
+					<cfset ResponseData.Status = getService().getStatusUnknown() />
+				</cfcase>
+			</cfswitch>
+		<cfelseif NOT len(ResponseData.StatusCode)>
+			<cfset ResponseData.Status = getService().getStatusUnknown() />
+		</cfif>
+
 		<!--- return raw collection to be handled by gateway-specific code --->
-		<cfreturn response />
+		<cfreturn ResponseData />
 
 	</cffunction>
 
@@ -325,7 +296,7 @@
 		</cfif>
 
 		<!--- send request --->
-		<cfhttp url="#arguments.url#" method="#arguments.method#" timeout="#arguments.timeout#" throwonerror="yes">
+		<cfhttp url="#arguments.url#" method="#arguments.method#" timeout="#arguments.timeout#" throwonerror="no">
 			<!--- pass along any extra headers, like Accept or Authorization or Content-Type --->
 			<cfloop collection="#arguments.headers#" item="key">
 				<cfhttpparam name="#key#" value="#arguments.headers[key]#" type="header" />
@@ -414,6 +385,11 @@
 		</cfif>
 	</cffunction>
 
+	<!--- gateways may on RARE occasion need to override the response object; being generated by the base gateway allows an implementation to override this --->
+	<cffunction name="createResponse" access="public" output="false" returntype="any" hint="Create a response object with status set to unprocessed">
+		<cfreturn createObject("component", "cfpayment.api.model.response").init(argumentCollection = arguments, service = getService()) />
+	</cffunction>
+
 
 	<!--- ------------------------------------------------------------------------------
 
@@ -495,7 +471,6 @@
 
 		<cfthrow message="Method not implemented." type="cfpayment.MethodNotImplemented" />
 	</cffunction>
-
 
 	<!--- determine capability of this gateway --->
 	<cffunction name="getIsCCEnabled" access="public" output="false" returntype="boolean" hint="determine whether or not this gateway can accept credit card transactions">

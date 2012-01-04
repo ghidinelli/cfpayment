@@ -3,8 +3,15 @@
 	<cffunction name="setUp" returntype="void" access="public" output="false">
 
 		<cfscript>
-			variables.svc = createObject("component", "cfpayment.api.core");
-			variables.response=variables.svc.createResponse();
+			gw.path = "base";
+			gw.GatewayID = 1;
+			gw.MerchantAccount = 101010101;
+			gw.Username = 'test';
+			gw.Password = 'test';
+			
+			variables.svc = createObject("component", "cfpayment.api.core").init(gw);
+			variables.gw = variables.svc.getGateway();
+			variables.response = variables.gw.createResponse();
 		</cfscript>
 	</cffunction>
 

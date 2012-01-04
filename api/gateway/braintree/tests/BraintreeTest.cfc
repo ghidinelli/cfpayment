@@ -28,8 +28,6 @@
 		<cfset var gw = structNew() />
 
 		<cfscript>  
-			variables.svc = createObject("component", "cfpayment.api.core");
-			
 			gw.path = "braintree.braintree";
 			gw.Username = 'testapi';
 			gw.Password = 'password1';
@@ -38,7 +36,7 @@
 			gw.TestMode = true;		// defaults to true anyways
 
 			// create gw and get reference			
-			variables.svc.init(gw);
+			variables.svc = createObject("component", "cfpayment.api.core").init(gw);
 			variables.gw = variables.svc.getGateway();
 			
 		</cfscript>
@@ -747,7 +745,7 @@
 	<cffunction name="responseFromStatus_success" access="public" returntype="void" output="false">
 	
 		<cfset var response = "" />
-		<cfset var transactionId = 1146421977 /><!--- run testPurchase() and grab the ID from there --->
+		<cfset var transactionId = 1538331236 /><!--- run testPurchase() and grab the ID from there --->
 		<cfset var options = structNew() />
 
 		<!--- get masked details --->
@@ -767,7 +765,7 @@
 	<cffunction name="responseFromStatus_decline" access="public" returntype="void" output="false">
 	
 		<cfset var response = "" />
-		<cfset var transactionId = 1146422020 /><!--- run testPurchase() and grab the ID from there --->
+		<cfset var transactionId = 1538331247 /><!--- run testPurchase() and grab the ID from there --->
 		<cfset var options = structNew() />
 
 		<!--- get masked details --->
@@ -792,14 +790,15 @@
 		<!--- get masked details --->
 		<cfset gw.setTestMode(false) /><!--- should error out here since this transaction id doesn't exist for this user --->
 		<cfset response = gw.getResponseFromStatus(transactionId = transactionId, options = options) />
-
+		<cfset debug(response[1].getMemento()) />
 		<!--- no assertions, using mxunit:expectedException --->
 
 	</cffunction>
 
 
 	<cffunction name="check_braintree_setters" output="false" access="public" returntype="any">
-		<cfset assertTrue(gw.getSecurityKey() EQ 'zjhh9UAS7d4UkBVqa6sagBvpeT733U88', "The security key was not set through the init config object") />
+		<cfset gw.setTestMode(false) />
+		<cfset assertTrue(gw.getSecurityKey() EQ 'zjhh9UAS7d4UkBVqa6sagBvpeT733U88', "The security key was not set through the init config object, was: #gw.getSecurityKey()#") />
 		<cfset assertTrue(gw.getSecurityKeyID() EQ '1084547', "The security key id was not set through the init config object") />
 	</cffunction>
 

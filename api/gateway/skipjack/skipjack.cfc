@@ -214,7 +214,7 @@ UPDATES:
 		<cfset var response = "" />
 
 		<!--- send it over the wire using the base gateway --->
-		<cfset response = super.process(argumentCollection = arguments) />
+		<cfset response = createResponse(argumentCollection = super.process(argumentCollection = arguments)) />
 
 		<!--- we do some meta-checks for gateway-level errors (as opposed to auth/decline errors) --->
 		<cfif NOT response.hasError()>

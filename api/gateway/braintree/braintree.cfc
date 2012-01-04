@@ -155,7 +155,7 @@
 
 
 		<!--- send it over the wire using the base gateway --->
-		<cfset response = super.process(payload = p) />
+		<cfset response = createResponse(argumentCollection = super.process(payload = p)) />
 
 		
 		<!--- we do some meta-checks for gateway-level errors (as opposed to auth/decline errors) --->
@@ -680,7 +680,7 @@
 
 		<cfset var status = status(argumentCollection = arguments) />
 		<cfset var arrResponse = arrayNew(1) />
-		<cfset var response = getService().createResponse() />
+		<cfset var response = createResponse() />
 		<cfset var xml = status.getParsedResult() />
 		<cfset var results = "" />
 		<cfset var ii = "" />
@@ -703,7 +703,7 @@
 			
 				<!--- this gives us a base of the "transaction" node so everything is right below it --->
 				<cfset results = xml.xmlRoot.xmlChildren[ii] />
-				<cfset response = getService().createResponse() />
+				<cfset response = createResponse() />
 
 				<!--- store (complete) parsed result for this transaction --->
 				<cfset response.setResult(toString(results)) />
@@ -899,6 +899,16 @@
 		
 		<!--- XML looks like <nm_response><transaction>...</transaction><transaction>...</transaction></nm_response> --->
 		<cfreturn arrayLen(arguments.status.xmlRoot.xmlChildren) GT 0 />
+	</cffunction>
+
+
+	<cffunction name="getIsCCEnabled" access="public" output="false" returntype="boolean" hint="determine whether or not this gateway can accept credit card transactions">
+		<cfreturn true />
+	</cffunction>
+
+
+	<cffunction name="getIsEFTEnabled" access="public" output="false" returntype="boolean" hint="determine whether or not this gateway can accept ACH/EFT transactions">
+		<cfreturn true />
 	</cffunction>
 
 </cfcomponent>

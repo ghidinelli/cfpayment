@@ -51,10 +51,11 @@
 			
 		var response = "";
 		headers.authorization = "Basic #toBase64(variables.SecretKey & ":")#";
-		//send it over the wire using the base gateway 
+
 		//Stripe returns errors with http status like 400,402 or 404 (https://stripe.com/docs/api#errors)
-		//we need to set throwonerror="no" so we can hande that
-		response = super.process(gatewayUrl=arguments.gatewayUrl, payload = payload, headers = headers, method=arguments.method, throwonerror="no");
+		response = createResponse(argumentCollection = super.process(gatewayUrl=arguments.gatewayUrl, payload = payload, headers = headers, method=arguments.method));
+		// now add custom handling of status codes for Stripe
+		handleHttpStatus(response = response, status = response.getStatusCode());
 		
 		//we do some meta-checks for gateway-level errors (as opposed to auth/decline errors) 
 		if (NOT response.hasError())
