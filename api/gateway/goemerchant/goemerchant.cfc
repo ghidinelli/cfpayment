@@ -65,7 +65,7 @@
 					<cfoutput>
 						#arguments.payload#
 					</cfoutput>
-			        <cfif cgi.REMOTE_ADDR NEQ "::1">
+			        <cfif !find("::1", cgi.REMOTE_ADDR)>
 			            <FIELD KEY="remote_ip_address">#cgi.REMOTE_ADDR#</FIELD>
 			       	<cfelse>
 			            <FIELD KEY="remote_ip_address">127.0.0.1</FIELD>
