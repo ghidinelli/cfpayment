@@ -78,7 +78,7 @@
 		<cfset local.h = { "Content-Type" = "text/xml" } />
 		<cfset local.p = local.strXML.trim()>
 		<cfset local.processorData = createResponse(argumentCollection = super.process(payload = local.p, headers=local.h)) />
-		
+
 
 		<cfif !local.processorData.hasError()>
 	        <cfset local.processorXMLData = XmlParse(local.processorData.getResult())>
@@ -177,10 +177,11 @@
 
 		<cfset var local = structNew() />
 		<cfset arguments.options.operationType = "sale" /> <!--- used in process method --->
+		<cfset local.ccNum = arguments.account.getAccount() />
 		<cfset local.payload = '<FIELD KEY="order_id">#arguments.options.order_ID#</FIELD>
 			            <FIELD KEY="total">#numberFormat(arguments.money.getAmount(),'9999.99')#</FIELD>
-			            <FIELD KEY="card_name">#getCardType(arguments.account).shortName#</FIELD>
-			            <FIELD KEY="card_number">#arguments.account.getAccount()#</FIELD>
+			            <FIELD KEY="card_name">#getCardType(local.ccNum).shortName#</FIELD>
+			            <FIELD KEY="card_number">#local.ccNum#</FIELD>
 			            <FIELD KEY="card_exp"> #numberFormat(arguments.account.getMonth(), "00")##right(arguments.account.getYear(), 2)#</FIELD>
 			            <FIELD KEY="owner_name">#arguments.account.getFirstName()# #arguments.account.getLastName()#</FIELD>
 			            <FIELD KEY="owner_street"></FIELD>
@@ -190,9 +191,11 @@
 			            <FIELD KEY="owner_country"></FIELD>
 			            <FIELD KEY="owner_email"></FIELD>
 			            <FIELD KEY="owner_phone"></FIELD>' />
+
 		<cfif trim(arguments.account.getVerificationValue()) NEQ "">
             <cfset local.payload = local.payload & '<FIELD KEY="cvv2">#arguments.account.getVerificationValue()#</FIELD>' />
 		</cfif>
+
 		<cfset local.response = process(local.payload, options) />
 
 		<cfreturn local.response />
@@ -207,10 +210,11 @@
 
 		<cfset var local = structNew() />
 		<cfset arguments.options.operationType = "auth" /> <!--- used in process method --->
+		<cfset local.ccNum = arguments.account.getAccount() />
 		<cfset local.payload = '<FIELD KEY="order_id">#arguments.options.order_ID#</FIELD>
 			            <FIELD KEY="total">#numberFormat(arguments.money.getAmount(),'9999.99')#</FIELD>
-			            <FIELD KEY="card_name">#getCardType(arguments.account).shortName#</FIELD>
-			            <FIELD KEY="card_number">#arguments.account.getAccount()#</FIELD>
+			            <FIELD KEY="card_name">#getCardType(local.ccNum).shortName#</FIELD>
+			            <FIELD KEY="card_number">#local.ccNum#</FIELD>
 			            <FIELD KEY="card_exp"> #numberFormat(arguments.account.getMonth(), "00")##right(arguments.account.getYear(), 2)#</FIELD>
 			            <FIELD KEY="owner_name">#arguments.account.getFirstName()# #arguments.account.getLastName()#</FIELD>
 			            <FIELD KEY="owner_street"></FIELD>
@@ -274,12 +278,10 @@
 
 	</cffunction>
 
-
 	<!--- this is a credit card gateway --->
 	<cffunction name="getIsCCEnabled" output="false" access="public" returntype="boolean" hint="determine whether or not this gateway can accept credit card transactions">
 		<cfreturn true />
 	</cffunction>
-
 
 	<!---
 		// CardTypes              Prefix          Width
@@ -299,30 +301,30 @@
 		// Most comprehensive seems to be Wikipedia: http://en.wikipedia.org/wiki/Credit_card_number
 	--->
 	<cffunction name="getCardType" access="private" returntype="struct" output="false" hint="Card Type short/long name required by GoEmerchant gateway">
-		<cfargument name="account" type="any" required="true" />
-		
+		<cfargument name="ccNum" type="numeric" required="true" />
+
 		<cfscript>
-			var local = structNew(); 
-			local.ccNum = arguments.account.getAccount();
-			switch(len(local.ccNum))
+			var local = structNew();
+
+			switch(len(arguments.ccNum))
 			{
 				case 16:
-					if(left(local.ccNum, 1) == 4)
+					if(left(arguments.ccNum, 1) == 4)
 					{
 						local.returnStruct.shortName = "Visa";
 						local.returnStruct.longName = "Visa";
 					}
-					else if(listFind("51,52,53,54,55", left(local.ccNum, 2)))
+					else if(listFind("51,52,53,54,55", left(arguments.ccNum, 2)))
 					{
 						local.returnStruct.shortName = "MasterCard";
 						local.returnStruct.longName = "Master Card";
 					}
-					else if(left(local.ccNum, 4) == 6011)
+					else if(left(arguments.ccNum, 4) == 6011)
 					{
 						local.returnStruct.shortName = "JCB";
 						local.returnStruct.longName = "JCB";
 					}
-					else if(left(local.ccNum, 1) == 3)
+					else if(left(arguments.ccNum, 1) == 3)
 					{
 						local.returnStruct.shortName = "JCB";
 						local.returnStruct.longName = "JCB";
@@ -330,17 +332,17 @@
 				break;
 
 				case 15:
-					if(listFind("34,37", left(local.ccNum, 2)))
+					if(listFind("34,37", left(arguments.ccNum, 2)))
 					{
 						local.returnStruct.shortName = "Amex";
 						local.returnStruct.longName = "American Express";
 					}
-					else if(listFind("2131,1800", left(local.ccNum, 4)))
+					else if(listFind("2131,1800", left(arguments.ccNum, 4)))
 					{
 						local.returnStruct.shortName = "JCB";
 						local.returnStruct.longName = "JCB";
 					}
-					else if(listFind("2014,2149", left(local.ccNum, 4)))
+					else if(listFind("2014,2149", left(arguments.ccNum, 4)))
 					{
 						local.returnStruct.shortName = "EnRoute";
 						local.returnStruct.longName = "EnRoute";
@@ -348,12 +350,12 @@
 				break;
 
 				case 14:
-					if(left(local.ccNum, 2) == 36 OR listFind("301,302,303,304,305", left(local.ccNum, 3)))
+					if(left(arguments.ccNum, 2) == 36 OR listFind("301,302,303,304,305", left(arguments.ccNum, 3)))
 					{
 						local.returnStruct.shortName = "DinersClub";
 						local.returnStruct.longName = "Diners Club";
 					}
-					else if(left(local.ccNum, 2) == 38)
+					else if(left(arguments.ccNum, 2) == 38)
 					{
 						local.returnStruct.shortName = "CarteBlanche";
 						local.returnStruct.longName = "Carte Blanche";
@@ -361,7 +363,7 @@
 				break;
 
 				case 13:
-					if(left(local.ccNum, 1) == 4)
+					if(left(arguments.ccNum, 1) == 4)
 					{
 						local.returnStruct.shortName = "Visa";
 						local.returnStruct.longName = "Visa";
