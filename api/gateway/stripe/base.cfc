@@ -24,7 +24,7 @@
 		<cfargument name="headers" type="struct" required="false" />
 
 		<!--- prepare response before attempting to send over wire --->
-		<cfset var response = getService().createResponse() />
+		<cfset var response = createResponse() />
 		<cfset var CFHTTP = "" />
 		<cfset var status = "" />
 		<cfset var paramType = "" />

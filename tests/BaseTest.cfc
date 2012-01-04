@@ -7,7 +7,7 @@
 		<cfscript>  
 			variables.svc = createObject("component", "cfpayment.api.core");
 			
-			gw.path = "base";
+			gw.path = "bogus.unittest";
 			gw.GatewayID = 1;
 			gw.MerchantAccount = 101010101;
 			gw.Username = 'test';
@@ -92,7 +92,7 @@
 		<cfset injectMethod(gw, this, "mock_http_empty_status_code", "doHttpCall") />
 		
 		<cfset response = gw.process(method = 'post', payload = structNew()) />
-		<cfset assertTrue(response.getStatus() EQ variables.svc.getStatusUnknown(), "Unknown HTTP status code so unknown payment status") />
+		<cfset assertTrue(response.getStatus() EQ variables.svc.getStatusUnknown(), "Unknown HTTP status code so unknown payment status, was: #response.getStatus()#") />
 	</cffunction>
 
 	<cffunction name="process_httpfailure" access="public" output="false">
@@ -115,41 +115,31 @@
 		<cfset assertTrue(response.getStatus() EQ variables.svc.getStatusTimeout(), "Status should be timeout") />
 	</cffunction>
 
-	<cffunction name="process_http404" access="public" output="false">
+	<cffunction name="process_http_status_code_302" access="public" output="false">
 		<cfset var response = "" />
 		<cfset var gw = variables.svc.getGateway() />
 		<cfset makePublic(gw, "process") />
-		<cfset injectMethod(gw, this, "mock_error_http404", "doHttpCall") />
-		
-		<cfset response = gw.process(method = 'post', payload = structNew()) />
-		<cfset assertTrue(response.getStatus() EQ variables.svc.getStatusFailure(), "Status should be failure for 404") />
-	</cffunction>
-
-	<cffunction name="process_http302" access="public" output="false">
-		<cfset var response = "" />
-		<cfset var gw = variables.svc.getGateway() />
-		<cfset makePublic(gw, "process") />
-		<cfset injectMethod(gw, this, "mock_error_http302", "doHttpCall") />
+		<cfset injectMethod(gw, this, "mock_http_302", "doHttpCall") />
 		
 		<cfset response = gw.process(method = 'post', payload = structNew()) />
 		<cfset assertTrue(response.getStatus() EQ variables.svc.getStatusFailure(), "Status should be failure for 302 permanently moved (CF won't follow this, so it's like a 404)") />
 	</cffunction>
 
-	<cffunction name="process_http503" access="public" output="false">
+	<cffunction name="process_http_status_code_503" access="public" output="false">
 		<cfset var response = "" />
 		<cfset var gw = variables.svc.getGateway() />
 		<cfset makePublic(gw, "process") />
-		<cfset injectMethod(gw, this, "mock_error_http503", "doHttpCall") />
+		<cfset injectMethod(gw, this, "mock_http_503", "doHttpCall") />
 		
 		<cfset response = gw.process(method = 'post', payload = structNew()) />
 		<cfset assertTrue(response.getStatus() EQ variables.svc.getStatusFailure(), "Status should be failure for service unavailable (HTTP 503)") />
 	</cffunction>
 
-	<cffunction name="process_error_http500" access="public" output="false">
+	<cffunction name="process_http_status_code_500" access="public" output="false">
 		<cfset var response = "" />
 		<cfset var gw = variables.svc.getGateway() />
 		<cfset makePublic(gw, "process") />
-		<cfset injectMethod(gw, this, "mock_error_http500", "doHttpCall") />
+		<cfset injectMethod(gw, this, "mock_http_500", "doHttpCall") />
 		
 		<cfset response = gw.process(method = 'post', payload = structNew()) />
 		<cfset assertTrue(response.getStatus() EQ variables.svc.getStatusUnknown(), "Status should be unknown for a 500 server error (we don't know if the transaction finished or not)") />
@@ -177,12 +167,12 @@
 	
 		<cfset assertTrue(gw.getTimeout() EQ 300, "Baseline cfpayment timeout is 300 seconds or 5 minutes") />
 		<!--- this may vary based upon your environment and CF version! --->
-		<cfset assertTrue(gw.getCurrentRequestTimeout() EQ 60, "Default page timeout on brian's laptop is 60s, was: #gw.getCurrentRequestTimeout()#, 0 means your system doesn't support determining this dynamically; try CF8?") />
+		<cfset assertTrue(gw.getCurrentRequestTimeout() NEQ 0, "Default page timeout is: #gw.getCurrentRequestTimeout()#, 0 means your system doesn't support determining this dynamically; try CF8?") />
 		
 		<cfset gw.setTimeout(5) />
 		<cfset response = gw.process(method = 'post', payload = structNew()) />
 		<!--- the getResult() is set to the timeout value because of our mock function for doHttpCall --->
-		<cfset assertTrue(response.getResult() EQ 60, "When page timeout > cfpayment timeout, result should be = page timeout; was: #response.getResult()#") />
+		<cfset assertTrue(response.getResult() EQ gw.getCurrentRequestTimeout(), "When page timeout > cfpayment timeout, result should be = page timeout; was: #response.getResult()#") />
 
 		<cfset gw.setTimeout(500) />
 		<cfset response = gw.process(method = 'post', payload = structNew()) />
@@ -196,10 +186,10 @@
 		<cfset var gw = variables.svc.getGateway() />
 		<cfset makePublic(gw, "getUsername") />
 		<cfset makePublic(gw, "getPassword") />
-		
-		<cfset assertTrue(gw.getGatewayID() EQ 1, "The value should have been 1") />
-		<cfset assertTrue(gw.getGatewayName() EQ "Base Gateway", "The value should have been 'Base Gateway'") />
-		<cfset assertTrue(gw.getGatewayVersion() EQ "1.0", "The value should have been 1.0") />
+
+		<cfset assertTrue(gw.getGatewayID() EQ 1, "The value should have been 1, was: #gw.getGatewayID()#") />
+		<cfset assertTrue(gw.getGatewayName() EQ "Bogus Gateway", "The value should have been 'Base Gateway'") />
+		<cfset assertTrue(gw.getGatewayVersion() EQ "1.1", "The value should have been 1.0") />
 		<cfset assertTrue(gw.getUsername() EQ "test", "The value should have been test") />
 		<cfset assertTrue(gw.getPassword() EQ "test", "The value should have been test") />
 		<!--- no setter available for gateway url - needed?  probably not, should be hardcoded by gateway developer --->
@@ -273,6 +263,18 @@
 		<cfset var res = {fileContent = '', statusCode = '404 Not Found', errorDetail = 'Unit Test errorDetail Value' } />
 		<cfreturn res />
 	</cffunction>
+	<cffunction name="mock_http_302" access="private" output="false">
+		<cfset var res = {fileContent = '', statusCode = '302 Moved Temporarily', errorDetail = 'Unit Test errorDetail Value' } />
+		<cfreturn res />
+	</cffunction>
+	<cffunction name="mock_http_503" access="private" output="false">
+		<cfset var res = {fileContent = '', statusCode = '503 Service Unavailable', errorDetail = 'Unit Test errorDetail Value' } />
+		<cfreturn res />
+	</cffunction>
+	<cffunction name="mock_http_500" access="private" output="false">
+		<cfset var res = {fileContent = '', statusCode = '500 Server Error', errorDetail = 'Unit Test errorDetail Value' } />
+		<cfreturn res />
+	</cffunction>
 	<cffunction name="mock_http_empty_status_code" output="false" access="private" returntype="any">
 		<cfset var res = {fileContent = '', statusCode = '', errorDetail = 'Unit Test errorDetail Value' } />
 		<cfreturn res />
@@ -291,18 +293,6 @@
 	</cffunction>
 	<cffunction name="mock_error_requesttimeout" access="private" output="false">
 		<cfthrow type="coldfusion.runtime.RequestTimedOutException" message="coldfusion.runtime.RequestTimedOutException" detail="Unit Test Exception" />
-	</cffunction>
-	<cffunction name="mock_error_http404" access="private" output="false">
-		<cfthrow type="COM.Allaire.ColdFusion.HTTPNotFound" message="COM.Allaire.ColdFusion.HTTPNotFound" detail="Unit Test Exception" />
-	</cffunction>
-	<cffunction name="mock_error_http302" access="private" output="false">
-		<cfthrow type="COM.Allaire.ColdFusion.HTTPMovedTemporarily" message="COM.Allaire.ColdFusion.HTTPMovedTemporarily" detail="Unit Test Exception" />
-	</cffunction>
-	<cffunction name="mock_error_http503" access="private" output="false">
-		<cfthrow type="COM.Allaire.ColdFusion.HTTPServiceUnavailable" message="COM.Allaire.ColdFusion.HTTPServiceUnavailable" detail="Unit Test Exception" />
-	</cffunction>
-	<cffunction name="mock_error_http500" access="private" output="false">
-		<cfthrow type="COM.Allaire.ColdFusion.HTTPServerError" message="COM.Allaire.ColdFusion.HTTPServerError" detail="Unit Test Exception" />
 	</cffunction>
 	<cffunction name="mock_error_unknown" access="private" output="false">
 		<cfthrow type="COM.Allaire.ColdFusion.SomeOtherError" message="COM.Allaire.ColdFusion.SomeOtherError" detail="Unit Test Exception" />

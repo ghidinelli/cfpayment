@@ -18,40 +18,21 @@
 --->
 <cfcomponent name="response" displayname="Gateway Response" output="false" hint="Normalized result for gateway response">
 
-<!---
-
-	properties that a gateway might want to set in the response
-	to normalize the answer from the bank:
-
-	.LocalID -- the value in our system, ExternalID in iTransact parlance or Invoice Number in Authorize.net
-	.TransactionID -- the value in their system, InternalID in iTransact parlance
-	.approvalcode
-	.avscategory
-	.avsapproval
-	.cvvcategory
-	.cvvapproval
-	.messages[]
-	.booSuccess
-
-
-	.set
-
---->
-
 	<!--- CONSTANTS in psuedo-constructor --->
 	<cfscript>
 		variables.cfpayment = structNew();
 
 		variables.cfpayment.Status = "";			// set in init() to be unprocessed
+		variables.cfpayment.StatusCode = "";		// hold the HTTP/connection status code 
 		variables.cfpayment.Result = "";			// hold the raw response from the other end
-		variables.cfpayment.Test = false;
+		variables.cfpayment.TestMode = false;
 		variables.cfpayment.Message = "";
 		variables.cfpayment.TransactionID = ""; 	// transaction id from remote system
 		variables.cfpayment.Authorization = ""; 	// six-character alphanum approval/authorization code
 		variables.cfpayment.AVSCode = "";
 		variables.cfpayment.CVVCode = "";
 		variables.cfpayment.ParsedResult = "";
-		variables.cfpayment.RequestData = "";		// store the payload from the Request; internal use only; may go away
+		variables.cfpayment.RequestData = "";		// store the payload from the Request; dev use only; populated only when testmode = true
 		variables.cfpayment.TokenID = "";			// normalize an ID for vault/remote lockbox services (store/unstore methods)
 
 		// list the possible AVS responses
@@ -97,34 +78,42 @@
 	</cfscript>
 
 
-
-	<cffunction name="init" output="false" access="public" returntype="any" hint="">
+	<cffunction name="init" output="false" access="public" returntype="any" hint="Instantiate (and optionally populate) the response object">
 		<cfargument name="service" type="any" required="true" />
+		<cfargument name="Status" type="string" required="false" />
+		<cfargument name="StatusCode" type="string" required="false" />
+		<cfargument name="Message" type="string" required="false" />
+		<cfargument name="Result" type="string" required="false" />
+		<cfargument name="RequestData" type="struct" required="false" />
+		<cfargument name="TestMode" type="boolean" required="false" />
 
 		<cfset variables.cfpayment.service = arguments.service />
-		<cfset setStatus(getService().getStatusUnprocessed()) />
 
+		<cfif NOT structKeyExists(arguments, "Status")>
+			<cfset setStatus(getService().getStatusUnprocessed()) />
+		</cfif>
+		
+		<cfset populate(argumentCollection = arguments) />
+		
 		<cfreturn this />
 	</cffunction>
+
 
 	<cffunction name="getService" output="false" access="private" returntype="any" hint="get access to the service for generating responses, errors, etc">
 		<cfreturn variables.cfpayment.service />
 	</cffunction>
 
 
-	<!--- success is determined by status code --->
-	<cffunction name="getSuccess" access="public" output="false" returntype="string">
+	<cffunction name="getSuccess" access="public" output="false" returntype="string" hint="Success is determined by comparing status to success in the core API">
 		<cfreturn getStatus() EQ getService().getStatusSuccessful()>
 	</cffunction>
 
-	<!--- an error is determined by the status code; the list of good/bad is in the core API --->
-	<cffunction name="hasError" access="public" output="false" returntype="boolean">
+	<cffunction name="hasError" access="public" output="false" returntype="boolean" hint="An error is determined by the status code; the list of good/bad is in the core API">
 		<cfreturn listFind(getService().getStatusErrors(), getStatus()) />
 	</cffunction>
 
 
-	<!---  Usage: status tracks the flow from unprocessed to attempted to success or exception --->
-	<cffunction name="getStatus" access="public" output="false" returntype="numeric">
+	<cffunction name="getStatus" access="public" output="false" returntype="numeric" hint="Status tracks transaction flow from unprocessed to attempted to success or exception">
 		<cfreturn variables.cfpayment.Status />
 	</cffunction>
 	<cffunction name="setStatus" access="public" output="false" returntype="any">
@@ -133,6 +122,13 @@
 		<cfreturn this />
 	</cffunction>
 
+	<cffunction name="getStatusCode" access="public" output="false" returntype="any" hint="StatusCode represents the original connection's result status.  For HTTP this would be like 200, 404, 500, etc.  For RESTful APIs which may use status codes to define results">
+		<cfreturn variables.StatusCode />
+	</cffunction>
+	<cffunction name="setStatusCode" access="public" output="false" returntype="void">
+		<cfargument name="StatusCode" type="any" required="true" />
+		<cfset variables.StatusCode = arguments.StatusCode />
+	</cffunction>
 
 	<!---  Usage: getAVSCode / setAVSCode  methods for AVSCode value --->
 	<cffunction name="getAVSCode" access="public" output="false" returntype="any">
@@ -172,7 +168,7 @@
 
 
 	<!---  Gateways typically return both an Authorization code (from Visa/Amex/MC/etc) and a Transaction ID (their reference number) --->
-	<cffunction name="getAuthorization" access="public" output="false" returntype="string">
+	<cffunction name="getAuthorization" access="public" output="false" returntype="string" hint="Authorization code is a bank-provided ID generated by Visa/Amex/MC/etc">
 		<cfreturn variables.cfpayment.Authorization />
 	</cffunction>
 	<cffunction name="setAuthorization" access="public" output="false" returntype="any">
@@ -181,7 +177,7 @@
 		<cfreturn this />
 	</cffunction>
 
-	<cffunction name="getTransactionID" access="public" output="false" returntype="any">
+	<cffunction name="getTransactionID" access="public" output="false" returntype="any" hint="Transaction ID is an ID generated by the gateway to identify the transaction">
 		<cfreturn variables.cfpayment.TransactionID />
 	</cffunction>
 	<cffunction name="setTransactionID" access="public" output="false" returntype="any">
@@ -190,7 +186,7 @@
 		<cfreturn this />
 	</cffunction>
 
-	<cffunction name="getTokenID" access="public" output="false" returntype="any">
+	<cffunction name="getTokenID" access="public" output="false" returntype="any" hint="Token ID is the reference to an account stored by the gateway">
 		<cfreturn variables.cfpayment.TokenID />
 	</cffunction>
 	<cffunction name="setTokenID" access="public" output="false" returntype="any">
@@ -200,8 +196,7 @@
 	</cffunction>
 
 
-	<!---  hold the raw response from the payment processor for the gateway to access and leverage --->
-	<cffunction name="getResult" access="public" output="false" returntype="any">
+	<cffunction name="getResult" access="public" output="false" returntype="any" hint="Holds the raw response from the payment processor for the gateway to parse">
 		<cfreturn variables.cfpayment.Result />
 	</cffunction>
 	<cffunction name="setResult" access="public" output="false" returntype="any">
@@ -221,28 +216,26 @@
 	</cffunction>
 
 
-	<cffunction name="getTest" access="public" output="false" returntype="boolean">
-		<cfreturn variables.cfpayment.Test />
+	<cffunction name="getTestMode" access="public" output="false" returntype="boolean">
+		<cfreturn variables.TestMode />
 	</cffunction>
-	<cffunction name="setTest" access="public" output="false" returntype="any">
-		<cfargument name="Test" type="boolean" required="true" />
-		<cfset variables.cfpayment.Test = arguments.Test />
-		<cfreturn this />
+	<cffunction name="setTestMode" access="public" output="false" returntype="void">
+		<cfargument name="TestMode" type="boolean" required="true" />
+		<cfset variables.TestMode = arguments.TestMode />
 	</cffunction>
 
-	<cffunction name="getRequestData" output="false" access="public" returntype="any" hint="">
+
+	<cffunction name="getRequestData" output="false" access="public" returntype="any" hint="RequestData is only populated when TestMode = true">
 		<cfreturn variables.cfpayment.RequestData />
 	</cffunction>
-
-	<cffunction name="setRequestData" output="false" access="public" returntype="any" hint="">
+	<cffunction name="setRequestData" output="false" access="public" returntype="any" hint="Be cautious when populating RequestData.  Card holder data must be protected in compliance with PCI DSS.">
 		<cfset variables.cfpayment.RequestData = arguments[1] />
 		<cfreturn this />
 	</cffunction>
 
 
-
 	<!---  Usage: getMessage / setMessage  methods for Message value --->
-	<cffunction name="getMessage" access="public" output="false" returntype="any">
+	<cffunction name="getMessage" access="public" output="false" returntype="any" hint="Human-readable transaction result">
 		<cfreturn variables.cfpayment.Message />
 	</cffunction>
 	<cffunction name="setMessage" access="public" output="false" returntype="any">
@@ -251,7 +244,6 @@
 		<cfreturn this />
 	</cffunction>
 
-	<!--- 	Date: 8/16/2008  Usage: determine if postal code matched in AVS --->
 	<cffunction name="getAVSPostalMatch" output="false" access="private" returntype="string" hint="Normalize the AVS postal match code">
 		<cfset var res = uCase(getAVSCode()) />
 
@@ -267,7 +259,6 @@
 		<cfreturn 'U' />
 	</cffunction>
 
-	<!--- 	Date: 8/16/2008  Usage: find if street address matched AVS --->
 	<cffunction name="getAVSStreetMatch" output="false" access="private" returntype="string" hint="Normalize the AVS street match code">
 		<cfset var res = uCase(getAVSCode()) />
 
@@ -282,7 +273,7 @@
 		<cfreturn 'U' /><!--- unknown - AVS invalid or could not be verified --->
 	</cffunction>
 
-	<cffunction name="getAVSMessage" output="false" access="public" returntype="any" hint="">
+	<cffunction name="getAVSMessage" output="false" access="public" returntype="any" hint="Get the human-readable AVS response">
 		<cfset var ret = "" />
 		<cfif structKeyExists(variables.cfpayment.ResponseAVS, getAVSCode())>
 			<cfset ret = variables.cfpayment.ResponseAVS[getAVSCode()] />
@@ -290,7 +281,7 @@
 		<cfreturn ret />
 	</cffunction>
 
-	<cffunction name="getCVVMessage" output="false" access="public" returntype="any" hint="">
+	<cffunction name="getCVVMessage" output="false" access="public" returntype="any" hint="Get the human-readable CVV response">
 		<cfset var ret = "" />
 		<cfif structKeyExists(variables.cfpayment.ResponseCVV, getCVVCode())>
 			<cfset ret = variables.cfpayment.ResponseCVV[getCVVCode()] />
@@ -298,11 +289,10 @@
 		<cfreturn ret />
 	</cffunction>
 
-	<!--- 	Date: 8/16/2008  Usage: did AVS pass fully? --->
-	<cffunction name="isValidAVS" output="false" access="public" returntype="boolean" hint="did AVS pass fully?">
-		<cfargument name="AllowBlankCode" type="boolean" default="true" hint="Set to true to allow blank AVS return code to pass validity." />
-		<cfargument name="AllowPostalOnlyMatch" type="boolean" default="false" hint="Set to true to allow postal-only AVS match to pass validity."  />
-		<cfargument name="AllowStreetOnlyMatch" type="boolean" default="false" hint="Set to true to allow prohibit street-only AVS match to pass validity."  />
+	<cffunction name="isValidAVS" output="false" access="public" returntype="boolean" hint="Check if AVS passed fully?">
+		<cfargument name="AllowBlankCode" type="boolean" default="true" hint="Set to true to allow blank AVS return code to pass validity" />
+		<cfargument name="AllowPostalOnlyMatch" type="boolean" default="false" hint="Set to true to allow postal-only AVS match to pass validity"  />
+		<cfargument name="AllowStreetOnlyMatch" type="boolean" default="false" hint="Set to true to allow prohibit street-only AVS match to pass validity"  />
 		<cfset var ret = false />
 		<cfif (arguments.AllowBlankCode AND (len(getAVSCode()) EQ 0))>
 			<cfset ret = true />
@@ -316,12 +306,10 @@
 			</cfif>
 		</cfif>
 		<cfreturn ret />
-<!--- 		<cfreturn (len(getAVSCode()) GT 0) AND (getAVSPostalMatch() EQ "Y") AND (getAVSStreetMatch() EQ "Y") /> --->
 	</cffunction>
 
-	<!--- 	Date: 8/16/2008  Usage: check if the CVV response indicates success --->
 	<cffunction name="isValidCVV" output="false" access="public" returntype="boolean" hint="Check if the CVV response indicates a match">
-		<cfargument name="AllowBlankCode" type="boolean" default="true" hint="Set to true to allow blank CVV return code to pass validity." />
+		<cfargument name="AllowBlankCode" type="boolean" default="true" hint="Set to true to allow blank CVV return code to pass validity" />
 		<cfset var ret = false />
 		<cfif (arguments.AllowBlankCode AND (len(getCVVCode()) EQ 0)) OR (getCVVCode() EQ "M")>
 			<cfset ret = true />
@@ -340,10 +328,19 @@
 		</cfif>
 	</cffunction>
 
-	<!--- 	Date: 7/6/2008  Usage: return a copy of the internal values --->
-	<cffunction name="getMemento" output="false" access="public" returntype="any" hint="return a copy of the internal values">
+	<cffunction name="getMemento" output="false" access="public" returntype="any" hint="Return a copy of the internal values">
 		<cfreturn duplicate(variables.cfpayment) />
 	</cffunction>
 
+	<cffunction name="populate" access="private" returntype="void" output="false" hint="Helper function to dynamically populate setters">
+		<cfset var argName = "" />
+		<cfloop collection="#arguments#" item="argName">
+			<cfif structKeyExists(arguments, argName) AND structKeyExists(this, "set" & argName)>
+				<cfinvoke component="#this#" method="set#argName#">
+					<cfinvokeargument name="#argName#" value="#arguments[argName]#" />
+				</cfinvoke>
+			</cfif>
+		</cfloop>
+	</cffunction>
 
 </cfcomponent>

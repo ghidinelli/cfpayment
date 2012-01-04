@@ -43,16 +43,15 @@
 	<cffunction name="init" output="false" access="public" returntype="any" hint="Initialize the core API and return a reference to it">
 		<cfargument name="config" type="struct" required="true" />
 
-		<cfset var cfg = arguments.config />
+		<cfset variables.instance.config = arguments.config />
 
 		<!--- the core service expects a structure of configuration information to be passed to it
 			  telling it what gateway to use and so forth --->
 		<cftry>
 			<!--- instantiate gateway and initialize it with the passed configuration --->
-			<cfset variables.instance.gateway = createObject("component", "gateway.#cfg.path#").init(config = cfg, service = this) />
+			<cfset variables.instance.gateway = createObject("component", "gateway.#lCase(variables.instance.config.path)#").init(config = variables.instance.config, service = this) />
 
 			<cfcatch>
-				<cfrethrow />
 				<cfthrow message="Invalid Gateway Specified" type="cfpayment.InvalidGateway" />
 			</cfcatch>
 		</cftry>
@@ -63,7 +62,6 @@
 
 	<!--- PUBLIC METHODS --->
 
-	<!--- 	Date: 7/6/2008  Usage: return the lowest priority gateway available or throw an error --->
 	<cffunction name="getGateway" access="public" output="false" returntype="any" hint="return the gateway or throw an error">
 		<cfreturn variables.instance.gateway />
 	</cffunction>
@@ -77,27 +75,18 @@
 		</cfif>
 	</cffunction>
 
-	<!--- 	Date: 7/6/2008  Usage: return a credit card object for population --->
 	<cffunction name="createCreditCard" output="false" access="public" returntype="any" hint="return a credit card object for population">
 		<cfreturn createObject("component", "model.creditcard").init(argumentCollection = arguments) />
 	</cffunction>
 
-	<!--- 	Date: 7/6/2008  Usage: create an EFT object for population --->
 	<cffunction name="createEFT" output="false" access="public" returntype="any" hint="create an electronic funds transfer (EFT) object for population">
 		<cfreturn createObject("component", "model.eft").init(argumentCollection = arguments) />
 	</cffunction>
 
-	<!--- 	Date: 11/18/2008  Usage: create a remote storage token for population --->
 	<cffunction name="createToken" output="false" access="public" returntype="any" hint="create a remote storage token for population">
 		<cfreturn createObject("component", "model.token").init(argumentCollection = arguments) />
 	</cffunction>
 
-	<!--- 	Date: 7/6/2008  Usage: create a response component --->
-	<cffunction name="createResponse" output="false" access="public" returntype="any" hint="Create a response component with status set to unprocessed">
-		<cfreturn createObject("component", "model.response").init(argumentCollection = arguments, service = this) />
-	</cffunction>
-
-	<!--- 	Date: 7/6/2008  Usage: create a money object for currency and formatting controls --->
 	<cffunction name="createMoney" output="false" access="public" returntype="any" hint="Create a money component for amount and currency conversion and formatting">
 		<cfreturn createObject("component", "model.money").init(argumentCollection = arguments) />
 	</cffunction>

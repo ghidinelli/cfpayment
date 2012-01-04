@@ -117,7 +117,7 @@
 
 
 			// send it over the wire using the base gateway's transport function.
-			response = super.process(payload = p);
+			response = createResponse(argumentCollection = super.process(payload = p));
 
 			
 			// do some meta-checks for gateway-level errors (as opposed to auth/decline errors)

@@ -36,7 +36,7 @@
 		<cfset p["password"] = getPassword() />
 		
 		<!--- send it over the wire using the base gateway --->
-		<cfset response = super.process(payload = p) />
+		<cfset response = createResponse(argumentCollection = super.process(payload = p)) />
 		
 		<!--- we do some meta-checks for gateway-level errors (as opposed to auth/decline errors) --->
 		<cfif NOT response.hasError()>
