@@ -15,7 +15,7 @@
 	See the License for the specific language governing permissions and 
 	limitations under the License.
 --->
-<cfcomponent displayname="Stripe Gateway" extends="cfpayment.api.gateway.stripe.base" hint="Stripe Gateway" output="false">
+<cfcomponent displayname="Stripe Gateway" extends="cfpayment.api.gateway.base" hint="Stripe Gateway" output="false">
 
 	<cfset variables.cfpayment.GATEWAY_NAME = "Stripe" />
 	<cfset variables.cfpayment.GATEWAY_VERSION = "1.0" />
