@@ -123,11 +123,11 @@
 	</cffunction>
 
 	<cffunction name="getStatusCode" access="public" output="false" returntype="any" hint="StatusCode represents the original connection's result status.  For HTTP this would be like 200, 404, 500, etc.  For RESTful APIs which may use status codes to define results">
-		<cfreturn variables.StatusCode />
+		<cfreturn variables.cfpayment.StatusCode />
 	</cffunction>
 	<cffunction name="setStatusCode" access="public" output="false" returntype="void">
 		<cfargument name="StatusCode" type="any" required="true" />
-		<cfset variables.StatusCode = arguments.StatusCode />
+		<cfset variables.cfpayment.StatusCode = arguments.StatusCode />
 	</cffunction>
 
 	<!---  Usage: getAVSCode / setAVSCode  methods for AVSCode value --->
