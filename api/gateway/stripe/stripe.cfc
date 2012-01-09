@@ -85,6 +85,9 @@
 		arguments.response.setMessage("Gateway returned status #arguments.status#: ");
 		switch(arguments.status)
 		{
+			case "200":
+				arguments.response.setStatus(getService().getStatusSuccessful());
+				break;
 			case "400": //invalid request, params not lowercase
 			case "402": //invalid card
 			case "404": //item not found, i.e. no charge for that id
