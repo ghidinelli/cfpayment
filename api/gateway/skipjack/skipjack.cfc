@@ -23,10 +23,11 @@ UPDATES:
 	22-JAN-2009-MBM: added len() check on ParsedResult.szAuthorizationDeclinedMessage in ParseAuthorizeMessage()
 	30-JAN-2009-MBM: added logic to MapGenericResponse() to find AuditId in response query and set response.TransactionId with the value (used for credit/newcharge items)
 					 removed isValidCVV and isValidAVS checks in ParseAuthorizeMessage() since we don't pass in the validity options
+	13-JAN-2011-MBM: change live url to use www instead of ms
 --->
 	<cfset variables.cfpayment.GATEWAY_NAME = "SkipJack" />
-	<cfset variables.cfpayment.GATEWAY_VERSION = "1.0" />
-	<cfset variables.cfpayment.GATEWAY_LIVE_URL = "https://ms.skipjackic.com/scripts/EvolvCC.dll?" />
+	<cfset variables.cfpayment.GATEWAY_VERSION = "1.1" />
+	<cfset variables.cfpayment.GATEWAY_LIVE_URL = "https://www.skipjackic.com/scripts/EvolvCC.dll?" />
 	<cfset variables.cfpayment.GATEWAY_TEST_URL = "https://developer.skipjackic.com/scripts/EvolvCC.dll?" />
 	<!--- gateway-specific variables --->
 	<cfset variables.cfpayment.SKIPJACK_GATEWAY_URL_METHOD = StructNew() />
