@@ -115,7 +115,7 @@
 	</cffunction>
 
 	<cffunction name="recurring" output="false" access="public" returntype="any" hint="Perform an add/edit recurring transaction">
-		<cfargument name="mode" type="string" required="true" /><!--- must be one of: add, edit, delete, get --->
+		<cfargument name="mode" type="any" required="true" /><!--- must be one of: add, edit, delete, get --->
 		<cfargument name="money" type="any" required="false" />
 		<cfargument name="account" type="any" required="false" /><!--- credit card or eft object --->
 		<cfargument name="options" type="struct" default="#StructNew()#" />
