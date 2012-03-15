@@ -868,7 +868,7 @@
 		<cfargument name="localTZ" type="boolean" required="false" default="true" hint="Convert from local server time?" />
 
 		<cfif arguments.localTZ>
-			<cfset arguments.date = dateAdd("s", getTimeZoneInfo().UTCTotalOffset, arguments.date) />
+			<cfset arguments.date = dateConvert("local2utc", arguments.date) />
 		</cfif>
 		
 		<cfreturn dateFormat(arguments.date, "yyyymmdd") & timeFormat(arguments.date, "HHmmss") />
@@ -883,7 +883,7 @@
 		<cfset var dteGMT = createDateTime(left(arguments.date, 4), mid(arguments.date, 5, 2), mid(arguments.date, 7, 2), mid(arguments.date, 9, 2), mid(arguments.date, 11, 2), mid(arguments.date, 13, 2)) />
 
 		<cfif arguments.localTZ>
-			<cfset dteGMT = dateAdd("s", -getTimeZoneInfo().UTCTotalOffset, dteGMT) />
+			<cfset dteGMT = dateConvert("utc2local", dteGMT) />
 		</cfif>
 		
 		<cfreturn dteGMT />

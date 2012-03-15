@@ -805,8 +805,16 @@
 
 	<cffunction name="test_date_conversion" output="false" access="public" returntype="void">
 		<cfset var dte = createDateTime(2009, 12, 7, 16, 0, 0) />
+		<cfset var dteNow = now() />
+		<cfset var dteGMT = dateAdd('s', getTimeZoneInfo().utcTotalOffset, dteNow) />
 		<cfset var conv = gw.dateToBraintree(dte) />
-		<cfset assertEquals(dte, gw.braintreeToDate(conv), "The converted date didn't match (#dte# != #conv#)") />
+		<cfset var str = "" />
+
+		<cfset assertTrue(dte EQ gw.braintreeToDate(conv), "The converted date didn't match (#dte# != #conv#)") />
+		<cfset assertTrue(gw.dateToBraintree(dteNow) EQ gw.dateToBraintree(dteGMT, false), "dateConvert() and dateAdd() should be equivalent: #gw.dateToBraintree(dteNow)# != #gw.dateToBraintree(dteGMT, false)#") />
+
+		<cfset str = dateFormat(dteGMT, "yyyymmdd") & timeFormat(dteGMT, "hhmmss") />
+		<cfset assertTrue(dteNow EQ gw.braintreeToDate(str), "The string we created should also be equal to the date field (#dteNow# != #gw.braintreeToDate(str)# / #str#)") />
 	</cffunction>
 
 
