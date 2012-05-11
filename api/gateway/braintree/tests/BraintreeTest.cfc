@@ -813,14 +813,17 @@
 		<cfset assertTrue(dte EQ gw.braintreeToDate(conv), "The converted date didn't match (#dte# != #conv#)") />
 		<cfset assertTrue(gw.dateToBraintree(dteNow) EQ gw.dateToBraintree(dteGMT, false), "dateConvert() and dateAdd() should be equivalent: #gw.dateToBraintree(dteNow)# != #gw.dateToBraintree(dteGMT, false)#") />
 
-		<cfset str = dateFormat(dteGMT, "yyyymmdd") & timeFormat(dteGMT, "hhmmss") />
-		<cfset assertTrue(dteNow EQ gw.braintreeToDate(str), "The string we created should also be equal to the date field (#dteNow# != #gw.braintreeToDate(str)# / #str#)") />
+		<!--- create a timestamp in GMT as though it came from  Braintree --->
+		<cfset dteGMT = dateConvert("local2utc", dteNow) />
+		<cfset str = dateFormat(dteGMT, "yyyymmdd") & timeFormat(dteGMT, "HHmmss") />
+		<cfset assertTrue(dteNow EQ gw.braintreeToDate(str), "Braintree date should convert to local time: (#dteNow# != #gw.braintreeToDate(str)# / #str#)") />
 	</cffunction>
 
 
 	<cffunction name="test_hash_compare" output="false" access="public" returntype="void">
 		<cfset var res = "" />
 		
+		<cfset gw.setTestMode(false) /><!--- requires non test mode --->
 		<cfset res = gw.verifyHash(orderId = '6BB3F54A-1D72-822B-79A10EF9D945F308'
 									,amount = 2.50
 									,response = '1' <!--- response, NOT responsetext 'SUCCESS' --->
