@@ -789,6 +789,13 @@
 	</cffunction>
 
 
+	<!--- braintree createResponse() overrides the AVS/CVV responses --->
+	<cffunction name="createResponse" access="private" output="false" returntype="any" hint="Create a Braintree response object with status set to unprocessed">
+		<cfreturn createObject("component", "cfpayment.api.gateway.braintree.response").init(argumentCollection = arguments, service = getService()) />
+	</cffunction>
+	
+	
+
 	<!--- HELPER FUNCTIONS TO MAKE LIFE EASIER IN COLDFUSION LAND --->
 	<cffunction name="generateHash" output="false" access="public" returntype="string">
 		<cfargument name="orderId" type="uuid" required="true" />
