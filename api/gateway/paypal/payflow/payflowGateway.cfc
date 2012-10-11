@@ -32,7 +32,7 @@
 	<cfset variables.cfpayment['GATEWAY_NAME'] = "Payflow Gateway via Name-Value Pairs">
 	<cfset variables.cfpayment['GATEWAY_VERSION'] = "1.0">
 	<cfset variables.cfpayment['GATEWAY_TEST_URL'] = "https://pilot-payflowpro.paypal.com">
-	<cfset variables.cfpayment['GATEWAY_LIVE_URL'] = "https://payflowpro.paypal.comp">
+	<cfset variables.cfpayment['GATEWAY_LIVE_URL'] = "https://payflowpro.paypal.com">
 	<cfset variables.cfpayment['GATEWAY_REFERENCE'] = "Gateway Developer Guide and Reference - 31-July-2012">
 	<cfset variables.cfpayment['GATEWAY_MASKING'] = true>
 	<cfset variables.cfpayment['GATEWAY_CHECKAVS'] = true>
