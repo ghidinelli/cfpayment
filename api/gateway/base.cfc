@@ -153,9 +153,9 @@
 	<cffunction name="getGatewayID" access="public" output="false" returntype="any">
 		<cfreturn variables.cfpayment.GATEWAYID />
 	</cffunction>
-	<cffunction name="setGATEWAYID" access="public" output="false" returntype="void">
-		<cfargument name="GATEWAYID" required="true" type="any" />
-		<cfset variables.cfpayment.GATEWAYID = arguments.GATEWAYID />
+	<cffunction name="setGatewayID" access="public" output="false" returntype="void">
+		<cfargument name="GatewayID" required="true" type="any" />
+		<cfset variables.cfpayment.GatewayID = arguments.GatewayID />
 	</cffunction>
 
 	<!--- the current request timeout allows us to intelligently modify the overall page timeout based 
