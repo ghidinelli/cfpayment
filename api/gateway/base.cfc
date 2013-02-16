@@ -171,9 +171,10 @@
 
 	<!--- manage transport and network/connection error handling; all gateways should send HTTP requests through this method --->
 	<cffunction name="process" output="false" access="package" returntype="struct" hint="Robust HTTP get/post mechanism with error handling">
+		<cfargument name="url" type="string" required="false" hint="URL to get/post" default="#getGatewayURL(argumentCollection = arguments)#" />
 		<cfargument name="method" type="string" required="false" default="post" />
 		<cfargument name="payload" type="any" required="true" /><!--- can be xml (simplevalue) or a struct of key-value pairs --->
-		<cfargument name="headers" type="struct" required="false" />
+		<cfargument name="headers" type="struct" required="false" default="#structNew()#" />
 
 		<!--- prepare response before attempting to send over wire --->
 		<cfset var CFHTTP = "" />
@@ -192,8 +193,9 @@
 		<!--- store payload for reference during development (can be simplevalue OR structure) --->
 		<cfif getTestMode()>
 			<cfset ResponseData.RequestData = { PAYLOAD = duplicate(arguments.payload)
-												,GATEWAY_URL = getGatewayURL(argumentCollection = arguments)
+												,GATEWAY_URL = arguments.url
 												,HTTP_METHOD = arguments.method
+												,HEADERS = arguments.headers
 												} />
 		</cfif>									
 
@@ -201,7 +203,7 @@
 		<cfsetting requesttimeout="#max(getCurrentRequestTimeout(), getTimeout() + 10)#" />
 
 		<cftry>
-			<cfset CFHTTP = doHttpCall(url = getGatewayURL(argumentCollection = arguments)
+			<cfset CFHTTP = doHttpCall(url = arguments.url
 										,timeout = getTimeout()
 										,argumentCollection = arguments) />
 
@@ -244,7 +246,7 @@
 				<!--- convert the CFCATCH.message into the HTTP Status Code --->
 				<cfset ResponseData.StatusCode = reReplace(CFCATCH.message, "[^0-9]", "", "ALL") />
 				<cfset ResponseData.Status = getService().getStatusUnknown() />
-				<cfset ResponseData.Message = CFCATCH.Message & "   (" & cfcatch.Type & ")" />
+				<cfset ResponseData.Message = CFCATCH.Message & " (" & cfcatch.Type & ")" />
 				<!--- let it fall through so we can attempt to handle the status code --->
 			</cfcatch>
 		</cftry>
@@ -254,10 +256,16 @@
 				<cfcase value="404,302,503"><!--- coldfusion doesn't follow 302s, so acts like a 404 --->
 					<cfset ResponseData.Message = "Gateway was not successfully reached and the transaction was not processed" />
 					<cfset ResponseData.Status = getService().getStatusFailure() />
+					<cfif structKeyExists(CFHTTP, "ErrorDetail") AND len(CFHTTP.ErrorDetail)>
+						<cfset ResponseData.Message = ResponseData.Message & " (Original message: #CFHTTP.ErrorDetail#)" />
+					</cfif>
 				</cfcase>
 				<cfcase value="500">
 					<cfset ResponseData.Message = "Gateway did not respond as expected and the transaction may have been processed" />
 					<cfset ResponseData.Status = getService().getStatusUnknown() />
+					<cfif structKeyExists(CFHTTP, "ErrorDetail") AND len(CFHTTP.ErrorDetail)>
+						<cfset ResponseData.Message = ResponseData.Message & " (Original message: #CFHTTP.ErrorDetail#)" />
+					</cfif>
 				</cfcase>
 			</cfswitch>
 		<cfelseif NOT len(ResponseData.StatusCode)>
@@ -269,6 +277,7 @@
 
 	</cffunction>
 
+
 	<!--- ------------------------------------------------------------------------------
 
 		  PRIVATE HELPER METHODS FOR DEVELOPERS
@@ -276,7 +285,7 @@
 		  ------------------------------------------------------------------------- --->
 	<cffunction name="doHttpCall" access="private" hint="wrapper around the http call - improves testing" returntype="struct" output="false">
 		<cfargument name="url" type="string" required="true" hint="URL to get/post" />
-		<cfargument name="method" type="string" required="false" hint="the http request method. use 'get' or 'post'" default="get" />
+		<cfargument name="method" type="string" required="false" hint="the http request method: GET, POST, PUT or DELETE" default="get" />
 		<cfargument name="timeout" type="numeric" required="true" />
 		<cfargument name="headers" type="struct" required="false" default="#structNew()#" />
 		<cfargument name="payload" type="any" required="false" default="#structNew()#" />
@@ -287,10 +296,14 @@
 		<cfset var skey = "" />
 		<cfset var paramType = "" />
 
-		<cfif ucase(arguments.method) EQ "GET">
+		<cfif uCase(arguments.method) EQ "GET">
 			<cfset paramType = "url" />
-		<cfelseif ucase(arguments.method) EQ "POST">
+		<cfelseif uCase(arguments.method) EQ "POST">
 			<cfset paramType = "formfield" />
+		<cfelseif uCase(arguments.method) EQ "PUT">
+			<cfset paramType = "body" />
+		<cfelseif uCase(arguments.method) EQ "DELETE">
+			<cfset paramType = "body" />
 		<cfelse>
 			<cfthrow message="Invalid Method" type="cfpayment.InvalidParameter.Method" />
 		</cfif>
@@ -326,7 +339,7 @@
 					</cfif>
 				</cfloop>
 				
-			<cfelseif isSimpleValue(arguments.payload)>
+			<cfelseif isSimpleValue(arguments.payload) AND len(arguments.payload)>
 
 				<!--- some services may need a Content-Type header of application/xml, pass it in as part of the headers array instead --->
 				<cfhttpparam value="#arguments.payload#" type="body" />
@@ -387,7 +400,7 @@
 
 	<!--- gateways may on RARE occasion need to override the response object; being generated by the base gateway allows an implementation to override this --->
 	<cffunction name="createResponse" access="public" output="false" returntype="any" hint="Create a response object with status set to unprocessed">
-		<cfreturn createObject("component", "cfpayment.api.model.response").init(argumentCollection = arguments, service = getService()) />
+		<cfreturn createObject("component", "cfpayment.api.model.response").init(argumentCollection = arguments, service = getService(), testMode = getTestMode()) />
 	</cffunction>
 
 
@@ -464,7 +477,6 @@
 
 		<cfthrow message="Method not implemented." type="cfpayment.MethodNotImplemented" />
 	</cffunction>
-
 
 	<cffunction name="supports" access="public" output="false" returntype="boolean" hint="Determine if gateway supports a specific card or account type">
 		<cfargument name="type" type="any" required="true" />

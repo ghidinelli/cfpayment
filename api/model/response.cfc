@@ -217,11 +217,11 @@
 
 
 	<cffunction name="getTestMode" access="public" output="false" returntype="boolean">
-		<cfreturn variables.TestMode />
+		<cfreturn variables.cfpayment.TestMode />
 	</cffunction>
 	<cffunction name="setTestMode" access="public" output="false" returntype="void">
 		<cfargument name="TestMode" type="boolean" required="true" />
-		<cfset variables.TestMode = arguments.TestMode />
+		<cfset variables.cfpayment.TestMode = arguments.TestMode />
 	</cffunction>
 
 
