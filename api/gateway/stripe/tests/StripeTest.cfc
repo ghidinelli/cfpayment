@@ -52,7 +52,7 @@
 			gw.TestMode = true;		// defaults to true anyways
 
 			// $CAD credentials
-			gw.TestSecretKey = 'sk_test_rdHpvrVI9UJsf7aRbeqWCWZ5';
+			gw.TestSecretKey = '';
 			gw.TestPublishableKey = '';
 
 			variables.svc = createObject("component", "cfpayment.api.core").init(gw);
