@@ -9,7 +9,7 @@ Tens of millions of dollars have been processed successfully.  Inspired by Ruby'
 
 Charge an Account in 6 Lines of Code
 ====================================
-```
+```js
 // initialize gateway
 cfg = { path = "stripe.stripe", TestSecretKey = "tGN0bIwXnHdwOa85VABjPdSn8nWY7G7I" };
 svc = createObject("component", "cfpayment.api.core").init(cfg);
@@ -17,7 +17,8 @@ gw = svc.getGateway();
 
 
 // create the account
-account = svc.createCreditCard().setAccount(4242424242424242).setMonth(10).setYear(year(now())+1)).setFirstName("John").setLastName("Doe");
+account = svc.createCreditCard().setAccount(4242424242424242).setMonth(10).setYear(year(now())+1))
+             .setFirstName("John").setLastName("Doe");
 
 // in cents = $50.00, defaults to USD but can take any ISO currency code
 money = svc.createMoney(5000); 
