@@ -51,8 +51,15 @@
 			<!--- instantiate gateway and initialize it with the passed configuration --->
 			<cfset variables.instance.gateway = createObject("component", "gateway.#lCase(variables.instance.config.path)#").init(config = variables.instance.config, service = this) />
 
-			<cfcatch>
+			<cfcatch type="template">
+				<!--- these are errors in the gateway itself, need to bubble them up for debugging --->
+				<cfrethrow />
+			</cfcatch>
+			<cfcatch type="application">
 				<cfthrow message="Invalid Gateway Specified" type="cfpayment.InvalidGateway" />
+			</cfcatch>
+			<cfcatch type="any">
+				<cfrethrow />
 			</cfcatch>
 		</cftry>
 
@@ -91,6 +98,11 @@
 		<cfreturn createObject("component", "model.money").init(argumentCollection = arguments) />
 	</cffunction>
 
+	<cffunction name="getAccountType" output="false" access="public" returntype="any">
+		<cfargument name="Account" type="any" required="true" />
+		<cfreturn lcase(listLast(getMetaData(arguments.account).fullname, ".")) />
+	</cffunction>	
+
 	<!--- statuses to determine success and failure --->
 	<cffunction name="getStatusUnprocessed" output="false" access="public" returntype="any" hint="This status is used to denote the transaction wasn't performed">
 		<cfreturn -1 />
@@ -98,7 +110,7 @@
 	<cffunction name="getStatusSuccessful" output="false" access="public" returntype="any" hint="This status indicates success">
 		<cfreturn 0 />
 	</cffunction>
-	<cffunction name="getStatusPending" output="false" access="public" returntype="any" hint="This status indicates when we have sent a request to the gateway and are awaiting response (Transaction API)">
+	<cffunction name="getStatusPending" output="false" access="public" returntype="any" hint="This status indicates when we have sent a request to the gateway and are awaiting response (Transaction API or delayed settlement like ACH)">
 		<cfreturn 1 />
 	</cffunction>
 	<cffunction name="getStatusDeclined" output="false" access="public" returntype="any" hint="This status indicates a declined transaction">
