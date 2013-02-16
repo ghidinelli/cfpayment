@@ -277,7 +277,7 @@
 		
 		<cfelseif structKeyExists(arguments, "account")>
 
-			<cfswitch expression="#lcase(listLast(getMetaData(arguments.account).fullname, "."))#">
+			<cfswitch expression="#getService().getAccountType(arguments.account)#">
 				<cfcase value="creditcard">
 					<!--- copy in name and customer details --->
 					<cfset post = addCustomer(post = post, account = arguments.account) />
@@ -293,7 +293,7 @@
 					<cfset post = addToken(post = post, account = arguments.account, options = arguments.options) />
 				</cfcase>
 				<cfdefaultcase>
-					<cfthrow type="cfpayment.InvalidAccount" message="The account type #lcase(listLast(getMetaData(arguments.account).fullname, "."))# is not supported by this gateway." />
+					<cfthrow type="cfpayment.InvalidAccount" message="The account type #getService().getAccountType(arguments.account)# is not supported by this gateway." />
 				</cfdefaultcase>
 			</cfswitch>
 
@@ -327,7 +327,7 @@
 		
 		<cfelseif structKeyExists(arguments, "account")>
 	
-			<cfswitch expression="#lcase(listLast(getMetaData(arguments.account).fullname, "."))#">
+			<cfswitch expression="#getService().getAccountType(arguments.account)#">
 				<cfcase value="creditcard">
 					<!--- copy in name and customer details --->
 					<cfset post = addCustomer(post = post, account = arguments.account) />
@@ -340,7 +340,7 @@
 					<cfset post = addToken(post = post, account = arguments.account, options = arguments.options) />
 				</cfcase>
 				<cfdefaultcase>
-					<cfthrow type="cfpayment.Invalid.AccountType" message="The account type #lcase(listLast(getMetaData(arguments.account).fullname, "."))# is not supported by this gateway." />
+					<cfthrow type="cfpayment.InvalidAccount" message="The account type #getService().getAccountType(arguments.account)# is not supported by this gateway." />
 				</cfdefaultcase>
 			</cfswitch>
 
@@ -374,7 +374,7 @@
 		
 		<cfelseif structKeyExists(arguments, "account")>
 
-			<cfswitch expression="#lcase(listLast(getMetaData(arguments.account).fullname, "."))#">
+			<cfswitch expression="#getService().getAccountType(arguments.account)#">
 				<cfcase value="creditcard">
 					<!--- copy in name and customer details --->
 					<cfset post = addCustomer(post = post, account = arguments.account) />
@@ -387,7 +387,7 @@
 					<cfthrow message="Validate not implemented for vault tokens; use authorize instead." type="cfpayment.MethodNotImplemented" />
 				</cfcase>
 				<cfdefaultcase>
-					<cfthrow type="cfpayment.Invalid.AccountType" message="The account type #lcase(listLast(getMetaData(arguments.account).fullname, "."))# is not supported by this gateway." />
+					<cfthrow type="cfpayment.InvalidAccount" message="The account type #getService().getAccountType(arguments.account)# is not supported by this gateway." />
 				</cfdefaultcase>
 			</cfswitch>
 
@@ -457,7 +457,7 @@
 		<!--- set general values --->
 		<cfset post["amount"] = arguments.money.getAmount() />
 
-		<cfif structKeyExists(arguments, "account") AND lcase(listLast(getMetaData(arguments.account).fullname, ".")) EQ "eft">
+		<cfif structKeyExists(arguments, "account") AND getService().getAccountType(arguments.account) EQ "eft">
 			<!--- in the direct deposit scenario, we need the account --->
 			<cfset post["type"] = "credit" />
 			<cfset post = addEFT(post = post, account = arguments.account, options = arguments.options) />
@@ -532,7 +532,7 @@
 		<cfset var post = structNew() />
 		<cfset var res = "" />
 		
-		<cfswitch expression="#lcase(listLast(getMetaData(arguments.account).fullname, "."))#">
+		<cfswitch expression="#getService().getAccountType(arguments.account)#">
 			<cfcase value="creditcard">
 				<cfset post = addCreditCard(post = post, account = arguments.account, options = arguments.options) />
 			</cfcase>
@@ -565,7 +565,7 @@
 		<cfset var post = structNew() />
 		<cfset var res = "" />
 
-		<cfif lcase(listLast(getMetaData(arguments.account).fullname, ".")) NEQ "token">
+		<cfif getService().getAccountType(arguments.account) NEQ "token">
 			<cfthrow type="cfpayment.InvalidAccount" message="Only an account type of token is supported by this method." />
 		</cfif>
 			
