@@ -180,15 +180,21 @@
 	</cffunction>
 
 
-		
-	<cffunction name="listCharges" output="false" access="public" >
-		<cfscript>			
-		var post = structNew();
-		return process(gatewayUrl = getGatewayUrl("/charges"), method="get",payload = post);		
-		</cfscript>		
-	</cffunction>
+	<cffunction name="listCharges" output="false" access="public" returntype="any">
+		<cfargument name="count" type="numeric" required="false" />
+		<cfargument name="offset" type="numeric" required="false" />
+		<cfargument name="tokenId" type="string" required="false" />
 	
-
+		<cfset var payload = {} />
+		
+		<cfloop collection="#arguments#" item="key">
+			<cfif structKeyExists(arguments, key)>
+				<cfset payload[lcase(key)] = arguments[key] />
+			</cfif>
+		</cfloop>
+	
+		<cfreturn process(gatewayUrl = getGatewayUrl("/charges"), method = "get", payload = payload) />
+	</cffunction>
 
 
 	<!--- determine capability of this gateway --->
@@ -360,7 +366,7 @@
 					break;
 			}
 
-			if (response.hasError())
+			if (response.hasError() AND isStruct(res) AND structKeyExists(res, "error"))
 			{
 				if (structKeyExists(res.error, "message"))
 					response.setMessage(res.error.message);
