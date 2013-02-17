@@ -152,7 +152,7 @@
 		<cfset var response = "" />
 
 		<!--- this will be rejected by gateway because the card number is not valid --->
-		<cfset offlineInjector(gw, this, "foo", "doHttpCall") />
+		<cfset offlineInjector(gw, this, "mock_purchase_ok", "doHttpCall") />
 		<cfset response = gw.purchase(money = variables.svc.createMoney(5000, gw.currency), account = createValidCard()) />
 		<cfset assertTrue(response.getSuccess(), "The #gw.currency# purchase failed but should have succeeded") />
 		<cfset assertTrue(response.getStatusCode() EQ 200, "Status code should be 200, was: #response.getStatusCode()#") />
@@ -211,18 +211,20 @@
 	</cffunction>
 
 
-	<cffunction name="testPurchaseWithoutCVV" access="public" returntype="void" output="false">
-		<cfset var gw = variables.cad />
+	<cffunction name="testPurchaseWithoutCVV" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
+		<cfargument name="gw" type="any" required="true" />
 		<cfset var response = "" />
 
-		<cfset offlineInjector(gw, this, "mock_invalid_address1", "doHttpCall") />
+		<cfset offlineInjector(gw, this, "mock_invalid_cvc", "doHttpCall") />
 		<cfset response = gw.purchase(money = variables.svc.createMoney(5000, gw.currency), account = createValidCardWithoutCVV()) />
 
 		<cfset assertTrue(response.getCVVCode() EQ "", "No CVV was passed so no answer should be provided but was: '#response.getCVVCode()#'") />
 		<cfset assertTrue(NOT response.getSuccess(), "The #gw.currency# purchase succeeded but should have failed") />
-		<cfset assertTrue(response.getStatusCode() EQ 200, "Status code should be 200, was: #response.getStatusCode()#") />
-		<cfset assertTrue(response.getParsedResult().card.cvc_check EQ "fail", "Should have been an invalid cvc, was: #response.getParsedResult().card.cvc_check#") />
-		<cfset assertTrue(NOT response.isValidCVV(), "CVV should not be valid") />
+		<cfset assertTrue(response.getStatusCode() EQ 402, "Status code for #gw.currency# should be 402, was: #response.getStatusCode()#") />
+		<cfset assertTrue(response.getParsedResult().error.code EQ "invalid_cvc", "Should have been an invalid cvc, was: #response.getParsedResult().error.code#") />
+
+		<cfset assertTrue(response.isValidCVV(), "Blank CVV should be valid") />
+		<cfset assertTrue(NOT response.isValidCVV(AllowBlankCode = false), "CVV should not be valid") />
 	</cffunction>
 
 
@@ -259,6 +261,31 @@
 
 	</cffunction>
 --->
+
+	<cffunction name="testListChargesWithoutCount" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
+		<cfargument name="gw" type="any" required="true" />
+		<cfset var response = "" />
+
+		<cfset offlineInjector(gw, this, "mock_list_charges_count_10", "doHttpCall") />
+		<cfset response = gw.listCharges() />
+
+		<cfset assertTrue(response.getSuccess(), "The #gw.currency# list did not succeed but should have") />
+		<cfset assertTrue(response.getStatusCode() EQ 200, "Status code for #gw.currency# should be 200, was: #response.getStatusCode()#") />
+		<cfset assertTrue(arrayLen(response.getParsedResult().data) EQ 10, "#gw.currency# list without count should have returned 10 results, was: #arrayLen(response.getParsedResult().data)#") />
+	</cffunction>
+
+
+	<cffunction name="testListChargesWithCountOf2" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
+		<cfargument name="gw" type="any" required="true" />
+		<cfset var response = "" />
+
+		<cfset offlineInjector(gw, this, "mock_list_charges_count_2", "doHttpCall") />
+		<cfset response = gw.listCharges(count = 2) />
+
+		<cfset assertTrue(response.getSuccess(), "The #gw.currency# list did not succeed but should have") />
+		<cfset assertTrue(response.getStatusCode() EQ 200, "Status code for #gw.currency# should be 200, was: #response.getStatusCode()#") />
+		<cfset assertTrue(arrayLen(response.getParsedResult().data) EQ 2, "#gw.currency# list without count should have returned 2 results, was: #arrayLen(response.getParsedResult().data)#") />
+	</cffunction>
 
 
 	<cffunction name="testStoreTokenSuccess" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
@@ -516,5 +543,16 @@
 		<cfreturn http />
 	</cffunction>
 
- 
+	<cffunction name="mock_list_charges_count_10" access="private">
+		<cfset var http = { StatusCode = '200', FileContent = '{ "object": "list", "count": 31800, "url": "/v1/charges", "data": [ { "id": "ch_1IxL1nrwUu7kmF", "object": "charge", "created": 1361061326, "livemode": false, "paid": true, "amount": 5000, "currency": "usd", "refunded": false, "fee": 175, "fee_details": [ { "amount": 175, "currency": "usd", "type": "stripe_fee", "description": "Stripe processing fees", "application": null, "amount_refunded": 0 } ], "card": { "object": "card", "last4": "4242", "type": "Visa", "exp_month": 10, "exp_year": 2014, "fingerprint": "Z0VUjeIIj0HObMhK", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass" }, "failure_message": null, "amount_refunded": 0, "customer": null, "invoice": null, "description": null, "dispute": null }, { "id": "ch_1IxLLW6cPV1kIK", "object": "charge", "created": 1361061323, "livemode": false, "paid": true, "amount": 5000, "currency": "usd", "refunded": false, "fee": 102, "fee_details": [ { "amount": 175, "currency": "usd", "type": "stripe_fee", "description": "Stripe processing fees", "application": null, "amount_refunded": 73 } ], "card": { "object": "card", "last4": "4242", "type": "Visa", "exp_month": 10, "exp_year": 2014, "fingerprint": "Z0VUjeIIj0HObMhK", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass" }, "failure_message": null, "amount_refunded": 2500, "customer": null, "invoice": null, "description": null, "dispute": null }, { "id": "ch_1IxL31sObDzpCv", "object": "charge", "created": 1361061320, "livemode": false, "paid": true, "amount": 5000, "currency": "usd", "refunded": true, "fee": 0, "fee_details": [ { "amount": 175, "currency": "usd", "type": "stripe_fee", "description": "Stripe processing fees", "application": null, "amount_refunded": 175 } ], "card": { "object": "card", "last4": "4242", "type": "Visa", "exp_month": 10, "exp_year": 2014, "fingerprint": "Z0VUjeIIj0HObMhK", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass" }, "failure_message": null, "amount_refunded": 5000, "customer": null, "invoice": null, "description": null, "dispute": null }, { "id": "ch_1IxK3Xh6I2xrNE", "object": "charge", "created": 1361061317, "livemode": false, "paid": false, "amount": 5000, "currency": "usd", "refunded": false, "fee": 0, "fee_details": [], "card": { "object": "card", "last4": "0119", "type": "Visa", "exp_month": 10, "exp_year": 2014, "fingerprint": "YggjdcH7yERT93CL", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass" }, "failure_message": "An error occurred while processing your card", "amount_refunded": 0, "customer": null, "invoice": null, "description": null, "dispute": null }, { "id": "ch_1Iuelcm8fpWb5v", "object": "charge", "created": 1361051359, "livemode": false, "paid": true, "amount": 100, "currency": "usd", "refunded": false, "fee": 33, "fee_details": [ { "amount": 33, "currency": "usd", "type": "stripe_fee", "description": "Stripe processing fees", "application": null, "amount_refunded": 0 } ], "card": { "object": "card", "last4": "4242", "type": "Visa", "exp_month": 12, "exp_year": 2015, "fingerprint": "Z0VUjeIIj0HObMhK", "country": "US", "name": "Java Bindings Cardholder", "address_line1": "522 Ramona St", "address_line2": "Palo Alto", "address_city": null, "address_state": "CA", "address_zip": "94301", "address_country": "USA", "cvc_check": null, "address_line1_check": "pass", "address_zip_check": "pass" }, "failure_message": null, "amount_refunded": 0, "customer": "cus_0By77C9AgMAIw2", "invoice": "in_1ItfkkOrk99sat", "description": null, "dispute": null }, { "id": "ch_1IueK7L83dUFhK", "object": "charge", "created": 1361051358, "livemode": false, "paid": true, "amount": 100, "currency": "usd", "refunded": false, "fee": 33, "fee_details": [ { "amount": 33, "currency": "usd", "type": "stripe_fee", "description": "Stripe processing fees", "application": null, "amount_refunded": 0 } ], "card": { "object": "card", "last4": "4242", "type": "Visa", "exp_month": 12, "exp_year": 2015, "fingerprint": "Z0VUjeIIj0HObMhK", "country": "US", "name": "Java Bindings Cardholder", "address_line1": "522 Ramona St", "address_line2": "Palo Alto", "address_city": null, "address_state": "CA", "address_zip": "94301", "address_country": "USA", "cvc_check": null, "address_line1_check": "pass", "address_zip_check": "pass" }, "failure_message": null, "amount_refunded": 0, "customer": "cus_0By7tRmEv8zcqW", "invoice": "in_1Itf8IT0wEG9R8", "description": null, "dispute": null }, { "id": "ch_1IueGPyiGOsISV", "object": "charge", "created": 1361051356, "livemode": false, "paid": true, "amount": 100, "currency": "usd", "refunded": false, "fee": 33, "fee_details": [ { "amount": 33, "currency": "usd", "type": "stripe_fee", "description": "Stripe processing fees", "application": null, "amount_refunded": 0 } ], "card": { "object": "card", "last4": "4242", "type": "Visa", "exp_month": 12, "exp_year": 2015, "fingerprint": "Z0VUjeIIj0HObMhK", "country": "US", "name": "Java Bindings Cardholder", "address_line1": "522 Ramona St", "address_line2": "Palo Alto", "address_city": null, "address_state": "CA", "address_zip": "94301", "address_country": "USA", "cvc_check": null, "address_line1_check": "pass", "address_zip_check": "pass" }, "failure_message": null, "amount_refunded": 0, "customer": "cus_0By6oVFxh4j0OR", "invoice": "in_1ItfCmqahj5CLg", "description": null, "dispute": null }, { "id": "ch_1Iuee3zxbf6Eez", "object": "charge", "created": 1361051355, "livemode": false, "paid": true, "amount": 100, "currency": "usd", "refunded": false, "fee": 33, "fee_details": [ { "amount": 33, "currency": "usd", "type": "stripe_fee", "description": "Stripe processing fees", "application": null, "amount_refunded": 0 } ], "card": { "object": "card", "last4": "4242", "type": "Visa", "exp_month": 12, "exp_year": 2015, "fingerprint": "Z0VUjeIIj0HObMhK", "country": "US", "name": "Java Bindings Cardholder", "address_line1": "522 Ramona St", "address_line2": "Palo Alto", "address_city": null, "address_state": "CA", "address_zip": "94301", "address_country": "USA", "cvc_check": null, "address_line1_check": "pass", "address_zip_check": "pass" }, "failure_message": null, "amount_refunded": 0, "customer": "cus_0By6rD5aPmULnT", "invoice": "in_1ItfDCc2kbn7XF", "description": null, "dispute": null }, { "id": "ch_1IucE7qqbtaXng", "object": "charge", "created": 1361051232, "livemode": false, "paid": true, "amount": 100, "currency": "usd", "refunded": false, "fee": 33, "fee_details": [ { "amount": 33, "currency": "usd", "type": "stripe_fee", "description": "Stripe processing fees", "application": null, "amount_refunded": 0 } ], "card": { "object": "card", "last4": "4242", "type": "Visa", "exp_month": 12, "exp_year": 2015, "fingerprint": "Z0VUjeIIj0HObMhK", "country": "US", "name": "Java Bindings Cardholder", "address_line1": "522 Ramona St", "address_line2": "Palo Alto", "address_city": null, "address_state": "CA", "address_zip": "94301", "address_country": "USA", "cvc_check": null, "address_line1_check": "pass", "address_zip_check": "pass" }, "failure_message": null, "amount_refunded": 0, "customer": "cus_0By5i2kAbTsaX3", "invoice": "in_1Iteod2vndXuD7", "description": null, "dispute": null }, { "id": "ch_1Iuc0z4PmscDT4", "object": "charge", "created": 1361051232, "livemode": false, "paid": true, "amount": 100, "currency": "usd", "refunded": false, "fee": 33, "fee_details": [ { "amount": 33, "currency": "usd", "type": "stripe_fee", "description": "Stripe processing fees", "application": null, "amount_refunded": 0 } ], "card": { "object": "card", "last4": "4242", "type": "Visa", "exp_month": 12, "exp_year": 2015, "fingerprint": "Z0VUjeIIj0HObMhK", "country": "US", "name": "Java Bindings Cardholder", "address_line1": "522 Ramona St", "address_line2": "Palo Alto", "address_city": null, "address_state": "CA", "address_zip": "94301", "address_country": "USA", "cvc_check": null, "address_line1_check": "pass", "address_zip_check": "pass" }, "failure_message": null, "amount_refunded": 0, "customer": "cus_0By5b0y9bDVB7U", "invoice": "in_1IteiR0nvAU7ta", "description": null, "dispute": null } ] }' } />
+		<cfreturn http />
+	</cffunction>
+
+	<cffunction name="mock_list_charges_count_2" access="private">
+		<cfset var http = { StatusCode = '200', FileContent = '{ "object": "list", "count": 31800, "url": "/v1/charges", "data": [ { "id": "ch_1IxL1nrwUu7kmF", "object": "charge", "created": 1361061326, "livemode": false, "paid": true, "amount": 5000, "currency": "usd", "refunded": false, "fee": 175, "fee_details": [ { "amount": 175, "currency": "usd", "type": "stripe_fee", "description": "Stripe processing fees", "application": null, "amount_refunded": 0 } ], "card": { "object": "card", "last4": "4242", "type": "Visa", "exp_month": 10, "exp_year": 2014, "fingerprint": "Z0VUjeIIj0HObMhK", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass" }, "failure_message": null, "amount_refunded": 0, "customer": null, "invoice": null, "description": null, "dispute": null }, { "id": "ch_1IxLLW6cPV1kIK", "object": "charge", "created": 1361061323, "livemode": false, "paid": true, "amount": 5000, "currency": "usd", "refunded": false, "fee": 102, "fee_details": [ { "amount": 175, "currency": "usd", "type": "stripe_fee", "description": "Stripe processing fees", "application": null, "amount_refunded": 73 } ], "card": { "object": "card", "last4": "4242", "type": "Visa", "exp_month": 10, "exp_year": 2014, "fingerprint": "Z0VUjeIIj0HObMhK", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass" }, "failure_message": null, "amount_refunded": 2500, "customer": null, "invoice": null, "description": null, "dispute": null } ] } ' } />
+		<cfreturn http />
+	</cffunction>
+
+
+
 </cfcomponent>
