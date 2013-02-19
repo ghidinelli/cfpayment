@@ -51,8 +51,8 @@
 			gw.GatewayID = 2;
 			gw.TestMode = true;		// defaults to true anyways
 
-			// $CAD credentials
-			gw.TestSecretKey = '';
+			// $CAD credentials (provided by support@stripe.com)
+			gw.TestSecretKey = 'sk_test_Zx4885WE43JGqPjqGzaWap8a';
 			gw.TestPublishableKey = '';
 
 			variables.svc = createObject("component", "cfpayment.api.core").init(gw);
