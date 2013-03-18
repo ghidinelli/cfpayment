@@ -49,7 +49,7 @@
 		structInsert(variables.cfpayment.ResponseCVV, "P", "Not Processed", true);														// seen in wild
 		structInsert(variables.cfpayment.ResponseCVV, "S", "Merchant has indicated that CVV2/CVC2 is not present on card", true);
 		structInsert(variables.cfpayment.ResponseCVV, "U", "Credit card issuing bank unable to process request, is not certified and/or has not provided Visa encryption keys", true);// seen in wild
-
+		structInsert(variables.cfpayment.ResponseCVV, "X", "Card does not support verification", true); // seen in wild, it actually says "No such issuer" but it's a decline
 
 	</cfscript>
 
