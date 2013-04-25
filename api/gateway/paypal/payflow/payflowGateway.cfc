@@ -481,7 +481,7 @@
 
 		<cfset var h = arguments.headers>
 
-		<cfset h['X-VPS-Request-ID'] = createUUID()>	<!--- X-VPS-Request-ID is a required http header.  gateway request will not work without it --->
+		<cfset h['X-VPS-Request-ID'] = createUUID()>	<!--- X-VPS-Request-ID is a required http header.  Docs say 1-32 characters??  gateway request will not work without it --->
 	</cffunction>
 
 <!--- =======================================================================================================
@@ -523,7 +523,7 @@
 		<!--- Don't let any exceptions stop the transaction --->
 		<cftry>
 			<cfif (compareNoCase("ACCT", n) EQ 0) AND (len(v) GT 4)>
-				<cfset masked = repeatString("X", len(v) - 4) + right(v, 4)>
+				<cfset masked = repeatString("X", len(v) - 4) & right(v, 4)>
 			<cfelseif inList("CVV2,PWD", n)>
 				<cfset masked = repeatString("X", len(v))>
 			<cfelse>

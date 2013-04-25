@@ -175,6 +175,7 @@
 		<cfargument name="method" type="string" required="false" default="post" />
 		<cfargument name="payload" type="any" required="true" /><!--- can be xml (simplevalue) or a struct of key-value pairs --->
 		<cfargument name="headers" type="struct" required="false" default="#structNew()#" />
+		<cfargument name="encoded" type="boolean" required="false" default="true" hint="Some gateways (e.g. PayPal Payflow Pro) require unencoded parameters" />
 
 		<!--- prepare response before attempting to send over wire --->
 		<cfset var CFHTTP = "" />
@@ -289,6 +290,7 @@
 		<cfargument name="timeout" type="numeric" required="true" />
 		<cfargument name="headers" type="struct" required="false" default="#structNew()#" />
 		<cfargument name="payload" type="any" required="false" default="#structNew()#" />
+		<cfargument name="encoded" type="boolean" required="false" default="true" />
 
 		<cfset var CFHTTP = "" />
 		<cfset var key = "" />
@@ -321,7 +323,7 @@
 				<cfloop collection="#arguments.payload#" item="key">
 					<cfif isSimpleValue(arguments.payload[key])>
 						<!--- most common param is simple value --->
-						<cfhttpparam name="#key#" value="#arguments.payload[key]#" type="#paramType#" />
+						<cfhttpparam name="#key#" value="#arguments.payload[key]#" type="#paramType#" encoded="#arguments.encoded#" />
 					<cfelseif isStruct(arguments.payload[key])>
 						<!--- loop over structure (check for _keylist to use a pre-determined output order) --->
 						<cfif structKeyExists(arguments.payload[key], "_keylist")>
@@ -331,7 +333,7 @@
 						</cfif>
 						<cfloop list="#keylist#" index="skey">
 							<cfif ucase(skey) NEQ "_KEYLIST">
-								<cfhttpparam name="#skey#" value="#arguments.payload[key][skey]#" type="#paramType#" />
+								<cfhttpparam name="#skey#" value="#arguments.payload[key][skey]#" type="#paramType#" encoded="#arguments.encoded#" />
 							</cfif>
 						</cfloop>
 					<cfelse>
