@@ -155,7 +155,7 @@
 				access     = "public"
 				returntype = "any"
 				output     = "false"
-				purpose    = ""
+				purpose    = "Inquiry Transaction by TransactionID. Other types of inquiry transactions are not supported."
 				author     = "Andrew Penhorwood"
 				created    = "08/30/2012">
 
@@ -641,14 +641,14 @@
 
 				<cfif structKeyExists(arguments.payload, "TRXTYPE")>
 					<!--- authorize (Authorization Transaction) & purchase (Sale Transaction) --->
-					<cfif arguments.payload.TRXTYPE EQ "A,S">
+					<cfif inList("A,S", arguments.payload.TRXTYPE)>
 						<cfif structKeyExists(results, "PNREF")>
 							<cfset response.setTransactionId(results.PNREF)>
 							<cfset response.setAuthorization(results.PNREF)>
 						</cfif>
 
 					<!--- capture (Delayed Capture Transaction) --->
-					<cfelseif arguments.payload.TRXTYPE EQ "D,C,I,V">
+					<cfelseif inList("D,C,I,V", arguments.payload.TRXTYPE)>
 						<cfif structKeyExists(results, "PNREF")>
 							<cfset response.setTransactionId(results.PNREF)>
 						</cfif>
