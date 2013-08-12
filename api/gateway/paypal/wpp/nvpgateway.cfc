@@ -202,7 +202,7 @@
 		<!--- Mask the request data --->
 		<cfif getMasking() eq "on">
 			<cfset rd = response.getRequestData() />
-			<cfif isDefined("rd.PAYLOAD")>
+			<cfif isStruct(rd) AND structKeyExists(rd, "payload")>
 				<cfloop collection="#rd.PAYLOAD#" item="n">
 					<cfset rd.PAYLOAD[n] = mask(n, rd.PAYLOAD[n]) />
 				</cfloop>
