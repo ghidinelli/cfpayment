@@ -90,6 +90,10 @@
 		<cfreturn createObject("component", "model.eft").init(argumentCollection = arguments) />
 	</cffunction>
 
+	<cffunction name="createOAuth" output="false" access="public" returntype="any" hint="create a representation for OAuth credentials to perform actions on behalf of someone">
+		<cfreturn createObject("component", "model.oauth").init(argumentCollection = arguments) />
+	</cffunction>
+
 	<cffunction name="createToken" output="false" access="public" returntype="any" hint="create a remote storage token for population">
 		<cfreturn createObject("component", "model.token").init(argumentCollection = arguments) />
 	</cffunction>
