@@ -315,7 +315,7 @@
 	</cffunction>
 
 
-
+	<!--- HELPER FUNCTIONS  --->
 	<cffunction name="getGatewayURL" access="public" output="false" returntype="any" hint="Append to Gateway URL to return the appropriate url for the API endpoint">
 		<cfargument name="endpoint" type="string" required="false" default="" />
 		<cfargument name="oauth_token" type="string" required="false" />
@@ -329,34 +329,5 @@
 		</cfif>
 	</cffunction>
  
-
-	<!--- HELPER FUNCTIONS  --->
-	<cffunction name="dateToUTC" output="false" access="public" returntype="any" hint="Take a date and return the number of seconds since the Unix Epoch">
-		<cfargument name="date" type="any" required="true" />
-		<cfreturn dateDiff("s", dateConvert("utc2Local", "January 1 1970 00:00"), arguments.date) />
-	</cffunction>
-	
-	<cffunction name="UTCToDate" output="false" access="public" returntype="date" hint="Take a UTC timestamp and convert it to a ColdFusion date object">
-		<cfargument name="utcdate" required="true" />
-		<cfreturn dateAdd("s", arguments.utcDate, dateConvert("utc2Local", "January 1 1970 00:00")) />
-	</cffunction>
-
-	<!--- returns a case sensitive structure for serializtion --->
-	<cffunction name="node" output="false" access="private" returntype="struct">
-		<!--- because serializeJson in CF 8 likes to change numbers from strings to floats, we have to hack postal addresses which may be undesirably changed: http://www.ghidinelli.com/2008/12/19/tricking-serializejson-to-treat-numbers-as-strings 
-		<cfif structKeyExists(arguments, "postal_code")>
-			<!--- prepend a space which forces it to be treated as a string by serializejson - it will be stripped out in doRemoteCall --->
-			<cfset arguments["postal_code"] = " #arguments["postal_code"]#" />
-			
-		</cfif>--->
-		<cfreturn arguments />
-	</cffunction>
-	
-
-	<!--- dwolla createResponse() overrides the getSuccess/hasError() responses 
-	<cffunction name="createResponse" access="public" output="false" returntype="any" hint="Create a response object with status set to unprocessed">
-		<cfreturn createObject("component", "cfpayment.api.gateway.dwolla.response").init(argumentCollection = arguments, service = getService()) />
-	</cffunction>
-	--->
 
 </cfcomponent>
