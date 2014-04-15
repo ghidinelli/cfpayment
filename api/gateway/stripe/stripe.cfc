@@ -19,7 +19,7 @@
 <cfcomponent displayname="Stripe Gateway" extends="cfpayment.api.gateway.base" hint="Stripe Gateway" output="false">
 
 	<cfset variables.cfpayment.GATEWAY_NAME = "Stripe" />
-	<cfset variables.cfpayment.GATEWAY_VERSION = "1.0.4" />
+	<cfset variables.cfpayment.GATEWAY_VERSION = "1.0.5" />
 	<!--- stripe test mode uses different credentials instead of different urls --->
 	<cfset variables.cfpayment.GATEWAY_URL = "https://api.stripe.com/v1" />
 
@@ -226,6 +226,10 @@
 			<cfset p["customer"] = arguments.options.tokenId />
 		</cfif>
 
+		<!--- add dynamic statement descriptors which show up on CC statement alongside merchant name: https://stripe.com/docs/api#create_charge --->
+		<cfif structKeyExists(arguments.options, "statement_description")>
+			<cfset p["statement_description"] = reReplace(arguments.options.statement_description, "[<>""']", "", "ALL") />
+		</cfif>
 
 		<!--- Stripe returns errors with http status like 400,402 or 404 (https://stripe.com/docs/api#errors) --->		
 		<cfset response = createResponse(argumentCollection = super.process(url = arguments.gatewayUrl, payload = payload, headers = headers, method = arguments.method)) />
