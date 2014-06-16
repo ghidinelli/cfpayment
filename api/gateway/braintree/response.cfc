@@ -27,6 +27,7 @@
 		structInsert(variables.cfpayment.ResponseAVS, "C", "Billing street address and postal code do not match.", true);
 		structInsert(variables.cfpayment.ResponseAVS, "D", "Billing street address and postal code match.", true);
 		structInsert(variables.cfpayment.ResponseAVS, "E", "Not a mail/phone order.", true);
+		structInsert(variables.cfpayment.ResponseAVS, "F", "Address and Postal Code match (UK only).", true);
 		structInsert(variables.cfpayment.ResponseAVS, "G", "Non-U.S. issuing bank does not support AVS.", true);
 		structInsert(variables.cfpayment.ResponseAVS, "I", "Non-U.S. issuing bank does not support AVS.", true);
 		structInsert(variables.cfpayment.ResponseAVS, "L", "Card member's name and 5-digit billing postal code match, but billing address does not match.", true);
@@ -58,7 +59,7 @@
 		<cfset var res = uCase(getAVSCode()) />
 
 		<!--- Y = yes, N = no, X = not relevant, U = unknown --->
-		<cfif listFind("D,L,M,P,W,X,Y,Z", res)><!--- it does match --->
+		<cfif listFind("D,F,L,M,P,W,X,Y,Z", res)><!--- it does match --->
 			<cfreturn 'Y' />
 		<cfelseif listFind("A,B,C,N", res)><!--- it does not match --->
 			<cfreturn 'N' />
@@ -73,7 +74,7 @@
 	<cffunction name="getAVSStreetMatch" output="false" access="private" returntype="string" hint="Normalize the AVS street match code">
 		<cfset var res = uCase(getAVSCode()) />
 
-		<cfif listFind("A,B,D,X,Y", res)><!--- it does match --->
+		<cfif listFind("A,B,D,F,X,Y", res)><!--- it does match --->
 			<cfreturn 'Y' />
 		<cfelseif listFind("C,L,M,N,P,W,Z", res)><!--- it does not match --->
 			<cfreturn 'N' />
