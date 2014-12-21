@@ -228,7 +228,7 @@
 
 		<!--- add dynamic statement descriptors which show up on CC statement alongside merchant name: https://stripe.com/docs/api#create_charge --->
 		<cfif structKeyExists(arguments.options, "statement_description")>
-			<cfset p["statement_description"] = reReplace(arguments.options.statement_description, "[<>""']", "", "ALL") />
+			<cfset p["statement_descriptor"] = reReplace(arguments.options.statement_description, "[<>""']", "", "ALL") />
 		</cfif>
 
 		<!--- Stripe returns errors with http status like 400,402 or 404 (https://stripe.com/docs/api#errors) --->		
