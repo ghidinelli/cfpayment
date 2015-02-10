@@ -7,6 +7,15 @@ Rather than roll your own credit card, ACH or alternative payment gateway with e
 
 Tens of millions of dollars have been processed successfully.  Inspired by Ruby's ActiveMerchant.
 
+Install
+=======
+
+A "/cfpayment" mapping is required to the cfpayment root folder.  Either add it via the Admin or on CF8+, create a [per-application mapping](http://help.adobe.com/en_US/ColdFusion/9.0/Developing/WSc3ff6d0ea77859461172e0811cbec0b63c-7fd5.html#WS0C5B9A8B-32B5-4db2-BC04-B76DF8823A34) in the Application.cfc:
+
+```cfml
+this.mappings["/cfpayment"] = "/path/to/your/cfpayment/folder";
+```
+
 Charge an Account in 6 Lines of Code
 ====================================
 ```js
