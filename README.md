@@ -36,10 +36,10 @@ money = svc.createMoney(5000);
 response = gw.purchase(money = money, account = account);
 
 // did we succeed?
-if (response.getSuccess())
+if (response.getSuccess()) {
   // yay!  look at response.getResult() or response.getParsedResult()
   // verify response.isValidAVS() or response.isValidCVV()
-else
+} else {
   // check response.getStatus(), output response.getMessage()
+}
 ```
-
