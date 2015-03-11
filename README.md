@@ -41,5 +41,5 @@ if (response.getSuccess()) {
   // verify response.isValidAVS() or response.isValidCVV()
 } else {
   // check response.getStatus(), output response.getMessage()
-```
 }
+```
