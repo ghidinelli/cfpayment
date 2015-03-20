@@ -176,6 +176,7 @@
 		<cfargument name="payload" type="any" required="true" /><!--- can be xml (simplevalue) or a struct of key-value pairs --->
 		<cfargument name="headers" type="struct" required="false" default="#structNew()#" />
 		<cfargument name="encoded" type="boolean" required="false" default="true" hint="Some gateways (e.g. PayPal Payflow Pro) require unencoded parameters" />
+		<cfargument name="files" type="struct" required="false" default="#structNew()#" />
 
 		<!--- prepare response before attempting to send over wire --->
 		<cfset var CFHTTP = "" />
@@ -291,6 +292,7 @@
 		<cfargument name="headers" type="struct" required="false" default="#structNew()#" />
 		<cfargument name="payload" type="any" required="false" default="#structNew()#" />
 		<cfargument name="encoded" type="boolean" required="false" default="true" />
+		<cfargument name="files" type="struct" required="false" default="#structNew()#" />
 
 		<cfset var CFHTTP = "" />
 		<cfset var key = "" />
@@ -351,6 +353,11 @@
 				<cfthrow message="The payload must be either XML/JSON/string or a struct" type="cfpayment.InvalidParameter.Payload" />
 
 			</cfif>
+
+			<!--- Handle file uploads with files that already exist on local drive/network. Note, this must be after the cfhttparam type formfield lines --->
+			<cfloop collection="#arguments.files#" item="key">
+				<cfhttpparam name="#key#" file="#arguments.files[key]#" type="file" />
+			</cfloop>
 		</cfhttp>
 
 		<cfreturn CFHTTP />
