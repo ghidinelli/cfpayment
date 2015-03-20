@@ -102,6 +102,7 @@
 	<cffunction name="testValidateSuccess" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
 		<cfset var response = "" />
+		
 		<cfset offlineInjector(gw, this, "mock_token_ok", "doHttpCall") />
 		<cfset response = gw.validate(money = variables.svc.createMoney(5000, gw.currency), account = createValidCard()) />
 		<cfset assertTrue(response.getSuccess() AND structKeyExists(response.getParsedResult(), "created"), "The validation did not succeed") />
@@ -341,7 +342,6 @@
 		
 		<cfset offlineInjector(gw, this, "mock_refund_partial_ok", "doHttpCall") />
 		<cfset response = gw.refund(transactionid = response.getTransactionID(), money = variables.svc.createMoney(2500, gw.currency)) />
-
 		<cfset assertTrue(response.getSuccess(), "You can refund a purchase in full") />
 		<cfset assertTrue(response.getParsedResult().amount_refunded EQ 2500, "The partial refund should be for $25.00") />
 		

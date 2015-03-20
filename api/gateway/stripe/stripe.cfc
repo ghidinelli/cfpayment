@@ -227,6 +227,17 @@
 		<cfreturn process(gatewayUrl = getGatewayURL("/tokens"), payload = post, options = options) />
 	</cffunction>
 	
+	<cffunction name="getCustomerTokenForSpecificAccount" output="false" access="public" returntype="any" hint="Get a token for an existing customer)">
+		<cfargument name="customer" type="any" required="true" />
+		<cfargument name="connectedAccount" type="any" required="true" />
+
+		<cfset var headers = {} />
+		<cfset headers["authorization"] = arguments.connectedAccount />
+		<cfset var post = {} />
+		<cfset post["customer"] = arguments.customer />
+		
+		<cfreturn process(gatewayUrl = getGatewayURL("/tokens"), payload = post, headers = headers) />
+	</cffunction>
 
 	<cffunction name="createAccount" output="false" access="public" returntype="any" hint="Provisions a marketplace account">
 		<cfargument name="country" type="string" required="true" />
@@ -341,13 +352,18 @@
 		<cfargument name="options" type="struct" required="false" default="#structNew()#" />
 		<cfargument name="headers" type="struct" required="false" default="#structNew()#" />
 		<cfargument name="method" type="string" required="false" default="post" />
+		<cfargument name="files" type="struct" required="false" default="#structNew()#" />
 
 		<cfset var results = "" />
 		<cfset var response = "" />
 		<cfset var p = arguments.payload /><!--- shortcut (by reference) --->
 
-		<!--- add authentication --->		
-		<cfset headers["authorization"] = "Bearer #getSecretKey()#" />
+		<!--- add authentication, if its not provided --->
+		<cfif structKeyExists(headers,"authorization") AND headers["authorization"] neq "">
+			<cfset headers["authorization"] = "Bearer #headers['authorization']#" />
+		<cfelse>
+			<cfset headers["authorization"] = "Bearer #getSecretKey()#" />
+		</cfif>
 		<!--- if we want to override the stripe API version, we can set it in the config with "ApiVersion".  Using 'latest' overrides to current version --->
 		<cfif len(getApiVersion())>
 			<!--- https://groups.google.com/a/lists.stripe.com/forum/#!topic/api-discuss/V4sYRlHwalc --->
@@ -370,7 +386,7 @@
 		</cfif>
 
 		<!--- Stripe returns errors with http status like 400,402 or 404 (https://stripe.com/docs/api#errors) --->		
-		<cfset response = createResponse(argumentCollection = super.process(url = arguments.gatewayUrl, payload = payload, headers = headers, method = arguments.method)) />
+		<cfset response = createResponse(argumentCollection = super.process(url = arguments.gatewayUrl, payload = payload, headers = headers, method = arguments.method, files = files)) />
 
 
 		<cfif isJSON(response.getResult())>
@@ -706,25 +722,30 @@
 
 		<!--- Identity Verification --->
 	<cffunction name="marketplaceUploadIdentityFile" output="false" access="public" returntype="any" hint="">
+		<cfargument name="accountSecret" type="any" required="false" />
 		<cfargument name="file" type="any" required="false" />
-		<cfhttp url="https://uploads.stripe.com/v1/files" method="POST" throwOnError="Yes">
-			<cfhttpparam type="header" name="authorization" value="Bearer #getSecretKey()#" />
-			<cfif len(getApiVersion())>
-				<cfhttpparam type="header" name="Stripe-Version" value="#getApiVersion()#" />
-			</cfif>
-			<cfhttpparam type="header" name="User-Agent" value="Stripe/v1 cfpayment/#variables.cfpayment.GATEWAY_VERSION#" />
-			<cfhttpparam type="formfield" name="purpose" value="identity_document" />
-			<cfhttpparam type="file" name="file" file="#arguments.file#" />
-		</cfhttp>
-		<cfreturn cfhttp>
+		<cfset var files = structNew() />
+		<cfset var headers = structNew() />
+		<cfset var post = structNew() />
+		<cfset files["file"] = arguments.file />
+		<cfset post["purpose"] = "identity_document" />
+		<cfif isDefined("arguments.accountSecret") AND arguments.accountSecret neq "">
+			<cfset headers["authorization"] = arguments.accountSecret />
+		</cfif>
+		<cfreturn process(gatewayUrl = "https://uploads.stripe.com/v1/files", payload = post, headers = headers, files = files) />
 	</cffunction>
 
 	<cffunction name="marketplaceAttachFileToAccount" output="false" access="public" returntype="any" hint="">
 		<cfargument name="connectedAccount" type="any" required="false" />		
+		<cfargument name="accountSecret" type="any" required="false" />
 		<cfargument name="fileId" type="any" required="false" />		
+		<cfset var headers = structNew() />
 		<cfset var post = structNew() />
+		<cfif isDefined("arguments.accountSecret") AND arguments.accountSecret neq "">
+			<cfset headers["authorization"] = arguments.accountSecret />
+		</cfif>
 		<cfset post["legal_entity[verification][document]"] = arguments.fileId />
-		<cfreturn process(gatewayUrl = getGatewayURL("/accounts/#arguments.connectedAccount#"), payload = post) />
+		<cfreturn process(gatewayUrl = getGatewayURL("/accounts/#arguments.connectedAccount#"), payload = post, headers = headers) />
 	</cffunction>
 
 	<!--- Charges --->
@@ -744,14 +765,14 @@
 	<cffunction name="marketplaceDirectCharge" output="false" access="public" returntype="any" hint="">
 		<cfargument name="connectedAccount" type="any" required="false" />		
 		<cfargument name="amount" type="any" required="false" />		
-		<cfargument name="cardToken" type="any" required="false" />		
+		<cfargument name="token" type="any" required="false" />		
 		<cfargument name="application_fee" type="any" required="false" />		
 		<cfset var headers = structNew() />
 		<cfset var post = structNew() />
-  		<cfset headers["Stripe-Account"] = arguments.connectedAccount />
+  		<cfset headers["authorization"] = arguments.connectedAccount />
 		<cfset post["amount"] = arguments.amount.getCents() />		
 		<cfset post["currency"] = lCase(arguments.amount.getCurrency()) />
-  		<cfset post["card"] = arguments.cardToken />
+  		<cfset post["source"] = arguments.token />
   		<cfset post["application_fee"] = arguments.application_fee.getCents() />
 		<cfreturn process(gatewayUrl = getGatewayURL("/charges"), payload = post, headers = headers) />
 	</cffunction>
@@ -759,15 +780,14 @@
 	<cffunction name="marketplaceDestinationCharge" output="false" access="public" returntype="any" hint="">
 		<cfargument name="destination" type="any" required="false" />		
 		<cfargument name="amount" type="any" required="false" />		
-		<cfargument name="currency" type="any" required="false" />		
-		<cfargument name="card" type="any" required="false" />		
+		<cfargument name="cardToken" type="any" required="false" />		
 		<cfargument name="application_fee" type="any" required="false" />		
 		<cfset var post = structNew() />
-  		<cfset post["post"] = arguments.destination />
-  		<cfset post["amount"] = arguments.amount />
-  		<cfset post["currency"] = arguments.currency />
-  		<cfset post["card"] = arguments.card />
-  		<cfset post["application_fee"] = arguments.application_fee />
+  		<cfset post["destination"] = arguments.destination />
+  		<cfset post["amount"] = arguments.amount.getCents() />
+  		<cfset post["currency"] = lCase(arguments.amount.getCurrency()) />
+  		<cfset post["card"] = arguments.cardToken />
+  		<cfset post["application_fee"] = arguments.application_fee.getCents() />
 		<cfreturn process(gatewayUrl = getGatewayURL("/charges"), payload = post) />
 	</cffunction>
 
@@ -775,7 +795,7 @@
 		<cfargument name="paymentId" type="any" required="false" />		
 		<cfargument name="refundAmount" type="any" required="false" />		
 		<cfset var post = structNew() />
-		<cfset post["amount"] = arguments.refundAmount />
+		<cfset post["amount"] = arguments.refundAmount.getCents() />
 		<cfreturn process(gatewayUrl = getGatewayURL("/charges/#arguments.paymentId#/refunds"), payload = post) />
 	</cffunction>
 
@@ -783,11 +803,10 @@
 		<cfargument name="paymentId" type="any" required="false" />		
 		<cfargument name="refundAmount" type="any" required="false" />		
 		<cfargument name="connectedAccount" type="any" required="false" />		
-		<cfset var connectedStripAccount = arguments.account />		
 		<cfset var headers = structNew() />
 		<cfset var post = structNew() />
 		<cfset headers["Stripe-Account"] = arguments.connectedAccount />
-		<cfset post["amount"] = arguments.refundAmount/>
+		<cfset post["amount"] = arguments.refundAmount.getCents() />
 		<cfreturn process(gatewayUrl = getGatewayURL("/charges/#arguments.paymentId#/refunds"), payload = post, headers = headers) />
 	</cffunction>
 
@@ -795,24 +814,26 @@
 		<cfargument name="paymentId" type="any" required="false" />		
 		<cfargument name="refundAmount" type="any" required="false" />		
 		<cfargument name="connectedAccount" type="any" required="false" />		
-		<cfset var connectedStripAccount = arguments.account />		
 		<cfset var headers = structNew() />
 		<cfset var post = structNew() />
-		<cfset headers["Stripe-Account"] = arguments.connectedAccount />
-		<cfset post["amount"] = arguments.refundAmount />
-		<cfset post["currency"] = "CAD" />
+		<cfset post["amount"] = arguments.refundAmount.getCents() />
 		<cfset post["reverse_transfer"] = "true" />
 		<cfreturn process(gatewayUrl = getGatewayURL("/charges/#arguments.paymentId#/refunds"), payload = post, headers = headers) />
 	</cffunction>
 
 	<!--- Transfers --->
 	<cffunction name="marketplaceTransferFromPlatformStripeAccountToConnectedStripeAccount" output="false" access="public" returntype="any" hint="">
+		<cfargument name="sourceTransaction" type="any" required="false" />
 		<cfargument name="destination" type="any" required="false" />
 		<cfargument name="transferAmount" type="any" required="false" />
+		sourceTransaction
 		<cfset var post = structNew() />
 		<cfset post["amount"] = arguments.transferAmount.getCents() />
 		<cfset post["currency"] = lCase(arguments.transferAmount.getCurrency()) />
 		<cfset post["destination"] = arguments.destination />
+		<cfif isDefined("arguments.sourceTransaction") AND arguments.sourceTransaction neq "">
+			<cfset post["source_transaction"] = arguments.sourceTransaction />
+		</cfif>
 		<cfreturn process(gatewayUrl = getGatewayURL("/transfers"), payload = post) />
 	</cffunction>
 
