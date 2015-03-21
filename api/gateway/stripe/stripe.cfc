@@ -377,7 +377,7 @@
 			<cfset p["description"] = arguments.options.description />
 		</cfif>
 		<cfif structKeyExists(arguments.options, "tokenId")>
-			<cfset p["card"] = arguments.options.tokenId />
+			<cfset p["customer"] = arguments.options.tokenId />
 		</cfif>
 
 		<!--- add dynamic statement descriptors which show up on CC statement alongside merchant name: https://stripe.com/docs/api#create_charge --->
