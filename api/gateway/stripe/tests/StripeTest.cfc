@@ -158,7 +158,18 @@
 		<cfset assertTrue(response.getStatusCode() EQ 200, "Status code should be 200, was: #response.getStatusCode()#") />
 		<cfset assertTrue(NOT response.hasError(), "Purchase should not have errors but did") />
 	</cffunction>
-	
+
+
+	<cffunction name="testPurchaseWithStatementDescriptor" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
+		<cfargument name="gw" type="any" required="true" />
+		<cfset var response = "" />
+		<!--- this will be rejected by gateway because the card number is not valid --->
+		<cfset offlineInjector(gw, this, "mock_purchase_ok", "doHttpCall") />
+		<cfset response = gw.purchase(money = variables.svc.createMoney(5000, gw.currency), account = createValidCard(), options = {"statement_description": "Test <Descriptor>"}) />
+		<cfset assertTrue(response.getSuccess(), "The #gw.currency# purchase failed but should have succeeded") />
+		<cfset assertTrue(response.getParsedResult().statement_descriptor EQ "Test Descriptor", "The statement descriptior should have returned 'Test Descriptor' (with invalid chars stripped), was: #response.getParsedResult().statement_descriptor#") />
+	</cffunction>	
+
 	
 	<cffunction name="testPurchaseDecline" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
@@ -195,7 +206,7 @@
 		<cfset response = gw.purchase(money = variables.svc.createMoney(5000, gw.currency), account = createValidCardWithoutStreetMatch()) />
 		<cfset assertTrue(response.getSuccess(), "The #gw.currency# purchase succeeded but should have failed") />
 		<cfset assertTrue(response.getStatusCode() EQ 200, "Status code should be 200, was: #response.getStatusCode()#") />
-		<cfset assertTrue(response.getParsedResult().card.address_line1_check EQ "fail", "Should have been an invalid address1, was: #response.getParsedResult().card.address_line1_check#") />
+		<cfset assertTrue(response.getParsedResult().source.address_line1_check EQ "fail", "Should have been an invalid address1, was: #response.getParsedResult().source.address_line1_check#") />
 	</cffunction>
 
 
