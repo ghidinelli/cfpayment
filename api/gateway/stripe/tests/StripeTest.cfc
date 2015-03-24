@@ -70,7 +70,7 @@
 			variables.gw = variables.usd;
 			
 			// for dataprovider testing
-			variables.gateways = [usd,cad];
+			variables.gateways = [cad];
 
 		</cfscript>
 
@@ -214,8 +214,6 @@
 
 		<cfset offlineInjector(gw, this, "mock_invalid_cvc", "doHttpCall") />
 		<cfset response = gw.purchase(money = variables.svc.createMoney(5000, gw.currency), account = createInvalidCVCError()) />
-		<cfset debug(response.getMemento()) />
-		<cfset debug(tostring(response.getResult())) />
 		<cfset assertTrue(NOT response.getSuccess(), "The #gw.currency# purchase succeeded but should have failed") />
 		<cfset assertTrue(response.getStatusCode() EQ 402, "Status code should be 402, was: #response.getStatusCode()#") />
 		<cfset assertTrue(response.getParsedResult().error.code EQ "invalid_cvc", "Should have been an invalid cvc, was: #response.getParsedResult().error.code#") />
