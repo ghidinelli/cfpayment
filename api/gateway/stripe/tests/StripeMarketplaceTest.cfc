@@ -72,6 +72,8 @@
 			// for dataprovider testing
 			variables.gateways = [cad];
 
+			// local resources
+			variables.filePathToSampleLicence = reReplace(expandPath('.'), 'main\\.+\\framework$', '', 'one') & 'shared\cfpayment\api\gateway\stripe\tests\sample_driving_license_usa.jpg';
 		</cfscript>
 
 		<!--- if set to false, will try to connect to remote service to check these all out --->
@@ -98,8 +100,15 @@
 			<cfset debug(arguments.response.getResult())>
 		</cfif>
 
+		<cfif isSimpleValue(arguments.response)>
+			<cfset assertTrue(false, "Response returned a simple value: '#arguments.response#'") />
+		</cfif>
 		<cfif NOT isObject(arguments.response)>
 			<cfset assertTrue(false, "Invalid: response is not an object") />
+		<cfelseif isStruct(arguments.response.getParsedResult()) AND structIsEmpty(arguments.response.getParsedResult())>
+			<cfset assertTrue(false, "Response structure returned is empty") />
+		<cfelseif isSimpleValue(arguments.response.getParsedResult())>
+			<cfset assertTrue(false, "Response is a string, expected a structure. Returned string = '#arguments.response.getParsedResult()#'") />
 		<cfelseif arguments.response.getStatusCode() neq 200>
 			<!--- Test status code and remote error messages --->
 			<cfif structKeyExists(arguments.response.getParsedResult(), "error")>
@@ -130,8 +139,15 @@
 			<cfset debug(arguments.response.getResult())>
 		</cfif>
 
+		<cfif isSimpleValue(arguments.response)>
+			<cfset assertTrue(false, "Response returned a simple value: '#arguments.response#'") />
+		</cfif>
 		<cfif NOT isObject(arguments.response)>
 			<cfset assertTrue(false, "Invalid: response is not an object") />
+		<cfelseif isStruct(arguments.response.getParsedResult()) AND structIsEmpty(arguments.response.getParsedResult())>
+			<cfset assertTrue(false, "Response structure returned is empty") />
+		<cfelseif isSimpleValue(arguments.response.getParsedResult())>
+			<cfset assertTrue(false, "Response is a string, expected a structure. Returned string = '#arguments.response.getParsedResult()#'") />
 		<cfelseif arguments.response.getStatusCode() neq arguments.expectedStatusCode>
 			<cfset assertTrue(false, "Status code should be #arguments.expectedStatusCode#, was: #arguments.response.getStatusCode()#") />
 		<cfelse>
@@ -314,8 +330,9 @@
 		<!--- Identity Verification Tests --->
 	<cffunction name="testUploadIdentityFile" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
+
 		<cfset offlineInjector(gw, this, "mock_upload_identity_file_ok", "doHttpCall") />
-		<cfset uploadFile = gw.marketplaceUploadIdentityFile(file = "C:\inetpub\pukka\msr\shared\cfpayment\api\gateway\stripe\tests\sample_driving_license_usa.jpg") />
+		<cfset uploadFile = gw.marketplaceUploadIdentityFile(file = variables.filePathToSampleLicence) />
 		<cfset standardResponseTests(response = uploadFile, expectedObjectName = "file_upload", expectedIdPrefix="file_") />
 	</cffunction>
 
@@ -330,7 +347,7 @@
 			<!--- Upload Identity File --->
 		<cfset offlineInjector(gw, this, "mock_upload_identity_file_ok", "doHttpCall") />
 		<cfset argumentCollection = structNew()>
-		<cfset argumentCollection.file = "C:\inetpub\pukka\msr\shared\cfpayment\api\gateway\stripe\tests\sample_driving_license_usa.jpg" />
+		<cfset argumentCollection.file = variables.filePathToSampleLicence />
 		<cfset argumentCollection.accountSecret = connectedAccount.getParsedResult().keys.secret />
 		<cfset uploadFile = gw.marketplaceUploadIdentityFile(argumentCollection = argumentCollection) />
 		<cfset standardResponseTests(response = uploadFile, expectedObjectName = "file_upload", expectedIdPrefix="file_") />

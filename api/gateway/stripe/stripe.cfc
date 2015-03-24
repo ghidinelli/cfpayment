@@ -257,83 +257,7 @@
 		<cfset post["email"] = arguments.email />
 		<cfset post["statement_descriptor"] = arguments.statement_descriptor />
 		<cfset post["display_name"] = arguments.display_name />
-		
-		<cfif structKeyExists(arguments.options, "legal_entity")>
-			<cfset post = addLegalEntity(post = post, account = arguments.legal_entity) />
-		</cfif>
-		
 
-			<!--- 
-  -d legal_entity[first_name]=Bob
-			{
-			  "id": "acct_14qyt6Alijdnw0EA",
-			  "email": null,
-			  "statement_descriptor": null,
-			  "display_name": null,
-			  "timezone": "Etc/UTC",
-			  "details_submitted": false,
-			  "charges_enabled": true,
-			  "transfers_enabled": false,
-			  "currencies_supported": [
-			    "usd",
-			    "aed",
-			    ...
-			    "zar",
-			    "zmw"
-			  ],
-			  "default_currency": "usd",
-			  "country": "US",
-			  "object": "account",
-			  "business_name": null,
-			  "managed": true,
-			  "transfers_only": false,
-			  "product_description": null,
-			  "legal_entity": {
-			    "type": null,
-			    "business_name": null,
-			    "address": {},
-			    "first_name": "Bob",
-			    "last_name": null,
-			    "personal_address": {},
-			    "dob": {
-			      "day": null,
-			      "month": null,
-			      "year": null
-			     },
-			    "additional_owners": null,
-			    "verification": {
-			        "status": "waiting",
-			        "document": null,
-			        "details": null
-			    }
-			  },
-			  "bank_accounts": {
-			    "object": "list",
-			    "total_count": 0,
-			    "has_more": false,
-			    "url": "/v1/accounts/acct_14qyt6Alijdnw0EA/bank_accounts",
-			    "data": []
-			  },
-			  "verification": {
-			    "fields_needed": [
-			      "product_description",
-			      "business_url",
-			      "support_phone",
-			      "legal_entity.type"
-			    ],
-			    "due_by": null,
-			    "contacted": false
-			  },
-			  "transfer_schedule": {
-			    "delay_days": 7,
-			    "interval": "daily"
-			  }
-			}
-
-			response.getParsedResult().id	
-
-			--->
-		
 		<cfreturn process(gatewayUrl = getGatewayURL("/accounts"), payload = post, options = options) />
 	</cffunction>
 
@@ -623,27 +547,6 @@
 	</cffunction>
 
 
-	<cffunction name="addLegalEntity" output="false" access="private" returntype="any" hint="Add payment source fields to the request object">
-		<cfargument name="post" type="struct" required="true" />
-		<cfargument name="account" type="any" required="true" />
-
-		<cfscript>
-			post["card[number]"] = arguments.account.getAccount();
-			post["card[exp_month]"] = arguments.account.getMonth();
-			post["card[exp_year]"] = arguments.account.getYear();
-			post["card[cvc]"] = arguments.account.getVerificationValue();
-			post["card[name]"] = arguments.account.getName();
-			post["card[address_line1]"] = arguments.account.getAddress();
-			post["card[address_line2]"] = arguments.account.getAddress2();
-			post["card[address_zip]"] = arguments.account.getPostalCode();
-			post["card[address_state]"] = arguments.account.getRegion();
-			post["card[address_country]"] = arguments.account.getCountry();
-		</cfscript>
-	
-		<cfreturn post />
-	</cffunction>	
-	
-	
 	<cffunction name="dateToUTC" output="false" access="public" returntype="any" hint="Take a date and return the number of seconds since the Unix Epoch">
 		<cfargument name="date" type="any" required="true" />
 		<cfreturn dateDiff("s", dateConvert("utc2Local", "January 1 1970 00:00"), arguments.date) />
@@ -900,9 +803,9 @@
 			post["email"] = 'test#dateFormat(now(),"yyyymmdd")##timeFormat(now(),"HHmmss")#@test.tst';
 			post["default_currency"] = 'CAD';
 			//These properties can be set when creating the account, and changed later if the account is managed, but are only relevant if the account has charges being made directly on it:
-			//post["statement_descriptor"] = 'CA';
-			//post["business_name"] = 'CA';
-			//post["support_phone"] = 'CA';
+			//post["statement_descriptor"] = '';
+			//post["business_name"] = '';
+			//post["support_phone"] = '';
 		</cfscript>
 	
 		<cfreturn post />
