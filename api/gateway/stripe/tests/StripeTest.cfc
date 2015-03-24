@@ -70,7 +70,7 @@
 			variables.gw = variables.usd;
 			
 			// for dataprovider testing
-			variables.gateways = [usd, cad];
+			variables.gateways = [usd,cad];
 
 		</cfscript>
 
@@ -147,6 +147,29 @@
 	</cffunction>	
 
 
+	<cffunction name="testPurchaseWithCustomerAccount" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
+		<cfargument name="gw" type="any" required="true" />
+		<cfset var response = "" />
+		<cfset var token = variables.svc.createToken() />
+
+		<cfset offlineInjector(gw, this, "mock_token_ok", "doHttpCall") />
+		<cfset response = gw.validate(money = variables.svc.createMoney(5000, gw.currency), account = createValidCard()) />
+		<cfset token.setID(response.getTransactionId()) />
+		<cfset offlineInjector(gw, this, "mock_store_ok", "doHttpCall") />
+		<cfset response = gw.store(account = token) />
+
+		<cfset var customer = variables.svc.createToken() />
+		<cfset customer.setId(response.getTransactionId()) />
+
+		<!--- this will be rejected by gateway because the card number is not valid --->
+		<cfset offlineInjector(gw, this, "mock_purchase_ok", "doHttpCall") />
+		<cfset response = gw.purchase(money = variables.svc.createMoney(5000, gw.currency), account = customer) />
+		<cfset assertTrue(response.getSuccess(), "The #gw.currency# purchase failed but should have succeeded") />
+		<cfset assertTrue(response.getStatusCode() EQ 200, "Status code should be 200, was: #response.getStatusCode()#") />
+		<cfset assertTrue(NOT response.hasError(), "Purchase should not have errors but did") />
+	</cffunction>
+
+
 	<cffunction name="testPurchaseWithCardSuccess" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
 		<cfset var response = "" />
@@ -165,8 +188,9 @@
 		<cfset var response = "" />
 		<!--- this will be rejected by gateway because the card number is not valid --->
 		<cfset offlineInjector(gw, this, "mock_purchase_ok", "doHttpCall") />
-		<cfset response = gw.purchase(money = variables.svc.createMoney(5000, gw.currency), account = createValidCard(), options = {"statement_description": "Test <Descriptor>"}) />
+		<cfset response = gw.purchase(money = variables.svc.createMoney(5000, gw.currency), account = createValidCard(), options = {"statement_descriptor": "Test <Descriptor>"}) />
 		<cfset assertTrue(response.getSuccess(), "The #gw.currency# purchase failed but should have succeeded") />
+		<cfset assertTrue(structKeyExists(response.getParsedResult(), 'statement_descriptor'), 'statement_descriptor key doesnt exist') />
 		<cfset assertTrue(response.getParsedResult().statement_descriptor EQ "Test Descriptor", "The statement descriptior should have returned 'Test Descriptor' (with invalid chars stripped), was: #response.getParsedResult().statement_descriptor#") />
 	</cffunction>	
 
@@ -334,7 +358,6 @@
 		<!--- this will be rejected by gateway because the card number is not valid --->
 		<cfset offlineInjector(gw, this, "mock_purchase_ok", "doHttpCall") />
 		<cfset response = gw.purchase(money = variables.svc.createMoney(5000, gw.currency), account = createValidCard()) />
-		
 		<cfset offlineInjector(gw, this, "mock_refund_full_ok", "doHttpCall") />
 		<cfset response = gw.refund(transactionid = response.getTransactionID()) />
 		<cfset assertTrue(response.getSuccess(), "You can refund a purchase in full") />
@@ -515,7 +538,7 @@
 	</cffunction>
 
 	<cffunction name="mock_purchase_ok" access="private">
-		<cfset var http = { StatusCode = '200 OK', FileContent = '{ "id": "ch_1IehV2hFFglF0v", "object": "charge", "created": 1360991963, "livemode": false, "paid": true, "amount": 5000, "currency": "usd", "refunded": false, "fee": 175, "fee_details": [ { "amount": 175, "currency": "usd", "type": "stripe_fee", "description": "Stripe processing fees", "application": null, "amount_refunded": 0 } ], "card": { "object": "card", "last4": "4242", "type": "Visa", "exp_month": 10, "exp_year": 2014, "fingerprint": "Z0VUjeIIj0HObMhK", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass" }, "failure_message": null, "amount_refunded": 0, "customer": null, "invoice": null, "description": null, "dispute": null }' } />
+		<cfset var http = { StatusCode = '200 OK', FileContent = '{ "id": "ch_1IehV2hFFglF0v", "object": "charge", "created": 1360991963, "livemode": false, "paid": true, "amount": 5000, "currency": "usd", "refunded": false, "fee": 175, "fee_details": [ { "amount": 175, "currency": "usd", "type": "stripe_fee", "description": "Stripe processing fees", "application": null, "amount_refunded": 0 } ], "card": { "object": "card", "last4": "4242", "type": "Visa", "exp_month": 10, "exp_year": 2014, "fingerprint": "Z0VUjeIIj0HObMhK", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass" }, "failure_message": null, "amount_refunded": 0, "customer": null, "invoice": null, "description": null, "dispute": null, "statement_descriptor": "TEST DESCRIPTOR" }' } />
 		<cfreturn http />
 	</cffunction>
 	
@@ -550,7 +573,7 @@
 	</cffunction>
 
 	<cffunction name="mock_invalid_address1" access="private">
-		<cfset var http = { StatusCode = '200', FileContent = '{ "id": "ch_1IeAMjrHpnj7dV", "object": "charge", "created": 1360990030, "livemode": false, "paid": true, "amount": 5000, "currency": "usd", "refunded": false, "fee": 175, "fee_details": [ { "amount": 175, "currency": "usd", "type": "stripe_fee", "description": "Stripe processing fees", "application": null, "amount_refunded": 0 } ], "card": { "object": "card", "last4": "0028", "type": "Visa", "exp_month": 10, "exp_year": 2014, "fingerprint": "1YqKn8Y7DbGMP8a1", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "fail", "address_zip_check": "pass" }, "failure_message": null, "amount_refunded": 0, "customer": null, "invoice": null, "description": null, "dispute": null }' } />
+		<cfset var http = { StatusCode = '200', FileContent = '{ "id": "ch_1IeAMjrHpnj7dV", "object": "charge", "created": 1360990030, "livemode": false, "paid": true, "amount": 5000, "currency": "usd", "refunded": false, "fee": 175, "fee_details": [ { "amount": 175, "currency": "usd", "type": "stripe_fee", "description": "Stripe processing fees", "application": null, "amount_refunded": 0 } ], "source": { "object": "card", "last4": "0028", "type": "Visa", "exp_month": 10, "exp_year": 2014, "fingerprint": "1YqKn8Y7DbGMP8a1", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "fail", "address_zip_check": "pass" }, "failure_message": null, "amount_refunded": 0, "customer": null, "invoice": null, "description": null, "dispute": null }' } />
 		<cfreturn http />
 	</cffunction>
 

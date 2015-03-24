@@ -435,14 +435,14 @@
 				<cfif structKeyExists(results.card, "fingerprint")>
 					<cfset response.setAuthorization(results.card.fingerprint) />
 				</cfif>
+			</cfif>
+			
+			<cfif structKeyExists(results, "id")>
+				<cfset response.setTransactionID(results.id) />
+			</cfif>
 				
-				<cfif structKeyExists(results, "id")>
-					<cfset response.setTransactionID(results.id) />
-				</cfif>
-				<cfif structKeyExists(results, "customer") AND results.customer NEQ "null">
-					<cfset response.setTokenID(results.customer) />
-				</cfif>
-				
+			<cfif structKeyExists(results, "customer") AND results.customer NEQ "null">
+				<cfset response.setTokenID(results.customer) />
 			</cfif>
 			
 			<!--- not sure if this is right? 
@@ -613,7 +613,11 @@
 		<cfargument name="account" type="any" required="true" />
 		
 		<!--- required when using as a payment source --->
-		<cfset arguments.post["card"] = arguments.account.getID() />
+		<cfif findNoCase("cus_", arguments.account.getID())>
+			<cfset arguments.post["customer"] = arguments.account.getID() />
+		<cfelse>
+			<cfset arguments.post["source"] = arguments.account.getID() />
+		</cfif>
 
 		<cfreturn arguments.post />
 	</cffunction>
