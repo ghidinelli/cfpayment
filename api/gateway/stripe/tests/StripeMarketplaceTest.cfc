@@ -75,7 +75,7 @@
 		</cfscript>
 
 		<!--- if set to false, will try to connect to remote service to check these all out --->
-		<cfset localMode = true />
+		<cfset localMode = false />
 		<cfset debugMode = false />
 	</cffunction>
 
