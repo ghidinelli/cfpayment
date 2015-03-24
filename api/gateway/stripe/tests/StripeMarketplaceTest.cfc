@@ -73,7 +73,7 @@
 			variables.gateways = [cad];
 
 			// local resources
-			variables.filePathToSampleLicence = reReplace(expandPath('.'), 'main\\.+\\framework$', '', 'one') & 'shared\cfpayment\api\gateway\stripe\tests\sample_driving_license_usa.jpg';
+			variables.filePathToSampleLicence = getDirectoryFromPath(getCurrentTemplatePath()) & 'sample_driving_license_usa.jpg';
 		</cfscript>
 
 		<!--- if set to false, will try to connect to remote service to check these all out --->
