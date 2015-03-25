@@ -75,7 +75,7 @@
 		</cfscript>
 
 		<!--- if set to false, will try to connect to remote service to check these all out --->
-		<cfset localMode = false />
+		<cfset localMode = true />
 
 	</cffunction>
 
@@ -261,40 +261,6 @@
 	</cffunction>
 
 
-<!--- 
-	<cffunction name="testValidate" access="public" returntype="void" output="false">
-	
-		<cfset var money = variables.svc.createMoney(5000) /><!--- in cents, $50.00 --->
-		<cfset var response = "" />
-		<cfset var options = structNew() />
-		
-		<cfset response = gw.validate(money = money, account = createValidCard(), options = options) />
-		<cfset assertTrue(response.getSuccess(), "The authorization did not succeed") />
-		<cfset assertTrue(response.getAVSCode() EQ "Y", "Exact match (street + zip) should be found") />
-
-		<!--- this will be rejected by gateway because the card number is not valid --->
-		<cfset response = gw.validate(money = money, account = createInvalidCard(), options = options) />
-		<cfset assertTrue(NOT response.getSuccess(), "The invalid card validation did succeed") />
-
-		<cfset response = gw.validate(money = money, account = createValidCardWithoutCVV(), options = options) />
-		<cfset assertTrue(response.getSuccess(), "The card without cvv validation did not succeed") />
-		<cfset assertTrue(response.getCVVCode() EQ "", "No CVV was passed so no answer should be provided but was: '#response.getCVVCode()#'") />
-
-		<cfset response = gw.validate(money = money, account = createValidCardWithBadCVV(), options = options) />
-		<cfset assertTrue(response.getSuccess(), "The card with bad cvv validation did not succeed") />
-		<cfset assertTrue(response.getCVVCode() EQ "N", "Bad CVV was passed so non-matching answer should be provided but was: '#response.getCVVCode()#'") />
-
-		<cfset response = gw.validate(money = money, account = createValidCardWithoutStreetMatch(), options = options) />
-		<cfset assertTrue(response.getSuccess(), "The card without street match validation did not succeed") />
-		<cfset assertTrue(response.getAVSCode() EQ "Z", "AVS Zip match only should be found") />
-
-		<cfset response = gw.validate(money = money, account = createValidCardWithoutZipMatch(), options = options) />
-		<cfset assertTrue(response.getSuccess(), "The card without zip match validation did not succeed") />
-		<cfset assertTrue(response.getAVSCode() EQ "A", "AVS Street match only should be found") />
-
-	</cffunction>
---->
-
 	<cffunction name="testListChargesWithoutCount" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
 		<cfset var response = "" />
@@ -379,61 +345,55 @@
 		
 	</cffunction>
 
-		
-		<!---
-		<cfset response = gw.purchase(money = money, account = account, options = options) />
-		<cfset debug(response.getMemento()) />
-		<cfset assertTrue(response.getSuccess(), "The purchase did not succeed") />
 
-		<cfset response = gw.refund(transactionid = response.getTransactionID(), money = money, options = options) />
-		<cfset debug(response.getMemento()) />
-		<cfset assertTrue(response.getSuccess(), "You can refund a purchase in full") />
+	<cffunction name="testConvertDateToStripe" output="false" access="public" returntype="void">
+		<cfset local.dte = createDateTime(2009, 12, 7, 16, 0, 0) />
+		<cfset local.dteNow = now() />
 
-
-		<!--- try partial refunds and overage --->
-		<cfset response = gw.purchase(money = money, account = account, options = options) />
-		<cfset transId = response.getTransactionID() />
-		<cfset debug(response.getMemento()) />
-		<cfset assertTrue(response.getSuccess(), "The purchase did not succeed") />
-
-		<cfset money = variables.svc.createMoney(2500) />
-		<cfset response = gw.refund(transactionid = transId, money = money, options = options) />
-		<cfset debug(response.getMemento()) />
-		<cfset assertTrue(response.getSuccess(), "You should be able to partially refund a purchase ($25)") />
-
-		<cfset response = gw.refund(transactionid = transId, money = money, options = options) />
-		<cfset debug(response.getMemento()) />
-		<cfset assertTrue(response.getSuccess(), "You should be able to partially refund second part of a purchase ($25)") />
-
-		<cfset response = gw.refund(transactionid = transId, money = money, options = options) />
-		<cfset debug(response.getMemento()) />
-		<cfset assertTrue(NOT response.getSuccess(), "You can't refund a purchase more than the original price") />
-
+		<cfset assertTrue(gw.utcToDate(gw.dateToUTC(dte)) EQ dte, "A round trip should return the original value") />
 	</cffunction>
-		--->
 
 
-
-	<cffunction name="test_date_conversion" output="false" access="public" returntype="void">
-		<cfset var dte = createDateTime(2009, 12, 7, 16, 0, 0) />
-		<cfset var dteNow = now() />
-		<cfset var dteGMT = dateAdd('s', getTimeZoneInfo().utcTotalOffset, dteNow) />
-		<cfset var conv = gw.dateToUTC(dte) />
-		<cfset var str = "" />
-
-		<cfset assertTrue(dte EQ gw.utcToDate(conv), "The converted date didn't match (#dte# != #conv#)") />
-		<cfset assertTrue(gw.dateToUTC(dteNow) EQ gw.dateToUTC(dteGMT, false), "dateConvert() and dateAdd() should be equivalent: #gw.dateToUTC(dteNow)# != #gw.dateToUTC(dteGMT, false)#") />
-
+	<cffunction name="testConvertStripeToDate" output="false" access="public" returntype="void">
 		<!--- create a timestamp in GMT as though it came from Stripe in epoch offset "created" --->
-		<cfset dteGMT = "2013-02-16 05:20:46" />
-		<cfset str = 1360992046 />
-		<cfset assertTrue(dteGMT EQ gw.utcToDate(str), "Stripe date should convert to local time: (#dteNow# != #gw.utcToDate(str)# / #str#)") />
+		<cfset local.dteKnownStripeEquivalent = "2013-02-16 05:20:46" />
+		<cfset local.stripeUTC = 1360992046 />
+
+		<!--- first convert the stripe epoch value into a local time value --->
+		<cfset local.dteLocalTime = gw.utcToDate(stripeUTC) />
+
+		<!--- if the coldfusion server is running in UTC, the utcTotalOffset = 0, otherwise we need to add the UTC offset for comparison so this test can run on any CF install anywhere --->
+		<cfset local.dteGMT = castToUTC(dteLocalTime) />
+
+		<!--- now they should be identical --->		
+		<cfset assertTrue(dteKnownStripeEquivalent EQ dteGMT, "Stripe date should convert to local time: (#dteKnownStripeEquivalent# != #dteGMT# / #stripeUTC#)") />
 	</cffunction>
 
 
 
 
 	<!--- PRIVATE HELPERS, MOCKS, ETC --->
+
+
+	<cffunction name="castToUTC" output="false" access="public" returntype="any">
+		<cfargument name="dtm" required="yes" type="any" />
+
+		<cfscript>
+			var tYear = ''; var tMonth = ''; var tDay = ''; var tDOW = ''; var thisOffset = ''; 
+		</cfscript>
+		
+		<cfset local.jTimeZone = createObject("java","java.util.TimeZone") />
+		<cfset local.timezone = jTimeZone.getDefault() />
+
+		<cfscript>
+			tYear = javacast("int", Year(arguments.dtm));
+			tMonth = javacast("int", month(arguments.dtm)-1); //java months are 0 based
+			tDay = javacast("int", Day(dtm));
+			tDOW = javacast("int", DayOfWeek(dtm));	//day of week
+			thisOffset = (timezone.getOffset(1, tYear, tMonth, tDay, tDOW, 0) / 1000) * -1.00;
+			return dateAdd("s", thisOffset, arguments.dtm);
+		</cfscript>
+	</cffunction>
 
 	<cffunction name="createValidCard" access="private" returntype="any" output="false">
 		<!--- these values simulate a valid card with matching avs/cvv --->
