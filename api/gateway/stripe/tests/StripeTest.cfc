@@ -70,7 +70,7 @@
 			variables.gw = variables.usd;
 			
 			// for dataprovider testing
-			variables.gateways = [cad];
+			variables.gateways = [usd, cad];
 
 		</cfscript>
 
