@@ -9,8 +9,8 @@ component
 		gw.path = 'basecommerce.basecommerce';
 		//Test account
 		gw.Username = 'xxxxxxxxxxxxx';
-		gw.Password = 'xxxxxxxxxxxxxxxxxxx';
-		gw.MerchantAccount = 'xxxxxxxxxxxxxxxxxxxxxxx';
+		gw.Password = 'xxxxxxxxxxxxxxx';
+		gw.MerchantAccount = 'xxxxxxxxxxxxxxxxxx';
 		gw.TestMode = true; // defaults to true anyways
 
 		// create gw and get reference			
@@ -92,7 +92,7 @@ component
 		assertTrue(accountToken.getToken() != '', 'Token not returned');
 	}
 
-	public void function testChargeAccount() {
+	public void function testCreditAccount() {
 		//Create account
 		local.argumentCollection = structNew();
 		local.argumentCollection.account = createAccount();
@@ -104,14 +104,13 @@ component
 		assertTrue(accountToken.getType() == 'CHECKING', 'Incorrect bank account type, should be Checking');
 		assertTrue(accountToken.getToken() != '', 'Token not returned');
 
-		//Charge account
+		//Credit account
 		local.options = structNew();
 		local.options.tokenId = accountToken.getToken();
-		local.options.transaction = 'credit';
-		offlineInjector(gw, this, 'mockChargeAccountOk', 'doHttpCall');
-		charge = gw.transaction(money = variables.svc.createMoney(500, 'USD'), options = local.options);
-		assertTrue(arrayLen(charge.getMessages()) == 0, '#arrayLen(charge.getMessages())# message(s) where returned from BaseCommerce: #arrayToList(charge.getMessages(), "<br />")#');
-		assertTrue(charge.getBankAccountTransactionId() > 0, 'Invalid transaction id returned: #charge.getBankAccountTransactionId()#');
+		offlineInjector(gw, this, 'mockCreditAccountOk', 'doHttpCall');
+		credit = gw.credit(money = variables.svc.createMoney(500, 'USD'), options = local.options);
+		assertTrue(arrayLen(credit.getMessages()) == 0, '#arrayLen(credit.getMessages())# message(s) where returned from BaseCommerce: #arrayToList(credit.getMessages(), "<br />")#');
+		assertTrue(credit.getBankAccountTransactionId() > 0, 'Invalid transaction id returned: #credit.getBankAccountTransactionId()#');
 	}
 
 	public void function testDebitAccount() {
@@ -126,12 +125,11 @@ component
 		assertTrue(accountToken.getType() == 'CHECKING', 'Incorrect bank account type, should be Checking');
 		assertTrue(accountToken.getToken() != '', 'Token not returned');
 
-		//Charge account
+		//Debit account
 		local.options = structNew();
 		local.options.tokenId = accountToken.getToken();
-		local.options.transaction = 'debit';
-		offlineInjector(gw, this, 'mockChargeAccountOk', 'doHttpCall');
-		debit = gw.transaction(money = variables.svc.createMoney(500, 'USD'), options = local.options);
+		offlineInjector(gw, this, 'mockDebitAccountOk', 'doHttpCall');
+		debit = gw.purchase(money = variables.svc.createMoney(500, 'USD'), options = local.options);
 		assertTrue(arrayLen(debit.getMessages()) == 0, '#arrayLen(debit.getMessages())# message(s) where returned from BaseCommerce: #arrayToList(debit.getMessages(), "<br />")#');
 		assertTrue(debit.getBankAccountTransactionId() > 0, 'Invalid transaction id returned: #debit.getBankAccountTransactionId()#');
 	}
@@ -158,7 +156,7 @@ component
 	}
 
 	//MOCKS
-	private any function mockChargeAccountOk() {
+	private any function mockCreditAccountOk() {
 		return { StatusCode = '200 OK', FileContent = '' };
 	}
 
