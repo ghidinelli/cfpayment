@@ -148,48 +148,24 @@ component
 	}
 
 	//Implement primary methods
-	public any function transaction(required any money, any transactionId, any account, struct options=structNew()) {
-		bankAccountTransactionObj = createObject('java', 'com.basecommercepay.client.BankAccountTransaction');
-		if(isDefined('arguments.options.transaction') && arguments.options.transaction == 'credit') bankAccountTransactionObj.setType(bankAccountTransactionObj.XS_BAT_TYPE_CREDIT);
-		else bankAccountTransactionObj.setType(bankAccountTransactionObj.XS_BAT_TYPE_DEBIT);
-		bankAccountTransactionObj.setMethod(bankAccountTransactionObj.XS_BAT_METHOD_CCD);
-		bankAccountTransactionObj.setAmount(arguments.money.getAmount());
-
-		locale = createObject('java', 'java.util.Locale');
-		calendarObj = createObject('java', 'java.util.GregorianCalendar').init(locale.US);
-		calendarObj.set(calendarObj.DAY_OF_YEAR, calendarObj.get(calendarObj.DAY_OF_YEAR) + 3);
-		effectiveDate = calendarObj.getTime();
-		bankAccountTransactionObj.setEffectiveDate(effectiveDate);
-		bankAccountTransactionObj.setToken(arguments.options.tokenId);
-
-
-		local.baseCommerceClientObj = createObject('java', 'com.basecommercepay.client.BaseCommerceClient');
-		local.baseCommerceClientObj.init(variables.cfpayment.Username, variables.cfpayment.Password, variables.cfpayment.MerchantAccount);
-		local.baseCommerceClientObj.setSandbox(variables.cfpayment.TestMode);
-		bankAccountTransactionObj = local.baseCommerceClientObj.processBankAccountTransaction(bankAccountTransactionObj);
-
-		return bankAccountTransactionObj;
-		/*
-		local.post = structNew();
-		local.post['amount'] = arguments.money.getAmount();
-		if(structKeyExists(arguments, 'account') && getService().getAccountType(arguments.account) EQ 'eft') {
-			local.post['type'] = 'credit';
-			local.post = addEFT(post = local.post, account = arguments.account, options = arguments.options);
-		} else if(structKeyExists(arguments.options, 'tokenId')) {
-			local.post['type'] = 'credit';
-			local.post['customer_vault_id'] = arguments.options.tokenId;
-		} else if(structKeyExists(arguments, 'transactionid')) {
-			local.post['type'] = 'refund';
-			local.post['transactionid'] = arguments.transactionid;
-		}
-		return process(payload = local.post, options = arguments.options);
-		*/
+	public any function purchase(required any money, any account, struct options=structNew()) {
+		local.argumentCollection = structNew();
+		local.argumentCollection.money = arguments.money;
+		if(isDefined('arguments.account')) local.argumentCollection.money = arguments.account;
+		local.argumentCollection.options = arguments.options;
+		local.argumentCollection.options.batType = 'XS_BAT_TYPE_CREDIT';
+		return transaction(argumentCollection = local.argumentCollection);
 	}
 	
-	public any function debit(required any money, any transactionId, any account, struct options=structNew()) {
-		return false;
+	public any function credit(required any money, any account, struct options=structNew()) {
+		local.argumentCollection = structNew();
+		local.argumentCollection.money = arguments.money;
+		if(isDefined('arguments.account')) local.argumentCollection.money = arguments.account;
+		local.argumentCollection.options = arguments.options;
+		local.argumentCollection.options.batType = 'XS_BAT_TYPE_DEBIT';
+		return transaction(argumentCollection = local.argumentCollection);
 	}
-
+	
 	public any function store(required any account, struct options=structNew()) {
 		switch(getService().getAccountType(arguments.account)) {
 			case 'creditcard':
@@ -216,6 +192,7 @@ component
 				throw(type='cfpayment.InvalidAccount', message='Account type of token is not supported by this method');
 		}
 		return bankAccountObj;
+
 		/*
 		local.post['customer_vault'] = 'add_customer';
 		local.post = addCustomer(post = local.post, account = arguments.account);
@@ -225,6 +202,41 @@ component
 			local.post['customer_vault'] = 'update_customer';
 		}
 		return process(payload = post, options = arguments.options);
+		*/
+	}
+
+	//Private Functions
+	private any function transaction(required any money, any account, struct options=structNew()) {
+		bankAccountTransactionObj = createObject('java', 'com.basecommercepay.client.BankAccountTransaction');
+		bankAccountTransactionObj.setType(bankAccountTransactionObj[arguments.options.batType]);
+		bankAccountTransactionObj.setMethod(bankAccountTransactionObj.XS_BAT_METHOD_CCD);
+		bankAccountTransactionObj.setAmount(arguments.money.getAmount());
+
+		locale = createObject('java', 'java.util.Locale');
+		calendarObj = createObject('java', 'java.util.GregorianCalendar').init(locale.US);
+		calendarObj.set(calendarObj.DAY_OF_YEAR, calendarObj.get(calendarObj.DAY_OF_YEAR) + 3);
+		effectiveDate = calendarObj.getTime();
+		bankAccountTransactionObj.setEffectiveDate(effectiveDate);
+		bankAccountTransactionObj.setToken(arguments.options.tokenId);
+
+
+		local.baseCommerceClientObj = createObject('java', 'com.basecommercepay.client.BaseCommerceClient');
+		local.baseCommerceClientObj.init(variables.cfpayment.Username, variables.cfpayment.Password, variables.cfpayment.MerchantAccount);
+		local.baseCommerceClientObj.setSandbox(variables.cfpayment.TestMode);
+		bankAccountTransactionObj = local.baseCommerceClientObj.processBankAccountTransaction(bankAccountTransactionObj);
+
+		return bankAccountTransactionObj;
+		/*
+		local.post = structNew();
+		local.post['amount'] = arguments.money.getAmount();
+		if(structKeyExists(arguments, 'account') && getService().getAccountType(arguments.account) EQ 'eft') {
+			local.post['type'] = 'credit';
+			local.post = addEFT(post = local.post, account = arguments.account, options = arguments.options);
+		} else if(structKeyExists(arguments.options, 'tokenId')) {
+			local.post['type'] = 'credit';
+			local.post['customer_vault_id'] = arguments.options.tokenId;
+		}
+		return process(payload = local.post, options = arguments.options);
 		*/
 	}
 
