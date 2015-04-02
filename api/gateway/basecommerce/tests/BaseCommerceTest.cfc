@@ -8,9 +8,9 @@ component
 
 		gw.path = 'basecommerce.basecommerce';
 		//Test account
-		gw.Username = 'xxxxxxxxxxxxxxxx';
-		gw.Password = 'xxxxxxxxxxxxxxxxxxx';
-		gw.MerchantAccount = 'xxxxxxxxxxxxxxxxxxxxxxx';
+		gw.Username = 'xxxxxxxxxxxxx';
+		gw.Password = 'xxxxxxxxxxxxxxxx';
+		gw.MerchantAccount = 'xxxxxxxxxxxxxxxxxx';
 		gw.TestMode = true; // defaults to true anyways
 
 		// create gw and get reference			
@@ -93,6 +93,8 @@ component
 		//Credit account
 		local.options = structNew();
 		local.options.tokenId = accountToken.getTokenId();
+		local.options.method = 'XS_BAT_METHOD_CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
+		local.options.effectiveDateDaysFromNow = 2;
 		offlineInjector(gw, this, 'mockCreditAccountOk', 'transactionData');
 		credit = gw.credit(money = variables.svc.createMoney(500, 'USD'), options = local.options);
 		standardResponseTests(credit);
@@ -118,6 +120,8 @@ component
 		//Debit account
 		local.options = structNew();
 		local.options.tokenId = accountToken.getTokenId();
+		local.options.method = 'XS_BAT_METHOD_CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
+		local.options.effectiveDateDaysFromNow = 0;
 		offlineInjector(gw, this, 'mockDebitAccountOk', 'transactionData');
 		debit = gw.purchase(money = variables.svc.createMoney(400, 'USD'), options = local.options);
 		standardResponseTests(debit);
@@ -186,6 +190,8 @@ component
 		//Credit account (unsuccessfully)
 		local.options = structNew();
 		local.options.tokenId = accountToken.getTokenId();
+		local.options.method = 'XS_BAT_METHOD_CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
+		local.options.effectiveDateDaysFromNow = 0;
 		offlineInjector(gw, this, 'mockCreditDebitAccountWithInvalidAmountFails', 'transactionData');
 		credit = gw.credit(money = variables.svc.createMoney(-1000, 'USD'), options = local.options);
 		standardErrorResponseTests(credit, 400);
@@ -207,6 +213,8 @@ component
 		//Credit account (unsuccessfully)
 		local.options = structNew();
 		local.options.tokenId = accountToken.getTokenId();
+		local.options.method = 'XS_BAT_METHOD_CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
+		local.options.effectiveDateDaysFromNow = 0;
 		offlineInjector(gw, this, 'mockCreditDebitAccountWithInvalidAmountFails', 'transactionData');
 		debit = gw.credit(money = variables.svc.createMoney(-2, 'USD'), options = local.options);
 		standardErrorResponseTests(debit, 400);
@@ -216,10 +224,58 @@ component
 	public void function testCreditAccountWithInvalidAccountTokenFails() {
 		local.options = structNew();
 		local.options.tokenId = 'lk1j43k324h32j4h32hk***FAKE***32j4h3k432kh43jkh';
+		local.options.method = 'XS_BAT_METHOD_CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
+		local.options.effectiveDateDaysFromNow = 2;
 		offlineInjector(gw, this, 'mockCreditAccountWithInvalidAccountTokenFails', 'transactionData');
 		credit = gw.credit(money = variables.svc.createMoney(-1000, 'USD'), options = local.options);
 		standardErrorResponseTests(credit, 400);
 		assertTrue(credit.getMessage()[1] == 'No bank account exists for given token', 'Incorrect error message: "#credit.getMessage()[1]#", expected: "No bank account exists for given token"');
+	}
+
+	public void function testCreditAccountWithInvalidMethodFails() {
+		//Create account (successfully)
+		local.argumentCollection = structNew();
+		local.argumentCollection.account = createAccount();
+		local.argumentCollection.options.name = 'Test Account';
+		offlineInjector(gw, this, 'mockCreateAccountOk', 'accountData');
+		accountToken = gw.store(argumentCollection = local.argumentCollection);
+		standardResponseTests(accountToken);
+		assertTrue(accountToken.getParsedResult().Status == 'ACTIVE', 'Invalid account status: #accountToken.getParsedResult().Status#');
+		assertTrue(accountToken.getParsedResult().type == 'CHECKING', 'Incorrect account type, should be "Checking", is: "#accountToken.getParsedResult().type#"');
+		assertTrue(accountToken.getTokenId() != '', 'Token not returned');
+
+		//Credit account (unsuccessfully)
+		local.options = structNew();
+		local.options.tokenId = accountToken.getTokenId();
+		local.options.method = 'XS_BAT_METHOD_THISWILLFAIL'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
+		local.options.effectiveDateDaysFromNow = 0;
+		offlineInjector(gw, this, 'mockCreditAccountWithInvalidMethodFails', 'transactionData');
+		credit = gw.credit(money = variables.svc.createMoney(1500, 'USD'), options = local.options);
+		standardErrorResponseTests(credit, 400);
+		assertTrue(credit.getMessage()[1] == 'Invalid transaction method passed in: #local.options.method#', 'Incorrect error message: "#credit.getMessage()[1]#", expected: "Invalid transaction method passed in: #local.options.method#"');
+	}
+
+	public void function testCreditAccountWithInvalideffectiveDateDaysFromNowFails() {
+		//Create account (successfully)
+		local.argumentCollection = structNew();
+		local.argumentCollection.account = createAccount();
+		local.argumentCollection.options.name = 'Test Account';
+		offlineInjector(gw, this, 'mockCreateAccountOk', 'accountData');
+		accountToken = gw.store(argumentCollection = local.argumentCollection);
+		standardResponseTests(accountToken);
+		assertTrue(accountToken.getParsedResult().Status == 'ACTIVE', 'Invalid account status: #accountToken.getParsedResult().Status#');
+		assertTrue(accountToken.getParsedResult().type == 'CHECKING', 'Incorrect account type, should be "Checking", is: "#accountToken.getParsedResult().type#"');
+		assertTrue(accountToken.getTokenId() != '', 'Token not returned');
+
+		//Credit account (unsuccessfully)
+		local.options = structNew();
+		local.options.tokenId = accountToken.getTokenId();
+		local.options.method = 'XS_BAT_METHOD_CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
+		local.options.effectiveDateDaysFromNow = -1;
+		offlineInjector(gw, this, 'mockCreditAccountWithInvalideffectiveDateDaysFromNowFails', 'transactionData');
+		credit = gw.credit(money = variables.svc.createMoney(700, 'USD'), options = local.options);
+		standardErrorResponseTests(credit, 400);
+		assertTrue(credit.getMessage()[1] == 'Effective date (days from now) must be 0 or greater', 'Incorrect error message: "#credit.getMessage()[1]#", expected: "Effective date (days from now) must be 0 or greater"');
 	}
 
 
@@ -307,5 +363,13 @@ component
 
 	private any function mockCreditAccountWithInvalidAccountTokenFails() {
 		return { StatusCode = 400, Status = 3, message = ['No bank account exists for given token'] };
+	}
+	
+	private any function mockCreditAccountWithInvalidMethodFails() {
+		return { StatusCode = 400, Status = 3, message = ['Invalid transaction method passed in: XS_BAT_METHOD_THISWILLFAIL'] };
+	}
+
+	private any function mockCreditAccountWithInvalideffectiveDateDaysFromNowFails() {
+		return { StatusCode = 400, Status = 3, message = ['Effective date (days from now) must be 0 or greater'] };
 	}
 }
