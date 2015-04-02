@@ -8,9 +8,9 @@ component
 
 		gw.path = 'basecommerce.basecommerce';
 		//Test account
-		gw.Username = 'xxxxxxxxxxxxxxx';
-		gw.Password = 'xxxxxxxxxxxxxxxxxx';
-		gw.MerchantAccount = 'xxxxxxxxxxxxxxxxxxxxx';
+		gw.Username = 'xxxxxxxxxxxxxxxx';
+		gw.Password = 'xxxxxxxxxxxxxxxxxxx';
+		gw.MerchantAccount = 'xxxxxxxxxxxxxxxxxxxxxxx';
 		gw.TestMode = true; // defaults to true anyways
 
 		// create gw and get reference			
@@ -29,14 +29,13 @@ component
 	}
 
 	private void function standardResponseTests(required any response) {
-		if(debugMode) {
+		if(variables.debugMode) {
 			debug(arguments.response.getParsedResult());
 			debug(arguments.response.getResult());
 		}
-
 		if(isSimpleValue(arguments.response)) assertTrue(false, 'Response returned a simple value: "#arguments.response#"');
-		if(!isObject(arguments.response)) assertTrue(false, 'Invalid: response is not an object');
-		else if(arguments.response.getStatusCode() != 200) {
+		assertTrue(isObject(arguments.response), 'Invalid: response is not an object');
+		if(arguments.response.getStatusCode() != 200) {
 			if(arguments.response.hasError()) {
 				if(arrayLen(arguments.response.getMessage())) {
 					assertTrue(false, 'Message returned from BaseCommerce: <br />#arrayToList(arguments.response.getMessage(), "<br />")#');
@@ -45,47 +44,32 @@ component
 				}
 			}
 			assertTrue(false, 'Status code should be 200, was: #arguments.response.getStatusCode()#');
-		} else if(isStruct(arguments.response.getParsedResult()) && structIsEmpty(arguments.response.getParsedResult())) {
-			assertTrue(false, 'Response structure returned is empty');
-		} else if(isSimpleValue(arguments.response.getParsedResult())) {
-			assertTrue(false, 'Parsed response is a string, expected a structure. Returned string = "#arguments.response.getParsedResult()#"');
 		}
+		if(isSimpleValue(arguments.response.getParsedResult())) assertTrue(false, 'Parsed response is a string, expected a structure. Returned string = "#arguments.response.getParsedResult()#"');
+		assertTrue(isStruct(arguments.response.getParsedResult()), 'Parsed response is not a structure');
+		assertFalse(structIsEmpty(arguments.response.getParsedResult()), 'Parsed response structure is empty');
 	}
 
-	private void function standardErrorResponseTests(required any response, required string expectedErrorType, required numeric expectedStatusCode) {
-		if(debugMode) {
-			debug(arguments.expectedErrorType);
+	private void function standardErrorResponseTests(required any response, required numeric expectedStatusCode) {
+		if(variables.debugMode) {
 			debug(arguments.expectedStatusCode);
-			debug(arguments.response.getParsedResult());
-			debug(arguments.response.getResult());
+			debug(arguments.response.haserror());
+			debug(arguments.response.getMessage());
+			debug(arguments.response.getStatusCode());
 		}
-
 		if(isSimpleValue(arguments.response)) assertTrue(false, 'Response returned a simple value: "#arguments.response#"');
-		if(!isObject(arguments.response)) assertTrue(false, 'Invalid: response is not an object');
-		else if(isStruct(arguments.response.getParsedResult()) && structIsEmpty(arguments.response.getParsedResult())) {
-			assertTrue(false, 'Response structure returned is empty');
-		} else if(isSimpleValue(arguments.response.getParsedResult())) {
-			assertTrue(false, 'Parsed response is a string, expected a structure. Returned string = "#arguments.response.getParsedResult()#"');
-		} else if(arguments.response.getStatusCode() != arguments.expectedStatusCode) {
-			assertTrue(false, 'Status code should be #arguments.expectedStatusCode#, was: #arguments.response.getStatusCode()#');
-		} else {
-			if(structKeyExists(arguments.response.getParsedResult(), 'error')) {
-				if(structKeyExists(arguments.response.getParsedResult().error, 'message') AND structKeyExists(arguments.response.getParsedResult().error, 'type')) {
-					assertTrue(arguments.response.getParsedResult().error.type eq arguments.expectedErrorType, 'Received error type (#arguments.response.getParsedResult().error.type#), expected error type (#arguments.expectedErrorType#) from API');
-				} else {
-					assertTrue(false, 'Error message from API missing details');
-				}
-			} else {
-				assertTrue(false, 'Object returned did not have an error');
-			}
-		}
+		assertTrue(isObject(arguments.response), 'Invalid: response is not an object');
+		assertTrue(arguments.response.getStatusCode() == arguments.expectedStatusCode, 'Status code should be #arguments.expectedStatusCode#, was: #arguments.response.getStatusCode()#');
+		assertTrue(arguments.response.haserror(), 'No errors indicated in response');
+		assertTrue(isArray(arguments.response.getMessage()), 'Error Message response not an array');
+		assertTrue(arrayLen(arguments.response.getMessage()), 'No error messages available');
 	}
 
 	//TESTS
 	public void function testCreateAccount() {
 		local.argumentCollection = structNew();
 		local.argumentCollection.account = createAccount();
-		local.argumentCollection.options.name = 'Test Accoiunt';
+		local.argumentCollection.options.name = 'Test Account';
 		offlineInjector(gw, this, 'mockCreateAccountOk', 'accountData');
 		accountToken = gw.store(argumentCollection = local.argumentCollection);
 		standardResponseTests(accountToken);
@@ -98,7 +82,7 @@ component
 		//Create account
 		local.argumentCollection = structNew();
 		local.argumentCollection.account = createAccount();
-		local.argumentCollection.options.name = 'Test Accoiunt';
+		local.argumentCollection.options.name = 'Test Account';
 		offlineInjector(gw, this, 'mockCreateAccountOk', 'accountData');
 		accountToken = gw.store(argumentCollection = local.argumentCollection);
 		standardResponseTests(accountToken);
@@ -123,7 +107,7 @@ component
 		//Create account
 		local.argumentCollection = structNew();
 		local.argumentCollection.account = createAccount();
-		local.argumentCollection.options.name = 'Test Accoiunt';
+		local.argumentCollection.options.name = 'Test Account';
 		offlineInjector(gw, this, 'mockCreateAccountOk', 'accountData');
 		accountToken = gw.store(argumentCollection = local.argumentCollection);
 		standardResponseTests(accountToken);
@@ -143,6 +127,101 @@ component
 		assertTrue(debit.getParsedResult().Status == 'CREATED', 'Invalid transaction status: #debit.getParsedResult().Status#');
 		assertTrue(debit.getParsedResult().type == 'DEBIT', 'Incorrect transaction type, should be "CREDIT", is: "#debit.getParsedResult().type#"');
 	}
+
+	public void function testCreateInvalidAccountFails() {
+		local.argumentCollection = structNew();
+		local.accountNumberString = '7';
+		local.argumentCollection.account = createInvalidAccount(local.accountNumberString);
+		local.argumentCollection.options.name = 'Test Invalid Account';
+		offlineInjector(gw, this, 'mockCreateInvalidAccountFails', 'accountData');
+		accountToken = gw.store(argumentCollection = local.argumentCollection);
+		standardErrorResponseTests(accountToken, 400);
+		assertTrue(accountToken.getMessage()[1] == 'Account Number must be at least 5 digits', 'Incorrect error message: "#accountToken.getMessage()[1]#", expected: "Account Number must be at least 5 digits"');
+	}
+
+	public void function testCreateAccountWithInvalidRoutingNumberFails() {
+		local.argumentCollection = structNew();
+		local.accountRoutingNumberString = '123';
+		local.argumentCollection.account = createAccountWithInvalidRoutingNumber(local.accountRoutingNumberString);
+		local.argumentCollection.options.name = 'Test Account With Invalid Routing Number';
+		offlineInjector(gw, this, 'mockCreateAccountWithInvalidRoutingNumberFails', 'accountData');
+		accountToken = gw.store(argumentCollection = local.argumentCollection);
+		standardErrorResponseTests(accountToken, 400);
+		assertTrue(accountToken.getMessage()[1] == 'Invalid Routing Number', 'Incorrect error message: "#accountToken.getMessage()[1]#", expected: "Invalid Routing Number"');
+	}
+
+	public void function testCreateAccountWithInvalidAccountTypeFails() {
+		local.argumentCollection = structNew();
+		local.accountTypeString = 'XS_BA_TYPE_THISWILLFAIL';
+		local.argumentCollection.account = createAccountWithInvalidAccountType(local.accountTypeString);
+		local.argumentCollection.options.name = 'Test Account With Invalid Account Type';
+		offlineInjector(gw, this, 'mockCreateAccountWithInvalidAccountTypeFails', 'accountData');
+		accountToken = gw.store(argumentCollection = local.argumentCollection);
+		standardErrorResponseTests(accountToken, 400);
+		assertTrue(accountToken.getMessage()[1] == 'Invalid account type passed in: #local.accountTypeString#', 'Incorrect error message: "#accountToken.getMessage()[1]#", expected: "Invalid account type passed in: #local.accountTypeString#"');
+	}
+
+	public void function testCreateAccountWithMissingAccountTypeFails() {
+		local.argumentCollection = structNew();
+		local.argumentCollection.account = createAccountWithMissingAccountType();
+		local.argumentCollection.options.name = 'Test Account With Invalid Account Type';
+		offlineInjector(gw, this, 'mockCreateAccountWithMissingAccountTypeFails', 'accountData');
+		accountToken = gw.store(argumentCollection = local.argumentCollection);
+		standardErrorResponseTests(accountToken, 400);
+		assertTrue(accountToken.getMessage()[1] == 'Missing account type', 'Incorrect error message: "#accountToken.getMessage()[1]#", expected: "Missing account type"');
+	}
+
+	public void function testCreditAccountWithInvalidAmountFails() {
+		//Create account (successfully)
+		local.argumentCollection = structNew();
+		local.argumentCollection.account = createAccount();
+		local.argumentCollection.options.name = 'Test Account';
+		offlineInjector(gw, this, 'mockCreateAccountOk', 'accountData');
+		accountToken = gw.store(argumentCollection = local.argumentCollection);
+		standardResponseTests(accountToken);
+		assertTrue(accountToken.getParsedResult().Status == 'ACTIVE', 'Invalid account status: #accountToken.getParsedResult().Status#');
+		assertTrue(accountToken.getParsedResult().type == 'CHECKING', 'Incorrect account type, should be "Checking", is: "#accountToken.getParsedResult().type#"');
+		assertTrue(accountToken.getTokenId() != '', 'Token not returned');
+
+		//Credit account (unsuccessfully)
+		local.options = structNew();
+		local.options.tokenId = accountToken.getTokenId();
+		offlineInjector(gw, this, 'mockCreditDebitAccountWithInvalidAmountFails', 'transactionData');
+		credit = gw.credit(money = variables.svc.createMoney(-1000, 'USD'), options = local.options);
+		standardErrorResponseTests(credit, 400);
+		assertTrue(credit.getMessage()[1] == 'Invalid Amount', 'Incorrect error message: "#credit.getMessage()[1]#", expected: "Invalid Amount"');
+	}
+
+	public void function testDebitAccountWithInvalidAmountFails() {
+		//Create account (successfully)
+		local.argumentCollection = structNew();
+		local.argumentCollection.account = createAccount();
+		local.argumentCollection.options.name = 'Test Account';
+		offlineInjector(gw, this, 'mockCreateAccountOk', 'accountData');
+		accountToken = gw.store(argumentCollection = local.argumentCollection);
+		standardResponseTests(accountToken);
+		assertTrue(accountToken.getParsedResult().Status == 'ACTIVE', 'Invalid account status: #accountToken.getParsedResult().Status#');
+		assertTrue(accountToken.getParsedResult().type == 'CHECKING', 'Incorrect account type, should be "Checking", is: "#accountToken.getParsedResult().type#"');
+		assertTrue(accountToken.getTokenId() != '', 'Token not returned');
+
+		//Credit account (unsuccessfully)
+		local.options = structNew();
+		local.options.tokenId = accountToken.getTokenId();
+		offlineInjector(gw, this, 'mockCreditDebitAccountWithInvalidAmountFails', 'transactionData');
+		debit = gw.credit(money = variables.svc.createMoney(-2, 'USD'), options = local.options);
+		standardErrorResponseTests(debit, 400);
+		assertTrue(debit.getMessage()[1] == 'Invalid Amount', 'Incorrect error message: "#debit.getMessage()[1]#", expected: "Invalid Amount"');
+	}
+
+	public void function testCreditAccountWithInvalidAccountTokenFails() {
+		local.options = structNew();
+		local.options.tokenId = 'lk1j43k324h32j4h32hk***FAKE***32j4h3k432kh43jkh';
+		offlineInjector(gw, this, 'mockCreditAccountWithInvalidAccountTokenFails', 'transactionData');
+		credit = gw.credit(money = variables.svc.createMoney(-1000, 'USD'), options = local.options);
+		standardErrorResponseTests(credit, 400);
+		assertTrue(credit.getMessage()[1] == 'No bank account exists for given token', 'Incorrect error message: "#credit.getMessage()[1]#", expected: "No bank account exists for given token"');
+	}
+
 
 	//HELPERS
 	private any function createAccount() {
@@ -165,6 +244,30 @@ component
 		return local.account;	
 	}
 
+	private any function createInvalidAccount(required string accountNumberString) {
+		local.account = createAccount();
+		local.account.setAccount(arguments.accountNumberString);
+		return local.account;	
+	}
+
+	private any function createAccountWithInvalidRoutingNumber(required string accountRoutingNumberString) {
+		local.account = createAccount();
+		local.account.setRoutingNumber(arguments.accountRoutingNumberString);
+		return local.account;	
+	}
+
+	private any function createAccountWithInvalidAccountType(required string accountTypeString) {
+		local.account = createAccount();
+		local.account.setAccountType(arguments.accountTypeString);
+		return local.account;	
+	}
+
+	private any function createAccountWithMissingAccountType() {
+		local.account = createAccount();
+		local.account.setAccountType('');
+		return local.account;	
+	}
+
 	//MOCKS
 	private any function mockCreditAccountOk() {
 		return { StatusCode = 200, transactionId = '43271', result = '{"MERCHANTTRANSACTIONID":0,"EFFECTIVEDATE":"April, 03 2015 00:00:00","ACCOUNTTYPE":"CHECKING","METHOD":"CCD","AMOUNT":5.0,"STATUS":"CREATED","SETTLEMENTDATE":"April, 06 2015 00:00:00","TYPE":"CREDIT"}' };
@@ -176,5 +279,33 @@ component
 
 	private any function mockDebitAccountOk() {
 		return { StatusCode = 200, transactionId = '43275', result = '{"MERCHANTTRANSACTIONID":0,"EFFECTIVEDATE":"April, 03 2015 00:00:00","ACCOUNTTYPE":"CHECKING","METHOD":"CCD","AMOUNT":4.0,"STATUS":"CREATED","SETTLEMENTDATE":"April, 06 2015 00:00:00","TYPE":"DEBIT"}' };
+	}
+
+	private any function mockCreateInvalidAccountFails() {
+		return { StatusCode = 400, Status = 3, message = ['Account Number must be at least 5 digits'] };
+	}
+
+	private any function mockCreateAccountWithInvalidRoutingNumberFails() {
+		return { StatusCode = 400, Status = 3, message = ['Invalid Routing Number'] };
+	}
+
+	private any function mockCreateAccountWithInvalidAccountTypeFails() {
+		return { StatusCode = 400, Status = 3, message = ['Invalid account type passed in: XS_BA_TYPE_THISWILLFAIL'] };
+	}
+
+	private any function mockCreateAccountWithMissingAccountTypeFails() {
+		return { StatusCode = 400, Status = 3, message = ['Missing account type'] };
+	}
+
+	private any function mockCreateAccountWithMissingAccountType() {
+		return { StatusCode = 400, Status = 3, message = ['Missing account type'] };
+	}
+
+	private any function mockCreditDebitAccountWithInvalidAmountFails() {
+		return { StatusCode = 400, Status = 3, message = ['Invalid Amount'] };
+	}
+
+	private any function mockCreditAccountWithInvalidAccountTokenFails() {
+		return { StatusCode = 400, Status = 3, message = ['No bank account exists for given token'] };
 	}
 }
