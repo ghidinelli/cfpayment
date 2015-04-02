@@ -8,9 +8,9 @@ component
 
 		gw.path = 'basecommerce.basecommerce';
 		//Test account
-		gw.Username = 'xxxxxxxxxxxxx';
-		gw.Password = 'xxxxxxxxxxxxxxx';
-		gw.MerchantAccount = 'xxxxxxxxxxxxxxxxxx';
+		gw.Username = 'xxxxxxxxxxxxxxx';
+		gw.Password = 'xxxxxxxxxxxxxxxxxx';
+		gw.MerchantAccount = 'xxxxxxxxxxxxxxxxxxxxx';
 		gw.TestMode = true; // defaults to true anyways
 
 		// create gw and get reference			
@@ -36,17 +36,19 @@ component
 
 		if(isSimpleValue(arguments.response)) assertTrue(false, 'Response returned a simple value: "#arguments.response#"');
 		if(!isObject(arguments.response)) assertTrue(false, 'Invalid: response is not an object');
-		else if(isStruct(arguments.response.getParsedResult()) && structIsEmpty(arguments.response.getParsedResult())) {
+		else if(arguments.response.getStatusCode() != 200) {
+			if(arguments.response.hasError()) {
+				if(arrayLen(arguments.response.getMessage())) {
+					assertTrue(false, 'Message returned from BaseCommerce: <br />#arrayToList(arguments.response.getMessage(), "<br />")#');
+				} else {
+					assertTrue(false, 'Error found but no error message attached');
+				}
+			}
+			assertTrue(false, 'Status code should be 200, was: #arguments.response.getStatusCode()#');
+		} else if(isStruct(arguments.response.getParsedResult()) && structIsEmpty(arguments.response.getParsedResult())) {
 			assertTrue(false, 'Response structure returned is empty');
 		} else if(isSimpleValue(arguments.response.getParsedResult())) {
 			assertTrue(false, 'Parsed response is a string, expected a structure. Returned string = "#arguments.response.getParsedResult()#"');
-		} else if(arguments.response.getStatusCode() != 200) {
-			if(structKeyExists(arguments.response.getParsedResult(), 'error')) {
-				assertTrue(false, 'Error From Stripe: (Type=#arguments.response.getParsedResult().error.type#) #arguments.response.getParsedResult().error.message#');
-			}
-			assertTrue(false, 'Status code should be 200, was: #arguments.response.getStatusCode()#');
-		} else {
-			assertTrue(arguments.response.getSuccess(), 'Response not successful');
 		}
 	}
 
@@ -84,12 +86,12 @@ component
 		local.argumentCollection = structNew();
 		local.argumentCollection.account = createAccount();
 		local.argumentCollection.options.name = 'Test Accoiunt';
-		offlineInjector(gw, this, 'mockCreateAccountOk', 'doHttpCall');
+		offlineInjector(gw, this, 'mockCreateAccountOk', 'accountData');
 		accountToken = gw.store(argumentCollection = local.argumentCollection);
-		assertTrue(arrayLen(accountToken.getMessages()) == 0, '#arrayLen(accountToken.getMessages())# message(s) where returned from BaseCommerce: #arrayToList(accountToken.getMessages(), "<br />")#');
-		assertTrue(accountToken.getStatus() == 'ACTIVE', 'Invalid status: #accountToken.getStatus()#');
-		assertTrue(accountToken.getType() == 'CHECKING', 'Incorrect bank account type, should be Checking');
-		assertTrue(accountToken.getToken() != '', 'Token not returned');
+		standardResponseTests(accountToken);
+		assertTrue(accountToken.getParsedResult().Status == 'ACTIVE', 'Invalid status: #accountToken.getParsedResult().Status#');
+		assertTrue(accountToken.getParsedResult().type == 'CHECKING', 'Incorrect bank account type, should be "Checking", is: "#accountToken.getParsedResult().type#"');
+		assertTrue(accountToken.getTokenId() != '', 'Token not returned');
 	}
 
 	public void function testCreditAccount() {
@@ -97,20 +99,24 @@ component
 		local.argumentCollection = structNew();
 		local.argumentCollection.account = createAccount();
 		local.argumentCollection.options.name = 'Test Accoiunt';
-		offlineInjector(gw, this, 'mockCreateAccountOk', 'doHttpCall');
+		offlineInjector(gw, this, 'mockCreateAccountOk', 'accountData');
 		accountToken = gw.store(argumentCollection = local.argumentCollection);
-		assertTrue(arrayLen(accountToken.getMessages()) == 0, '#arrayLen(accountToken.getMessages())# message(s) where returned from BaseCommerce: #arrayToList(accountToken.getMessages(), "<br />")#');
-		assertTrue(accountToken.getStatus() == 'ACTIVE', 'Invalid status: #accountToken.getStatus()#');
-		assertTrue(accountToken.getType() == 'CHECKING', 'Incorrect bank account type, should be Checking');
-		assertTrue(accountToken.getToken() != '', 'Token not returned');
+		standardResponseTests(accountToken);
+		assertTrue(accountToken.getParsedResult().Status == 'ACTIVE', 'Invalid account status: #accountToken.getParsedResult().Status#');
+		assertTrue(accountToken.getParsedResult().type == 'CHECKING', 'Incorrect account type, should be "Checking", is: "#accountToken.getParsedResult().type#"');
+		assertTrue(accountToken.getTokenId() != '', 'Token not returned');
 
 		//Credit account
 		local.options = structNew();
-		local.options.tokenId = accountToken.getToken();
-		offlineInjector(gw, this, 'mockCreditAccountOk', 'doHttpCall');
+		local.options.tokenId = accountToken.getTokenId();
+		offlineInjector(gw, this, 'mockCreditAccountOk', 'transactionData');
 		credit = gw.credit(money = variables.svc.createMoney(500, 'USD'), options = local.options);
-		assertTrue(arrayLen(credit.getMessages()) == 0, '#arrayLen(credit.getMessages())# message(s) where returned from BaseCommerce: #arrayToList(credit.getMessages(), "<br />")#');
-		assertTrue(credit.getBankAccountTransactionId() > 0, 'Invalid transaction id returned: #credit.getBankAccountTransactionId()#');
+		standardResponseTests(credit);
+		assertTrue(credit.getParsedResult().accountType == 'CHECKING', 'Incorrect bank account type, should be "Checking", is: "#credit.getParsedResult().accountType#"');
+		assertTrue(credit.getParsedResult().amount == 5, 'The credit amount requested and the actual credit given is different, should be 5, is: #credit.getParsedResult().amount#');
+		assertTrue(credit.getTransactionId() > 0, 'Invalid transaction id returned: #credit.getTransactionId()#');
+		assertTrue(credit.getParsedResult().Status == 'CREATED', 'Invalid transaction status: #credit.getParsedResult().Status#');
+		assertTrue(credit.getParsedResult().type == 'CREDIT', 'Incorrect transaction type, should be "CREDIT", is: "#credit.getParsedResult().type#"');
 	}
 
 	public void function testDebitAccount() {
@@ -118,20 +124,24 @@ component
 		local.argumentCollection = structNew();
 		local.argumentCollection.account = createAccount();
 		local.argumentCollection.options.name = 'Test Accoiunt';
-		offlineInjector(gw, this, 'mockCreateAccountOk', 'doHttpCall');
+		offlineInjector(gw, this, 'mockCreateAccountOk', 'accountData');
 		accountToken = gw.store(argumentCollection = local.argumentCollection);
-		assertTrue(arrayLen(accountToken.getMessages()) == 0, '#arrayLen(accountToken.getMessages())# message(s) where returned from BaseCommerce: #arrayToList(accountToken.getMessages(), "<br />")#');
-		assertTrue(accountToken.getStatus() == 'ACTIVE', 'Invalid status: #accountToken.getStatus()#');
-		assertTrue(accountToken.getType() == 'CHECKING', 'Incorrect bank account type, should be Checking');
-		assertTrue(accountToken.getToken() != '', 'Token not returned');
+		standardResponseTests(accountToken);
+		assertTrue(accountToken.getParsedResult().Status == 'ACTIVE', 'Invalid status: #accountToken.getParsedResult().Status#');
+		assertTrue(accountToken.getParsedResult().type == 'CHECKING', 'Incorrect bank account type, should be "Checking", is: "#accountToken.getParsedResult().type#"');
+		assertTrue(accountToken.getTokenId() != '', 'Token not returned');
 
 		//Debit account
 		local.options = structNew();
-		local.options.tokenId = accountToken.getToken();
-		offlineInjector(gw, this, 'mockDebitAccountOk', 'doHttpCall');
-		debit = gw.purchase(money = variables.svc.createMoney(500, 'USD'), options = local.options);
-		assertTrue(arrayLen(debit.getMessages()) == 0, '#arrayLen(debit.getMessages())# message(s) where returned from BaseCommerce: #arrayToList(debit.getMessages(), "<br />")#');
-		assertTrue(debit.getBankAccountTransactionId() > 0, 'Invalid transaction id returned: #debit.getBankAccountTransactionId()#');
+		local.options.tokenId = accountToken.getTokenId();
+		offlineInjector(gw, this, 'mockDebitAccountOk', 'transactionData');
+		debit = gw.purchase(money = variables.svc.createMoney(400, 'USD'), options = local.options);
+		standardResponseTests(debit);
+		assertTrue(debit.getParsedResult().accountType == 'CHECKING', 'Incorrect bank account type, should be "Checking", is: "#debit.getParsedResult().accountType#"');
+		assertTrue(debit.getParsedResult().amount == 4, 'The credit amount requested and the actual credit given is different, should be 4, is: #debit.getParsedResult().amount#');
+		assertTrue(debit.getTransactionId() > 0, 'Invalid transaction id returned: #debit.getTransactionId()#');
+		assertTrue(debit.getParsedResult().Status == 'CREATED', 'Invalid transaction status: #debit.getParsedResult().Status#');
+		assertTrue(debit.getParsedResult().type == 'DEBIT', 'Incorrect transaction type, should be "CREDIT", is: "#debit.getParsedResult().type#"');
 	}
 
 	//HELPERS
@@ -157,14 +167,14 @@ component
 
 	//MOCKS
 	private any function mockCreditAccountOk() {
-		return { StatusCode = '200 OK', FileContent = '' };
+		return { StatusCode = 200, transactionId = '43271', result = '{"MERCHANTTRANSACTIONID":0,"EFFECTIVEDATE":"April, 03 2015 00:00:00","ACCOUNTTYPE":"CHECKING","METHOD":"CCD","AMOUNT":5.0,"STATUS":"CREATED","SETTLEMENTDATE":"April, 06 2015 00:00:00","TYPE":"CREDIT"}' };
 	}
 
 	private any function mockCreateAccountOk() {
-		return { StatusCode = '200 OK', FileContent = '' };
+		return { statusCode = 200, tokenId = 'a347d5a9bc92015fe68871403775f012d204002f9f8419590d4363088376c20e', result = '{"STATUS":"ACTIVE","TYPE":"CHECKING"}' };
 	}
 
 	private any function mockDebitAccountOk() {
-		return { StatusCode = '200 OK', FileContent = '' };
+		return { StatusCode = 200, transactionId = '43275', result = '{"MERCHANTTRANSACTIONID":0,"EFFECTIVEDATE":"April, 03 2015 00:00:00","ACCOUNTTYPE":"CHECKING","METHOD":"CCD","AMOUNT":4.0,"STATUS":"CREATED","SETTLEMENTDATE":"April, 06 2015 00:00:00","TYPE":"DEBIT"}' };
 	}
 }
