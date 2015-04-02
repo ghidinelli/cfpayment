@@ -47,8 +47,15 @@ component
 			local.bankAccountObj.setName(arguments.options.name);
 			local.bankAccountObj.setAccountNumber(toString(arguments.account.getAccount()));
 			local.bankAccountObj.setRoutingNumber(toString(arguments.account.getRoutingNumber()));
-			local.bankAccountObj.setType(bankAccountObj[arguments.account.getAccountType()]);
-
+			try {
+				local.bankAccountObj.setType(local.bankAccountObj[arguments.account.getAccountType()]);
+			} catch(any e) {
+				local.bankData.status = 3;
+				if(arguments.account.getAccountType() == '') local.bankData.message = ['Missing account type'];
+				else local.bankData.message = ['Invalid account type passed in: #arguments.account.getAccountType()#'];
+				local.bankData.statusCode = 400;
+				return local.bankData;
+			}
 			local.baseCommerceClientObj = createObject('java', 'com.basecommercepay.client.BaseCommerceClient');
 			local.baseCommerceClientObj.init(variables.cfpayment.Username, variables.cfpayment.Password, variables.cfpayment.MerchantAccount);
 			local.baseCommerceClientObj.setSandbox(variables.cfpayment.TestMode);
@@ -100,7 +107,7 @@ component
 
 		if(local.bankAccountTransactionObj.isStatus(local.bankAccountTransactionObj.XS_BAT_STATUS_FAILED)) {
 			local.transactionData.status = 3;
-			local.transactionData.message = local.bankAccountObj.getMessages();
+			local.transactionData.message = local.bankAccountTransactionObj.getMessages();
 			local.transactionData.statusCode = 400;
 		} else if(local.bankAccountTransactionObj.isStatus(local.bankAccountTransactionObj.XS_BAT_STATUS_CREATED)) {
 			local.transactionData.tokenId = local.bankAccountTransactionObj.getToken();
