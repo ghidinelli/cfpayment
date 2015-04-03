@@ -29,9 +29,8 @@ component
 	private any function populateResponse(required struct data) {
 		//Response object populated outside of the gateway connection methods (accountData, transactionData) to allow for mocking of data in offline unit tests
 		local.response = createResponse();
-		if(structKeyExists(arguments.data, 'status')) local.response.setStatus(translateStatus(arguments.data.status));
+		if(structKeyExists(arguments.data, 'status')) local.response.setStatus(arguments.data.status);
 		if(structKeyExists(arguments.data, 'message') && isArray(arguments.data.message)) local.response.setMessage(arrayToList(arguments.data.message));
-		if(structKeyExists(arguments.data, 'statusCode')) local.response.setStatusCode(arguments.data.statusCode);
 		if(structKeyExists(arguments.data, 'tokenId')) local.response.setTokenId(arguments.data.tokenId);
 		if(structKeyExists(arguments.data, 'transactionId')) local.response.setTransactionId(arguments.data.transactionId);
 
@@ -48,9 +47,14 @@ component
 			local.bankAccountObj = createObject('java', 'com.basecommercepay.client.BankAccount');
 
 			//Populate bank account object data passed in to this object
-			local.bankAccountObj.setName(arguments.account.getFirstName() & ' ' & arguments.account.getLastName());
+			local.bankAccountObj.setName(trim(arguments.account.getFirstName() & ' ' & arguments.account.getLastName()));
 			local.bankAccountObj.setAccountNumber(toString(arguments.account.getAccount()));
 			local.bankAccountObj.setRoutingNumber(toString(arguments.account.getRoutingNumber()));
+			
+			if (NOT listFindNoCase("checking,savings", arguments.account.getAccountType()))
+			{
+				// report unsupported account type
+			}
 
 			//Check that bank account type is valid, otherwise return error
 			try {
@@ -61,7 +65,6 @@ component
 				if(!isDefined('arguments.account')) local.bankData.message = ['Missing account object in arguments'];
 				else if(arguments.account.getAccountType() == '') local.bankData.message = ['Missing account type'];
 				else local.bankData.message = ['Invalid account type passed in: #arguments.account.getAccountType()#'];
-				local.bankData.statusCode = 400;
 				return local.bankData;
 			}
 
@@ -73,26 +76,14 @@ component
 			//Send account request to BaseCommerce api and update bank account object with result
 			local.bankAccountObj = baseCommerceClientObj.addBankAccount(bankAccountObj);
 
-			//Extract data and handle errors
-			if(local.bankAccountObj.isStatus(local.bankAccountObj.XS_BA_STATUS_FAILED)) {
-				local.bankData.status = local.bankAccountObj.getStatus();
-				local.bankData.message = local.bankAccountObj.getMessages();
-				local.bankData.statusCode = 400;
-			} else if(local.bankAccountObj.isStatus(local.bankAccountObj.XS_BA_STATUS_ACTIVE)) {
-				//Get BaseCommerce returned data and insert into intermediate struct for later insertion into cfpayment response object
-				local.bankData.tokenId = local.bankAccountObj.getToken();
-				local.bankData.type = local.bankAccountObj.getType();
-				local.bankData.status = local.bankAccountObj.getStatus();
-				local.bankData.statusCode = 200;
-			} else {
-				local.bankData.status = local.bankAccountObj.getStatus();
-				local.bankData.message = ['Status not expected: "#local.bankAccountObj.getStatus()#"'];
-				local.bankData.statusCode = 400;
-			}
+			//Get BaseCommerce returned data and insert into intermediate struct for later insertion into cfpayment response object
+			local.bankData.status = translateStatus(local.bankAccountObj);
+			local.bankData.message = local.bankAccountObj.getMessages();
+			local.bankData.tokenId = local.bankAccountObj.getToken();
+			local.bankData.type = local.bankAccountObj.getType();
 		} else {
 			local.bankData.status = local.bankAccountObj.getStatus();
 			local.bankData.message = ['Unsupported account type: "#getService().getAccountType(arguments.account)#"'];
-			local.bankData.statusCode = 400;
 		}
 
 		return local.bankData;
@@ -117,7 +108,6 @@ component
 			else if(!structKeyExists(arguments.options, 'method')) local.transactionData.message = ['Missing message in arguments.options'];
 			else if(arguments.options.method == '') local.transactionData.message = ['Missing transaction method'];
 			else local.transactionData.message = ['Invalid transaction method passed in: #arguments.options.method#'];
-			local.transactionData.statusCode = 400;
 			return local.transactionData;
 		}
 
@@ -138,7 +128,6 @@ component
 		if(local.bankAccountTransactionObj.isStatus(local.bankAccountTransactionObj.XS_BAT_STATUS_FAILED)) {
 			local.transactionData.status = local.bankAccountTransactionObj.getStatus();
 			local.transactionData.message = local.bankAccountTransactionObj.getMessages();
-			local.transactionData.statusCode = 400;
 		} else if(local.bankAccountTransactionObj.isStatus(local.bankAccountTransactionObj.XS_BAT_STATUS_CREATED)) {
 			//Get BaseCommerce returned data and insert into intermediate struct for later insertion into cfpayment response object
 			local.transactionData.tokenId = local.bankAccountTransactionObj.getToken();
@@ -151,30 +140,37 @@ component
 			local.transactionData.amount = local.bankAccountTransactionObj.getAmount();
 			local.transactionData.merchantTransactionID = local.bankAccountTransactionObj.getMerchantTransactionID();
 			local.transactionData.method = local.bankAccountTransactionObj.getMethod();
-			local.transactionData.statusCode = 200;
 		} else {
 			local.transactionData.status = local.bankAccountTransactionObj.getStatus();
 			local.transactionData.message = ['Status not expected: "#local.transactionData.getStatus()#"'];
-			local.transactionData.statusCode = 400;
 		}
 
 		return local.transactionData;
 	}
 
-	private any function translateStatus(required any status) {
-		switch (arguments.status) 
-		{
-			case 'ACTIVE':
-			case 'CREATED':
-				return getService().getStatusSuccessful();
-				break;
-
-			case 'FAILED':
-				return getService().getStatusFailure();
-				break;
-
-			default:
-				throw(type = 'Application', message = 'Unknown BaseCommerce Status: #arguments.status#');
-		}		
+	private any function translateStatus(required any basecommerce) {
+		// the basecommerce object has static fields against which we can check for success/failure and 
+		// map to cfpayment values
+		if (basecommerce.isStatus(basecommerce.XS_BAT_STATUS_FAILED)) {
+			return getService().getStatusFailure();
+		} else if (basecommerce.isStatus(basecommerce.XS_BA_STATUS_FAILED)) {
+			return getService().getStatusFailure();
+		} else if (basecommerce.isStatus(basecommerce.XS_BAT_STATUS_CREATED)) {
+			return getService().getStatusSuccessful();
+		} else if (basecommerce.isStatus(basecommerce.XS_BA_STATUS_ACTIVE)) {
+			return getService().getStatusSuccessful();
+		} else if (basecommerce.isStatus(basecommerce.XS_BAT_STATUS_INITIATED)) {
+			return getService().getStatusSuccessful();
+		} else if (basecommerce.isStatus(basecommerce.XS_BAT_STATUS_SETTLED)) {
+			return getService().getStatusSuccessful();
+		} else if (basecommerce.isStatus(basecommerce.XS_BAT_STATUS_RETURNED)) {
+			return getService().getStatusSuccessful();
+		} else if (basecommerce.isStatus(basecommerce.XS_BAT_STATUS_PENDING_SETTLEMENT)) {
+			return getService().getStatusSuccessful();
+		} else if (basecommerce.isStatus(basecommerce.XS_BAT_STATUS_CANCELED)) {
+			return getService().getStatusSuccessful();
+		}
+		// if we get here, we don't know what the result is
+		throw(type = 'Application', message = 'Unknown BaseCommerce Status: #arguments.status#');
 	}
 }	
