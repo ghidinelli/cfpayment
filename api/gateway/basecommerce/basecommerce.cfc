@@ -29,13 +29,15 @@ component
 	private any function populateResponse(required struct data) {
 		//Response object populated outside of the gateway connection methods (accountData, transactionData) to allow for mocking of data in offline unit tests
 		local.response = createResponse();
-		if(structKeyExists(arguments.data, 'status')) local.response.setStatus(arguments.data.status);
-		if(structKeyExists(arguments.data, 'message')) local.response.setMessage(arguments.data.message);
+		if(structKeyExists(arguments.data, 'status')) local.response.setStatus(translateStatus(arguments.data.status));
+		if(structKeyExists(arguments.data, 'message') && isArray(arguments.data.message)) local.response.setMessage(arrayToList(arguments.data.message));
 		if(structKeyExists(arguments.data, 'statusCode')) local.response.setStatusCode(arguments.data.statusCode);
 		if(structKeyExists(arguments.data, 'tokenId')) local.response.setTokenId(arguments.data.tokenId);
 		if(structKeyExists(arguments.data, 'transactionId')) local.response.setTransactionId(arguments.data.transactionId);
-		if(structKeyExists(arguments.data, 'result')) local.response.setParsedResult(deserializeJson(arguments.data.result));
-		if(structKeyExists(arguments.data, 'result')) local.response.setResult(arguments.data.result);
+
+		local.response.setParsedResult(arguments.data);
+		local.response.setResult(arguments.data);
+
 		return local.response;
 	}
 	
@@ -53,7 +55,7 @@ component
 			try {
 				local.bankAccountObj.setType(local.bankAccountObj[arguments.account.getAccountType()]);
 			} catch(any e) {
-				local.bankData.status = 3;
+				local.bankData.status = "FAILED";
 				if(arguments.account.getAccountType() == '') local.bankData.message = ['Missing account type'];
 				else local.bankData.message = ['Invalid account type passed in: #arguments.account.getAccountType()#'];
 				local.bankData.statusCode = 400;
@@ -70,24 +72,22 @@ component
 
 			//Extract data and handle errors
 			if(local.bankAccountObj.isStatus(local.bankAccountObj.XS_BA_STATUS_FAILED)) {
-				local.bankData.status = 3;
+				local.bankData.status = local.bankAccountObj.getStatus();
 				local.bankData.message = local.bankAccountObj.getMessages();
 				local.bankData.statusCode = 400;
 			} else if(local.bankAccountObj.isStatus(local.bankAccountObj.XS_BA_STATUS_ACTIVE)) {
 				//Get BaseCommerce returned data and insert into intermediate struct for later insertion into cfpayment response object
 				local.bankData.tokenId = local.bankAccountObj.getToken();
-				local.responseData = structNew();
-				local.responseData.type = local.bankAccountObj.getType();
-				local.responseData.status = local.bankAccountObj.getStatus();
-				local.bankData.result = serializeJson(local.responseData);
+				local.bankData.type = local.bankAccountObj.getType();
+				local.bankData.status = local.bankAccountObj.getStatus();
 				local.bankData.statusCode = 200;
 			} else {
-				local.bankData.status = 3;
+				local.bankData.status = local.bankAccountObj.getStatus();
 				local.bankData.message = ['Status not expected: "#local.bankAccountObj.getStatus()#"'];
 				local.bankData.statusCode = 400;
 			}
 		} else {
-			local.bankData.status = 3;
+			local.bankData.status = local.bankAccountObj.getStatus();
 			local.bankData.message = ['Unsupported account type: "#getService().getAccountType(arguments.account)#"'];
 			local.bankData.statusCode = 400;
 		}
@@ -108,7 +108,7 @@ component
 		try {
 			local.bankAccountTransactionObj.setMethod(local.bankAccountTransactionObj[arguments.options.method]);
 		} catch(any e) {
-			local.transactionData.status = 3;
+			local.transactionData.status = "FAILED";
 			if(arguments.options.method == '') local.transactionData.message = ['Missing transaction method'];
 			else local.transactionData.message = ['Invalid transaction method passed in: #arguments.options.method#'];
 			local.transactionData.statusCode = 400;
@@ -116,24 +116,8 @@ component
 		}
 
 		//Check that effective date (days from now) is a valid integer within range
-		param name='arguments.options.effectiveDateDaysFromNow' default='';
-		if(isValid('integer', arguments.options.effectiveDateDaysFromNow) && arguments.options.effectiveDateDaysFromNow >= 0 && arguments.options.effectiveDateDaysFromNow <= 1000) {
-			local.locale = createObject('java', 'java.util.Locale');
-			local.calendarObj = createObject('java', 'java.util.GregorianCalendar').init(local.locale.US);
-			local.calendarObj.set(local.calendarObj.DAY_OF_YEAR, local.calendarObj.get(local.calendarObj.DAY_OF_YEAR) + arguments.options.effectiveDateDaysFromNow);
-			local.effectiveDate = local.calendarObj.getTime();
-			local.bankAccountTransactionObj.setEffectiveDate(local.effectiveDate);
-		} else {
-			local.transactionData.status = 3;
-			if(arguments.options.effectiveDateDaysFromNow == '') local.transactionData.message = ['Missing Effective date (days from now)'];
-			else if(!isNumeric(arguments.options.effectiveDateDaysFromNow)) local.transactionData.message = ['Effective date (days from now) is not a number'];
-			else if(arguments.options.effectiveDateDaysFromNow < 0) local.transactionData.message = ['Effective date (days from now) must be 0 or greater'];
-			else if(arguments.options.effectiveDateDaysFromNow > 1000) local.transactionData.message = ['Effective date (days from now) must be 1000 or lower'];
-			else if(!isValid('integer', arguments.options.effectiveDateDaysFromNow)) local.transactionData.message = ['Effective date (days from now) must be an integer'];
-			else local.transactionData.message = ['Effective date (days from now) is not valid'];
-			local.transactionData.statusCode = 400;
-			return local.transactionData;
-		}
+		if (structKeyExists(arguments.options, "effectiveDate")) 
+			local.bankAccountTransactionObj.setEffectiveDate(arguments.options.effectiveDate);
 
 		//Set up client connection object
 		local.baseCommerceClientObj = createObject('java', 'com.basecommercepay.client.BaseCommerceClient');
@@ -142,33 +126,58 @@ component
 		
 		//Send transaction request to BaseCommerce api and update transaction object with result
 		local.bankAccountTransactionObj = local.baseCommerceClientObj.processBankAccountTransaction(local.bankAccountTransactionObj);
+		writeDump(output = "console", var="eff date in: #arguments.options.effectiveDate#");
+		writeDump(output = "console", var="eff date: #bankAccountTransactionObj.getEffectiveDate()#");
+		writeDump(output = "console", var="settle date: #bankAccountTransactionObj.getSettlementDate()#");
+		writeDump(output = "console", var="status : #bankAccountTransactionObj.getStatus()#");
 
 		//Extract data and handle errors
 		if(local.bankAccountTransactionObj.isStatus(local.bankAccountTransactionObj.XS_BAT_STATUS_FAILED)) {
-			local.transactionData.status = 3;
+			local.transactionData.status = local.bankAccountTransactionObj.getStatus();
 			local.transactionData.message = local.bankAccountTransactionObj.getMessages();
 			local.transactionData.statusCode = 400;
 		} else if(local.bankAccountTransactionObj.isStatus(local.bankAccountTransactionObj.XS_BAT_STATUS_CREATED)) {
 			//Get BaseCommerce returned data and insert into intermediate struct for later insertion into cfpayment response object
 			local.transactionData.tokenId = local.bankAccountTransactionObj.getToken();
 			local.transactionData.transactionId = local.bankAccountTransactionObj.getBankAccountTransactionId();
-			local.responseData = structNew();
-			local.responseData.type = local.bankAccountTransactionObj.getType();
-			local.responseData.status = local.bankAccountTransactionObj.getStatus();
-			local.responseData.effectiveDate = local.bankAccountTransactionObj.getEffectiveDate();
-			local.responseData.settlementDate = local.bankAccountTransactionObj.getSettlementDate();
-			local.responseData.accountType = local.bankAccountTransactionObj.getAccountType();
-			local.responseData.amount = local.bankAccountTransactionObj.getAmount();
-			local.responseData.merchantTransactionID = local.bankAccountTransactionObj.getMerchantTransactionID();
-			local.responseData.method = local.bankAccountTransactionObj.getMethod();
-			local.transactionData.result = serializeJson(local.responseData);
+			local.transactionData.type = local.bankAccountTransactionObj.getType();
+			local.transactionData.status = local.bankAccountTransactionObj.getStatus();
+			local.transactionData.effectiveDate = local.bankAccountTransactionObj.getEffectiveDate();
+			local.transactionData.settlementDate = local.bankAccountTransactionObj.getSettlementDate();
+			local.transactionData.accountType = local.bankAccountTransactionObj.getAccountType();
+			local.transactionData.amount = local.bankAccountTransactionObj.getAmount();
+			local.transactionData.merchantTransactionID = local.bankAccountTransactionObj.getMerchantTransactionID();
+			local.transactionData.method = local.bankAccountTransactionObj.getMethod();
 			local.transactionData.statusCode = 200;
 		} else {
-			local.transactionData.status = 3;
+			local.transactionData.status = local.bankAccountTransactionObj.getStatus();
 			local.transactionData.message = ['Status not expected: "#local.transactionData.getStatus()#"'];
 			local.transactionData.statusCode = 400;
 		}
 
 		return local.transactionData;
 	}
+
+	private any function translateStatus(required any status) {
+
+		writeDump(output = "console", var = "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ Found #arguments.status#");
+
+		switch (arguments.status) 
+		{
+			case "ACTIVE":
+			case "CREATED":
+				return getService().getStatusSuccessful();
+				break;
+
+			case "FAILED":
+				return getService().getStatusFailure();
+				break;
+
+			default:
+				throw(type = "Application", message = "Unknown BaseCommerce Status: #arguments.status#");
+
+		}		
+	}
+
+
 }	
