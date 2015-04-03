@@ -36,7 +36,7 @@ component
 		if(structKeyExists(arguments.data, 'transactionId')) local.response.setTransactionId(arguments.data.transactionId);
 
 		local.response.setParsedResult(arguments.data);
-		local.response.setResult(arguments.data);
+		local.response.setResult(serializeJson(arguments.data));
 
 		return local.response;
 	}
@@ -46,17 +46,20 @@ component
 
 		if(getService().getAccountType(arguments.account) == 'eft') {
 			local.bankAccountObj = createObject('java', 'com.basecommercepay.client.BankAccount');
+
 			//Populate bank account object data passed in to this object
-			local.bankAccountObj.setName(arguments.options.name);
+			local.bankAccountObj.setName(arguments.account.getFirstName() & ' ' & arguments.account.getLastName());
 			local.bankAccountObj.setAccountNumber(toString(arguments.account.getAccount()));
 			local.bankAccountObj.setRoutingNumber(toString(arguments.account.getRoutingNumber()));
 
 			//Check that bank account type is valid, otherwise return error
 			try {
+				//local.bankAccountObj[arguments.account.getAccountType()] is accessing the java object's field, simmilar to accessing struct values in CF
 				local.bankAccountObj.setType(local.bankAccountObj[arguments.account.getAccountType()]);
 			} catch(any e) {
-				local.bankData.status = "FAILED";
-				if(arguments.account.getAccountType() == '') local.bankData.message = ['Missing account type'];
+				local.bankData.status = 'FAILED';
+				if(!isDefined('arguments.account')) local.bankData.message = ['Missing account object in arguments'];
+				else if(arguments.account.getAccountType() == '') local.bankData.message = ['Missing account type'];
 				else local.bankData.message = ['Invalid account type passed in: #arguments.account.getAccountType()#'];
 				local.bankData.statusCode = 400;
 				return local.bankData;
@@ -106,18 +109,22 @@ component
 
 		//Check that transaction method is valid, otherwise return error
 		try {
+			//local.bankAccountTransactionObj[arguments.options.method] is accessing the java object's field, simmilar to accessing struct values in CF
 			local.bankAccountTransactionObj.setMethod(local.bankAccountTransactionObj[arguments.options.method]);
 		} catch(any e) {
-			local.transactionData.status = "FAILED";
-			if(arguments.options.method == '') local.transactionData.message = ['Missing transaction method'];
+			local.transactionData.status = 'FAILED';
+			if(!isDefined('arguments.options')) local.transactionData.message = ['Missing options in arguments'];
+			else if(!structKeyExists(arguments.options, 'method')) local.transactionData.message = ['Missing message in arguments.options'];
+			else if(arguments.options.method == '') local.transactionData.message = ['Missing transaction method'];
 			else local.transactionData.message = ['Invalid transaction method passed in: #arguments.options.method#'];
 			local.transactionData.statusCode = 400;
 			return local.transactionData;
 		}
 
 		//Check that effective date (days from now) is a valid integer within range
-		if (structKeyExists(arguments.options, "effectiveDate")) 
+		if(structKeyExists(arguments.options, 'effectiveDate') && isDate(arguments.options.effectiveDate)) {
 			local.bankAccountTransactionObj.setEffectiveDate(arguments.options.effectiveDate);
+		}
 
 		//Set up client connection object
 		local.baseCommerceClientObj = createObject('java', 'com.basecommercepay.client.BaseCommerceClient');
@@ -126,10 +133,6 @@ component
 		
 		//Send transaction request to BaseCommerce api and update transaction object with result
 		local.bankAccountTransactionObj = local.baseCommerceClientObj.processBankAccountTransaction(local.bankAccountTransactionObj);
-		writeDump(output = "console", var="eff date in: #arguments.options.effectiveDate#");
-		writeDump(output = "console", var="eff date: #bankAccountTransactionObj.getEffectiveDate()#");
-		writeDump(output = "console", var="settle date: #bankAccountTransactionObj.getSettlementDate()#");
-		writeDump(output = "console", var="status : #bankAccountTransactionObj.getStatus()#");
 
 		//Extract data and handle errors
 		if(local.bankAccountTransactionObj.isStatus(local.bankAccountTransactionObj.XS_BAT_STATUS_FAILED)) {
@@ -159,25 +162,19 @@ component
 	}
 
 	private any function translateStatus(required any status) {
-
-		writeDump(output = "console", var = "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ Found #arguments.status#");
-
 		switch (arguments.status) 
 		{
-			case "ACTIVE":
-			case "CREATED":
+			case 'ACTIVE':
+			case 'CREATED':
 				return getService().getStatusSuccessful();
 				break;
 
-			case "FAILED":
+			case 'FAILED':
 				return getService().getStatusFailure();
 				break;
 
 			default:
-				throw(type = "Application", message = "Unknown BaseCommerce Status: #arguments.status#");
-
+				throw(type = 'Application', message = 'Unknown BaseCommerce Status: #arguments.status#');
 		}		
 	}
-
-
 }	
