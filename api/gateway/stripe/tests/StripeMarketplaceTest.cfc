@@ -77,7 +77,7 @@
 		</cfscript>
 
 		<!--- if set to false, will try to connect to remote service to check these all out --->
-		<cfset localMode = false />
+		<cfset localMode = true />
 		<cfset debugMode = false />
 	</cffunction>
 
@@ -163,13 +163,13 @@
 		</cfif>
 	</cffunction>
 
-	<!--- Tests --->
+<!--- Tests --->
 
-		<!--- Marketplace Account Tests --->
+	<!--- Marketplace Account Tests --->
 	<cffunction name="testMarketplaceCreateConnectedAccount" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
 
-			<!--- Create Connected Account --->
+		<!--- Create Connected Account --->
 		<cfset offlineInjector(gw, this, "mock_create_account_ok", "doHttpCall") />
 		<cfset connectedAccount = gw.marketplaceCreateConnectedAccount() />
 		<cfset standardResponseTests(response = connectedAccount, expectedObjectName = "account", expectedIdPrefix="acct_") />
@@ -179,12 +179,12 @@
 		<cfargument name="gw" type="any" required="true" />
 		<cfset var newEmail = "test#dateFormat(now(), 'yyyymmdd')##timeFormat(now(), 'HHmmss')#@test.test" />
 
-			<!--- Create Connected Account --->
+		<!--- Create Connected Account --->
 		<cfset offlineInjector(gw, this, "mock_create_account_ok", "doHttpCall") />
 		<cfset connectedAccount = gw.marketplaceCreateConnectedAccount() />
 		<cfset standardResponseTests(response = connectedAccount, expectedObjectName = "account", expectedIdPrefix="acct_") />
 
-			<!--- Update Connected Account --->
+		<!--- Update Connected Account --->
 		<cfset offlineInjector(gw, this, "mock_update_account_ok", "doHttpCall") />
 		<cfset update = gw.marketplaceUpdateConnectedAccount(connectedAccount = connectedAccount.getParsedResult().id, updates = ["legal_entity[first_name]=John","legal_entity[last_name]=Smith","email=#newEmail#"]) />
 		<cfset standardResponseTests(response = update, expectedObjectName = "account", expectedIdPrefix="acct_") />
@@ -193,7 +193,7 @@
 	<cffunction name="testMarketplaceListConnectedAccounts" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
 
-			<!--- List Connected Accounts --->
+		<!--- List Connected Accounts --->
 		<cfset offlineInjector(gw, this, "mock_account_list_ok", "doHttpCall") />
 		<cfset list = gw.marketplaceListConnectedAccounts() />
 		<cfset standardResponseTests(response = list, expectedObjectName = "list", expectedIdPrefix="") />
@@ -204,12 +204,12 @@
 		<cfargument name="gw" type="any" required="true" />
 		<cfset var newEmail = "test#dateFormat(now(), 'yyyymmdd')##timeFormat(now(), 'HHmmss')#@test.test" />
 
-			<!--- Create Connected Account --->
+		<!--- Create Connected Account --->
 		<cfset offlineInjector(gw, this, "mock_create_account_ok", "doHttpCall") />
 		<cfset connectedAccount = gw.marketplaceCreateConnectedAccount() />
 		<cfset standardResponseTests(response = connectedAccount, expectedObjectName = "account", expectedIdPrefix="acct_") />
 
-			<!--- Update Connected Account --->
+		<!--- Update Connected Account --->
 		<cfset offlineInjector(gw, this, "mock_update_account_ok", "doHttpCall") />
 		<cfset argumentCollection = structNew()>
 		<cfset argumentCollection.connectedAccount = connectedAccount.getParsedResult().id />
@@ -222,27 +222,83 @@
 		<cfargument name="gw" type="any" required="true" />
 		<cfset var newEmail = "test#dateFormat(now(), 'yyyymmdd')##timeFormat(now(), 'HHmmss')#@test.test" />
 
-			<!--- Create Connected Account --->
+		<!--- Create Connected Account --->
 		<cfset offlineInjector(gw, this, "mock_create_account_ok", "doHttpCall") />
 		<cfset connectedAccount = gw.marketplaceCreateConnectedAccount() />
 		<cfset standardResponseTests(response = connectedAccount, expectedObjectName = "account", expectedIdPrefix="acct_") />
 
-			<!--- Update Connected Account --->
+		<!--- Update Connected Account --->
 		<cfset offlineInjector(gw, this, "mock_update_account_failed", "doHttpCall") />
 		<cfset update = gw.marketplaceUpdateConnectedAccount(connectedAccount = connectedAccount.getParsedResult().id, updates = ["legal_entity[invalid_field]=fail"]) />
 		<cfset standardErrorResponseTests(response = update, expectedStatusCode="400", expectedErrorType = "invalid_request_error") />
 	</cffunction>
 
-		<!--- Bank Account Tests --->
-	<cffunction name="testFetchBankAccounts" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
+	<cffunction name="testMarketplaceNewlyCreatedConnectedAccountHasCorrectLegalEntityFieldsNeeded" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
 
-			<!--- Create Connected Account --->
+		<!--- Create Connected Account --->
+		<cfset offlineInjector(gw, this, "mock_create_account_ok", "doHttpCall") />
+		<cfset connectedAccount = gw.marketplaceCreateConnectedAccount() />
+		<cfset standardResponseTests(response = connectedAccount, expectedObjectName = "account", expectedIdPrefix="acct_") />
+		<cfset assertTrue(structKeyExists(connectedAccount.getParsedResult(), "verification"), "Verification missing in return data") />
+		<cfset assertTrue(isStruct(connectedAccount.getParsedResult().verification), "Verification data is not a struct") />
+		<cfset assertTrue(structKeyExists(connectedAccount.getParsedResult().verification, "fields_needed"), "Fields_Needed missing in return data") />
+		<cfset assertTrue(isArray(connectedAccount.getParsedResult().verification["fields_needed"]), "Fields_Needed data is not an array") />
+		<cfset assertTrue(arrayLen(connectedAccount.getParsedResult().verification["fields_needed"]) gt 0, "Fields_Needed array is empty") />
+		<cfloop list="legal_entity.first_name,legal_entity.last_name,legal_entity.dob.day,legal_entity.dob.month,legal_entity.dob.year,legal_entity.type,legal_entity.address.line1,legal_entity.address.city,legal_entity.address.state,legal_entity.address.postal_code,bank_account,tos_acceptance.ip,tos_acceptance.date" index="fieldNeeded">
+			<cfset assertTrue(listFindNoCase(arrayToList(connectedAccount.getParsedResult().verification["fields_needed"]), fieldNeeded), "Missing Fields_needed value: #fieldNeeded#") />
+		</cfloop>
+	</cffunction>
+
+	<cffunction name="testMarketplaceNewlyCreatedConnectedAccountCorrectlyPopulatedReturnsNoValidationFieldsNeeded" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
+		<cfargument name="gw" type="any" required="true" />
+		<cfset var newEmail = "test#dateFormat(now(), 'yyyymmdd')##timeFormat(now(), 'HHmmss')#@test.test" />
+
+		<!--- Create Connected Account --->
 		<cfset offlineInjector(gw, this, "mock_create_account_ok", "doHttpCall") />
 		<cfset connectedAccount = gw.marketplaceCreateConnectedAccount() />
 		<cfset standardResponseTests(response = connectedAccount, expectedObjectName = "account", expectedIdPrefix="acct_") />
 
-			<!--- Fetch Attached Bank Accounts --->
+		<!--- Create Bank Account --->
+		<cfset offlineInjector(gw, this, "mock_create_bank_accounts_ok", "doHttpCall") />
+		<cfset bankAccount = gw.marketplaceCreateBankAccount(connectedAccount = connectedAccount.getParsedResult().id, account = createAccount()) />
+		<cfset standardResponseTests(response = bankAccount, expectedObjectName = "bank_account", expectedIdPrefix="ba_") />
+
+		<!--- Update Connected Account --->
+		<cfset offlineInjector(gw, this, "mock_update_account_validation_passes_ok", "doHttpCall") />
+		<cfset fieldsNeeded = [
+			"legal_entity[first_name]=John",
+			"legal_entity[last_name]=Smith",
+			"legal_entity[dob][day]=20",
+			"legal_entity[dob][month]=5",
+			"legal_entity[dob][year]=1990",
+			"legal_entity[type]=company",
+			"legal_entity[address][line1]=123 Another Street",
+			"legal_entity[address][city]=Some City",
+			"legal_entity[address][state]=A State",
+			"legal_entity[address][postal_code]=123ABC",
+			"tos_acceptance[date]=1428338336",
+			"tos_acceptance[ip]=184.66.107.116"
+		] />
+		<cfset update = gw.marketplaceUpdateConnectedAccount(connectedAccount = connectedAccount.getParsedResult().id, updates = fieldsNeeded) />
+		<cfset standardResponseTests(response = update, expectedObjectName = "account", expectedIdPrefix="acct_") />
+		<cfset assertTrue(structKeyExists(update.getParsedResult(), "verification"), "Verification missing in return data") />
+		<cfset assertTrue(isStruct(update.getParsedResult().verification), "Verification data is not a struct") />
+		<cfset assertTrue(structKeyExists(update.getParsedResult().verification, "fields_needed"), "Fields_Needed missing in return data") />
+		<cfset assertTrue(isArray(update.getParsedResult().verification["fields_needed"]), "Fields_Needed data is not an array") />
+		<cfset assertTrue(arrayLen(update.getParsedResult().verification["fields_needed"]) eq 0, "Fields_Needed array should be empty") />
+	</cffunction>
+
+	<!--- Bank Account Tests --->
+	<cffunction name="testFetchBankAccounts" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
+		<cfargument name="gw" type="any" required="true" />
+
+		<!--- Create Connected Account --->
+		<cfset offlineInjector(gw, this, "mock_create_account_ok", "doHttpCall") />
+		<cfset connectedAccount = gw.marketplaceCreateConnectedAccount() />
+		<cfset standardResponseTests(response = connectedAccount, expectedObjectName = "account", expectedIdPrefix="acct_") />
+
+		<!--- Fetch Attached Bank Accounts --->
 		<cfset offlineInjector(gw, this, "mock_fetch_bank_accounts_ok", "doHttpCall") />
 		<cfset bankAccounts = gw.marketplaceFetchBankAccounts(connectedAccount = connectedAccount.getParsedResult().id) />
 		<cfset standardResponseTests(response = bankAccounts, expectedObjectName = "list", expectedIdPrefix="") />
@@ -252,12 +308,12 @@
 	<cffunction name="testCreateBankAccount" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
 
-			<!--- Create Connected Account --->
+		<!--- Create Connected Account --->
 		<cfset offlineInjector(gw, this, "mock_create_account_ok", "doHttpCall") />
 		<cfset connectedAccount = gw.marketplaceCreateConnectedAccount() />
 		<cfset standardResponseTests(response = connectedAccount, expectedObjectName = "account", expectedIdPrefix="acct_") />
 
-			<!--- Create Bank Account --->
+		<!--- Create Bank Account --->
 		<cfset offlineInjector(gw, this, "mock_create_bank_accounts_ok", "doHttpCall") />
 		<cfset bankAccount = gw.marketplaceCreateBankAccount(connectedAccount = connectedAccount.getParsedResult().id, account = createAccount()) />
 		<cfset standardResponseTests(response = bankAccount, expectedObjectName = "bank_account", expectedIdPrefix="ba_") />
@@ -266,17 +322,17 @@
 	<cffunction name="testUpdateBankAccountDefaultForCurrency" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
 
-			<!--- Create Connected Account --->
+		<!--- Create Connected Account --->
 		<cfset offlineInjector(gw, this, "mock_create_account_ok", "doHttpCall") />
 		<cfset connectedAccount = gw.marketplaceCreateConnectedAccount() />
 		<cfset standardResponseTests(response = connectedAccount, expectedObjectName = "account", expectedIdPrefix="acct_") />
 
-			<!--- Create Bank Account --->
+		<!--- Create Bank Account --->
 		<cfset offlineInjector(gw, this, "mock_create_bank_accounts_ok", "doHttpCall") />
 		<cfset bankAccount = gw.marketplaceCreateBankAccount(connectedAccount = connectedAccount.getParsedResult().id, account = createAccount()) />
 		<cfset standardResponseTests(response = bankAccount, expectedObjectName = "bank_account", expectedIdPrefix="ba_") />
 
-			<!--- Make Bank Account Default For Currency --->
+		<!--- Make Bank Account Default For Currency --->
 		<cfset offlineInjector(gw, this, "mock_update_bank_account_default_for_currency_ok", "doHttpCall") />
 		<cfset update = gw.marketplaceUpdateBankAccountDefaultForCurrency(connectedAccount = connectedAccount.getParsedResult().id, bankAccountId = bankAccount.getParsedResult().id) />
 		<cfset standardResponseTests(response = update, expectedObjectName = "bank_account", expectedIdPrefix="ba_") />
@@ -286,22 +342,22 @@
 	<cffunction name="testDeleteBankAccount" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
 
-			<!--- Create Connected Account --->
+		<!--- Create Connected Account --->
 		<cfset offlineInjector(gw, this, "mock_create_account_ok", "doHttpCall") />
 		<cfset connectedAccount = gw.marketplaceCreateConnectedAccount() />
 		<cfset standardResponseTests(response = connectedAccount, expectedObjectName = "account", expectedIdPrefix="acct_") />
 
-			<!--- Create Bank Account --->
+		<!--- Create Bank Account --->
 		<cfset offlineInjector(gw, this, "mock_create_bank_accounts_ok", "doHttpCall") />
 		<cfset bankAccount = gw.marketplaceCreateBankAccount(connectedAccount = connectedAccount.getParsedResult().id, account = createAccount()) />
 		<cfset standardResponseTests(response = bankAccount, expectedObjectName = "bank_account", expectedIdPrefix="ba_") />
 
-			<!--- Create Another Bank Account; Creating two bank account because you can't delete the account that is 'default for currency' --->
+		<!--- Create Another Bank Account; Creating two bank account because you can't delete the account that is 'default for currency' --->
 		<cfset offlineInjector(gw, this, "mock_create_bank_accounts_ok", "doHttpCall") />
 		<cfset bankAccount = gw.marketplaceCreateBankAccount(connectedAccount = connectedAccount.getParsedResult().id, account = createAccount()) />
 		<cfset standardResponseTests(response = bankAccount, expectedObjectName = "bank_account", expectedIdPrefix="ba_") />
 
-			<!--- Delete Bank Account --->
+		<!--- Delete Bank Account --->
 		<cfset offlineInjector(gw, this, "mock_delete_bank_accounts_ok", "doHttpCall") />
 		<cfset delete = gw.marketplaceDeleteBankAccount(connectedAccount = connectedAccount.getParsedResult().id, bankAccountId = bankAccount.getParsedResult().id) />
 		<cfset standardResponseTests(response = delete, expectedObjectName = "", expectedIdPrefix="ba_") />
@@ -311,23 +367,23 @@
 	<cffunction name="testDeleteDefaultForCurrencyBankAccountFails" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
 
-			<!--- Create Connected Account --->
+		<!--- Create Connected Account --->
 		<cfset offlineInjector(gw, this, "mock_create_account_ok", "doHttpCall") />
 		<cfset connectedAccount = gw.marketplaceCreateConnectedAccount() />
 		<cfset standardResponseTests(response = connectedAccount, expectedObjectName = "account", expectedIdPrefix="acct_") />
 
-			<!--- Create Bank Account --->
+		<!--- Create Bank Account --->
 		<cfset offlineInjector(gw, this, "mock_create_bank_accounts_ok", "doHttpCall") />
 		<cfset bankAccount = gw.marketplaceCreateBankAccount(connectedAccount = connectedAccount.getParsedResult().id, account = createAccount()) />
 		<cfset standardResponseTests(response = bankAccount, expectedObjectName = "bank_account", expectedIdPrefix="ba_") />
 
-			<!--- Delete Bank Account --->
+		<!--- Delete Bank Account --->
 		<cfset offlineInjector(gw, this, "mock_delete_bank_accounts_fail", "doHttpCall") />
 		<cfset delete = gw.marketplaceDeleteBankAccount(connectedAccount = connectedAccount.getParsedResult().id, bankAccountId = bankAccount.getParsedResult().id) />
 		<cfset standardErrorResponseTests(response = delete, expectedStatusCode="400", expectedErrorType = "invalid_request_error") />
 	</cffunction>
 
-		<!--- Identity Verification Tests --->
+	<!--- Identity Verification Tests --->
 	<cffunction name="testUploadIdentityFile" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
 
@@ -339,12 +395,12 @@
 	<cffunction name="testAttachFileToAccount" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
 
-			<!--- Create Connected Account --->
+		<!--- Create Connected Account --->
 		<cfset offlineInjector(gw, this, "mock_create_account_ok", "doHttpCall") />
 		<cfset connectedAccount = gw.marketplaceCreateConnectedAccount() />
 		<cfset standardResponseTests(response = connectedAccount, expectedObjectName = "account", expectedIdPrefix="acct_") />
 
-			<!--- Upload Identity File --->
+		<!--- Upload Identity File --->
 		<cfset offlineInjector(gw, this, "mock_upload_identity_file_ok", "doHttpCall") />
 		<cfset argumentCollection = structNew()>
 		<cfset argumentCollection.file = variables.filePathToSampleLicence />
@@ -352,7 +408,7 @@
 		<cfset uploadFile = gw.marketplaceUploadIdentityFile(argumentCollection = argumentCollection) />
 		<cfset standardResponseTests(response = uploadFile, expectedObjectName = "file_upload", expectedIdPrefix="file_") />
 
-			<!--- Attach Identity File to Account --->
+		<!--- Attach Identity File to Account --->
 		<cfset argumentCollection = structNew()>
 		<cfset argumentCollection.connectedAccount = connectedAccount.getParsedResult().id />
 		<cfset argumentCollection.accountSecret = connectedAccount.getParsedResult().keys.secret />
@@ -363,16 +419,16 @@
 		<cfset assertTrue(uploadFile.getParsedResult().id eq attachFile.getParsedResult()["legal_entity"]["verification"]["document"], "Identity file not attached to account") />
 	</cffunction>
 
-		<!--- Test Bank Charges --->
+	<!--- Test Bank Charges --->
 	<cffunction name="testCharge" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
 
-			<!--- Create CC Token --->
+		<!--- Create CC Token --->
 		<cfset offlineInjector(gw, this, "mock_create_card_token_ok", "doHttpCall") />
 		<cfset token = gw.createToken(createCard()) />
 		<cfset standardResponseTests(response = token, expectedObjectName = "token", expectedIdPrefix="tok_") />
 
-			<!--- Charge --->
+		<!--- Charge --->
 		<cfset argumentCollection = structNew()>
 		<cfset argumentCollection.amount = variables.svc.createMoney(1000, gw.currency)>
 		<cfset argumentCollection.source = token.getParsedResult().id>
@@ -385,22 +441,22 @@
 	<cffunction name="testDirectCharge" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
 
-			<!---Create a customer--->
+		<!---Create a customer--->
 		<cfset offlineInjector(gw, this, "mock_create_customer_ok", "doHttpCall") />
 		<cfset customer = gw.store(createCard()) />
 		<cfset standardResponseTests(response = customer, expectedObjectName = "customer", expectedIdPrefix="cus_") />
 
-			<!--- Create Connected Account --->
+		<!--- Create Connected Account --->
 		<cfset offlineInjector(gw, this, "mock_create_account_ok", "doHttpCall") />
 		<cfset connectedAccount = gw.marketplaceCreateConnectedAccount() />
 		<cfset standardResponseTests(response = connectedAccount, expectedObjectName = "account", expectedIdPrefix="acct_") />
 
-			<!---Create a token for the customer with the connected account--->
+		<!---Create a token for the customer with the connected account--->
 		<cfset offlineInjector(gw, this, "mock_get_token_for_customer_ok", "doHttpCall") />
 		<cfset customerToken = gw.getCustomerTokenForSpecificAccount(customer = customer.getParsedResult().id, connectedAccount = connectedAccount.getParsedResult().keys.secret) />
 		<cfset standardResponseTests(response = customerToken, expectedObjectName = "token", expectedIdPrefix="tok_") />
 
-			<!--- Direct Charge To Connected Account --->
+		<!--- Direct Charge To Connected Account --->
 		<cfset argumentCollection = structNew()>
 		<cfset argumentCollection.connectedAccount = connectedAccount.getParsedResult().keys.secret />
 		<cfset argumentCollection.amount = variables.svc.createMoney(1000, gw.currency) />
@@ -414,17 +470,17 @@
 	<cffunction name="testDestinationCharge" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
 
-			<!--- Create Connected Account --->
+		<!--- Create Connected Account --->
 		<cfset offlineInjector(gw, this, "mock_create_account_ok", "doHttpCall") />
 		<cfset connectedAccount = gw.marketplaceCreateConnectedAccount() />
 		<cfset standardResponseTests(response = connectedAccount, expectedObjectName = "account", expectedIdPrefix="acct_") />
 
-			<!--- Create Token --->
+		<!--- Create Token --->
 		<cfset offlineInjector(gw, this, "mock_create_card_token_ok", "doHttpCall") />
 		<cfset token = gw.createToken(createCard()) />
 		<cfset standardResponseTests(response = token, expectedObjectName = "token", expectedIdPrefix="tok_") />
 
-			<!--- Destination Charge --->
+		<!--- Destination Charge --->
 		<cfset argumentCollection = structNew()>
 		<cfset argumentCollection.destination = connectedAccount.getParsedResult().id>
 		<cfset argumentCollection.amount = variables.svc.createMoney(1000, gw.currency)>
@@ -438,12 +494,12 @@
 	<cffunction name="testRefundCharge" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
 
-			<!--- Create CC Token --->
+		<!--- Create CC Token --->
 		<cfset offlineInjector(gw, this, "mock_create_card_token_ok", "doHttpCall") />
 		<cfset token = gw.createToken(createCard()) />
 		<cfset standardResponseTests(response = token, expectedObjectName = "token", expectedIdPrefix="tok_") />
 
-			<!--- Charge --->
+		<!--- Charge --->
 		<cfset argumentCollection = structNew()>
 		<cfset argumentCollection.amount = variables.svc.createMoney(1000, gw.currency)>
 		<cfset argumentCollection.source = token.getParsedResult().id>
@@ -452,7 +508,7 @@
 		<cfset charge = gw.charge(argumentCollection = argumentCollection) />
 		<cfset standardResponseTests(response = charge, expectedObjectName = "charge", expectedIdPrefix="ch_") />
 
-			<!--- Refund Charge --->
+		<!--- Refund Charge --->
 		<cfset argumentCollection = structNew()>
 		<cfset argumentCollection.paymentId = charge.getParsedResult().id />
 		<cfset argumentCollection.refundAmount = variables.svc.createMoney(300, gw.currency) />
@@ -464,22 +520,22 @@
 	<cffunction name="testRefundChargeToConnectedAccount" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
 
-			<!---Create a customer--->
+		<!---Create a customer--->
 		<cfset offlineInjector(gw, this, "mock_create_customer_ok", "doHttpCall") />
 		<cfset customer = gw.store(createCard()) />
 		<cfset standardResponseTests(response = customer, expectedObjectName = "customer", expectedIdPrefix="cus_") />
 
-			<!--- Create Connected Account --->
+		<!--- Create Connected Account --->
 		<cfset offlineInjector(gw, this, "mock_create_account_ok", "doHttpCall") />
 		<cfset connectedAccount = gw.marketplaceCreateConnectedAccount() />
 		<cfset standardResponseTests(response = connectedAccount, expectedObjectName = "account", expectedIdPrefix="acct_") />
 
-			<!---Create a token for the customer with the connected account--->
+		<!---Create a token for the customer with the connected account--->
 		<cfset offlineInjector(gw, this, "mock_get_token_for_customer_ok", "doHttpCall") />
 		<cfset customerToken = gw.getCustomerTokenForSpecificAccount(customer = customer.getParsedResult().id, connectedAccount = connectedAccount.getParsedResult().keys.secret) />
 		<cfset standardResponseTests(response = customerToken, expectedObjectName = "token", expectedIdPrefix="tok_") />
 
-			<!--- Direct Charge To Connected Account --->
+		<!--- Direct Charge To Connected Account --->
 		<cfset argumentCollection = structNew()>
 		<cfset argumentCollection.connectedAccount = connectedAccount.getParsedResult().keys.secret />
 		<cfset argumentCollection.amount = variables.svc.createMoney(1000, gw.currency) />
@@ -489,7 +545,7 @@
 		<cfset charge = gw.marketplaceDirectCharge(argumentCollection = argumentCollection) />
 		<cfset standardResponseTests(response = charge, expectedObjectName = "charge", expectedIdPrefix="ch_") />
 
-			<!--- Refund Charge To Connected Account --->
+		<!--- Refund Charge To Connected Account --->
 		<cfset argumentCollection = structNew()>
 		<cfset argumentCollection.paymentId = charge.getParsedResult().id />
 		<cfset argumentCollection.refundAmount = variables.svc.createMoney(250, gw.currency) />
@@ -502,17 +558,17 @@
 	<cffunction name="testRefundToAccountPullingBackFundsFromConnectedAccount" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
 
-			<!--- Create Connected Account --->
+		<!--- Create Connected Account --->
 		<cfset offlineInjector(gw, this, "mock_create_account_ok", "doHttpCall") />
 		<cfset connectedAccount = gw.marketplaceCreateConnectedAccount() />
 		<cfset standardResponseTests(response = connectedAccount, expectedObjectName = "account", expectedIdPrefix="acct_") />
 
-			<!--- Create Token --->
+		<!--- Create Token --->
 		<cfset offlineInjector(gw, this, "mock_create_card_token_ok", "doHttpCall") />
 		<cfset token = gw.createToken(createCard()) />
 		<cfset standardResponseTests(response = token, expectedObjectName = "token", expectedIdPrefix="tok_") />
 
-			<!--- Destination Charge --->
+		<!--- Destination Charge --->
 		<cfset argumentCollection = structNew()>
 		<cfset argumentCollection.destination = connectedAccount.getParsedResult().id>
 		<cfset argumentCollection.amount = variables.svc.createMoney(1000, gw.currency)>
@@ -522,7 +578,7 @@
 		<cfset charge = gw.marketplaceDestinationCharge(argumentCollection = argumentCollection) />
 		<cfset standardResponseTests(response = charge, expectedObjectName = "charge", expectedIdPrefix="ch_") />
 
-			<!--- Refund Charge By Pulling Back Required Funds From Connected Account --->
+		<!--- Refund Charge By Pulling Back Required Funds From Connected Account --->
 		<cfset argumentCollection = structNew()>
 		<cfset argumentCollection.paymentId = charge.getParsedResult().id />
 		<cfset argumentCollection.refundAmount = variables.svc.createMoney(400, gw.currency) />
@@ -532,21 +588,21 @@
 		<cfset standardResponseTests(response = refund, expectedObjectName = "refund", expectedIdPrefix="re_") />
 	</cffunction>
 
-		<!--- Test Bank Transfers --->
+	<!--- Test Bank Transfers --->
 	<cffunction name="testTransferFromPlatformStripeAccountToConnectedStripeAccount" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
 
-			<!--- Create Connected Account --->
+		<!--- Create Connected Account --->
 		<cfset offlineInjector(gw, this, "mock_create_account_ok", "doHttpCall") />
 		<cfset connectedAccount = gw.marketplaceCreateConnectedAccount() />
 		<cfset standardResponseTests(response = connectedAccount, expectedObjectName = "account", expectedIdPrefix="acct_") />
 
-			<!--- Create Token --->
+		<!--- Create Token --->
 		<cfset offlineInjector(gw, this, "mock_create_card_token_ok", "doHttpCall") />
 		<cfset token = gw.createToken(createCard()) />
 		<cfset standardResponseTests(response = token, expectedObjectName = "token", expectedIdPrefix="tok_") />
 
-			<!--- Charge --->
+		<!--- Charge --->
 		<cfset argumentCollection = structNew()>
 		<cfset argumentCollection.amount = variables.svc.createMoney(1000, gw.currency)>
 		<cfset argumentCollection.source = token.getParsedResult().id>
@@ -555,7 +611,7 @@
 		<cfset charge = gw.charge(argumentCollection = argumentCollection) />
 		<cfset standardResponseTests(response = charge, expectedObjectName = "charge", expectedIdPrefix="ch_") />
 
-			<!--- Transfer To Connected Account --->
+		<!--- Transfer To Connected Account --->
 		<cfset argumentCollection = structNew()>
 		<cfset argumentCollection.destination = connectedAccount.getParsedResult().id>
 		<cfset argumentCollection.transferAmount = variables.svc.createMoney(500, gw.currency)>
@@ -567,17 +623,17 @@
 	<cffunction name="testAssociateTransferWithCharge" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
 
-			<!--- Create Connected Account --->
+		<!--- Create Connected Account --->
 		<cfset offlineInjector(gw, this, "mock_create_account_ok", "doHttpCall") />
 		<cfset connectedAccount = gw.marketplaceCreateConnectedAccount() />
 		<cfset standardResponseTests(response = connectedAccount, expectedObjectName = "account", expectedIdPrefix="acct_") />
 
-			<!--- Create Token --->
+		<!--- Create Token --->
 		<cfset offlineInjector(gw, this, "mock_create_card_token_ok", "doHttpCall") />
 		<cfset token = gw.createToken(createCard()) />
 		<cfset standardResponseTests(response = token, expectedObjectName = "token", expectedIdPrefix="tok_") />
 
-			<!--- Charge --->
+		<!--- Charge --->
 		<cfset argumentCollection = structNew()>
 		<cfset argumentCollection.amount = variables.svc.createMoney(1000, gw.currency)>
 		<cfset argumentCollection.source = token.getParsedResult().id>
@@ -586,7 +642,7 @@
 		<cfset charge = gw.charge(argumentCollection = argumentCollection) />
 		<cfset standardResponseTests(response = charge, expectedObjectName = "charge", expectedIdPrefix="ch_") />
 
-			<!--- Transfer To Connected Account --->
+		<!--- Transfer To Connected Account --->
 		<cfset argumentCollection = structNew()>
 		<cfset argumentCollection.destination = connectedAccount.getParsedResult().id>
 		<cfset argumentCollection.sourceTransaction = charge.getParsedResult().id>
@@ -599,17 +655,17 @@
 	<cffunction name="testTransferWithApplicationFee" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
 
-			<!--- Create Connected Account --->
+		<!--- Create Connected Account --->
 		<cfset offlineInjector(gw, this, "mock_create_account_ok", "doHttpCall") />
 		<cfset connectedAccount = gw.marketplaceCreateConnectedAccount() />
 		<cfset standardResponseTests(response = connectedAccount, expectedObjectName = "account", expectedIdPrefix="acct_") />
 
-			<!--- Create Token --->
+		<!--- Create Token --->
 		<cfset offlineInjector(gw, this, "mock_create_card_token_ok", "doHttpCall") />
 		<cfset token = gw.createToken(createCard()) />
 		<cfset standardResponseTests(response = token, expectedObjectName = "token", expectedIdPrefix="tok_") />
 
-			<!--- Charge --->
+		<!--- Charge --->
 		<cfset argumentCollection = structNew()>
 		<cfset argumentCollection.amount = variables.svc.createMoney(1000, gw.currency)>
 		<cfset argumentCollection.source = token.getParsedResult().id>
@@ -618,7 +674,7 @@
 		<cfset charge = gw.charge(argumentCollection = argumentCollection) />
 		<cfset standardResponseTests(response = charge, expectedObjectName = "charge", expectedIdPrefix="ch_") />
 
-			<!--- Transfer With Application Fee --->
+		<!--- Transfer With Application Fee --->
 		<cfset argumentCollection = structNew()>
 		<cfset argumentCollection.destination = connectedAccount.getParsedResult().id>
 		<cfset argumentCollection.transferAmount = variables.svc.createMoney(500, gw.currency)>
@@ -631,17 +687,17 @@
 	<cffunction name="testReversingTransfer" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
 
-			<!--- Create Connected Account --->
+		<!--- Create Connected Account --->
 		<cfset offlineInjector(gw, this, "mock_create_account_ok", "doHttpCall") />
 		<cfset connectedAccount = gw.marketplaceCreateConnectedAccount() />
 		<cfset standardResponseTests(response = connectedAccount, expectedObjectName = "account", expectedIdPrefix="acct_") />
 
-			<!--- Create Token --->
+		<!--- Create Token --->
 		<cfset offlineInjector(gw, this, "mock_create_card_token_ok", "doHttpCall") />
 		<cfset token = gw.createToken(createCard()) />
 		<cfset standardResponseTests(response = token, expectedObjectName = "token", expectedIdPrefix="tok_") />
 
-			<!--- Charge --->
+		<!--- Charge --->
 		<cfset argumentCollection = structNew()>
 		<cfset argumentCollection.amount = variables.svc.createMoney(1000, gw.currency)>
 		<cfset argumentCollection.source = token.getParsedResult().id>
@@ -650,7 +706,7 @@
 		<cfset charge = gw.charge(argumentCollection = argumentCollection) />
 		<cfset standardResponseTests(response = charge, expectedObjectName = "charge", expectedIdPrefix="ch_") />
 
-			<!--- Transfer From Platform To Connected Account --->
+		<!--- Transfer From Platform To Connected Account --->
 		<cfset argumentCollection = structNew()>
 		<cfset argumentCollection.destination = connectedAccount.getParsedResult().id>
 		<cfset argumentCollection.transferAmount = variables.svc.createMoney(500, gw.currency)>
@@ -658,7 +714,7 @@
 		<cfset transfer = gw.marketplaceTransferFromPlatformStripeAccountToConnectedStripeAccount(argumentCollection = argumentCollection) />
 		<cfset standardResponseTests(response = transfer, expectedObjectName = "transfer", expectedIdPrefix="tr_") />
 
-			<!--- Reverse The Transfer --->
+		<!--- Reverse The Transfer --->
 		<cfset argumentCollection = structNew()>
 		<cfset argumentCollection.paymentId = transfer.getParsedResult().destination_payment>
 		<cfset argumentCollection.connectedAccount = connectedAccount.getParsedResult().id>
@@ -706,7 +762,7 @@
 	</cffunction>
 	<!--- Mocks --->
 	<cffunction name="mock_create_account_ok" access="private">
-		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "acct_15c2AnD8ot0g87U6", "email": null, "statement_descriptor": null, "display_name": null, "timezone": "Etc/UTC", "details_submitted": false, "charges_enabled": true, "transfers_enabled": false, "currencies_supported": [ "cad", "usd" ], "default_currency": "cad", "country": "CA", "object": "account", "business_name": null, "managed": true, "product_description": null, "legal_entity": { "type": null, "business_name": null, "address": { "line1": null, "line2": null, "city": null, "state": null, "postal_code": null, "country": "CA" }, "first_name": null, "last_name": null, "personal_address": { "line1": null, "line2": null, "city": null, "state": null, "postal_code": null, "country": null }, "dob": { "day": null, "month": null, "year": null }, "additional_owners": null, "verification": { "status": "unchecked", "document": null, "details": null } }, "bank_accounts": { "object": "list", "total_count": 0, "has_more": false, "url": "/v1/accounts/acct_15c2AnD8ot0g87U6/bank_accounts", "data": [] }, "verification": { "fields_needed": [ "legal_entity.type", "tos_acceptance.ip", "tos_acceptance.date" ], "due_by": null, "contacted": false }, "transfer_schedule": { "delay_days": 7, "interval": "daily" }, "tos_acceptance": { "date": null, "ip": null, "user_agent": null }, "decline_charge_on": { "cvc_failure": false, "avs_failure": false }, "keys": { "secret": "sk_test_XKbx1Hen8Jjq10228rZzWAhq", "publishable": "pk_test_LlsNZLlVL8mULhbnBO8Y9wXp" } }' } />
+		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "acct_15oe3nHQ9U3jyomi", "email": "test20150406173055@test.tst", "statement_descriptor": null, "display_name": null, "timezone": "Etc/UTC", "details_submitted": false, "charges_enabled": true, "transfers_enabled": false, "currencies_supported": [ "cad", "usd" ], "default_currency": "cad", "country": "CA", "object": "account", "business_name": null, "business_url": null, "support_phone": null, "metadata": {}, "managed": true, "product_description": null, "debit_negative_balances": false, "bank_accounts": { "object": "list", "total_count": 0, "has_more": false, "url": "/v1/accounts/acct_15oe3nHQ9U3jyomi/bank_accounts", "data": [] }, "verification": { "fields_needed": [ "legal_entity.first_name", "legal_entity.last_name", "legal_entity.dob.day", "legal_entity.dob.month", "legal_entity.dob.year", "legal_entity.type", "legal_entity.address.line1", "legal_entity.address.city", "legal_entity.address.state", "legal_entity.address.postal_code", "bank_account", "tos_acceptance.ip", "tos_acceptance.date" ], "due_by": null, "contacted": false }, "transfer_schedule": { "delay_days": 7, "interval": "daily" }, "tos_acceptance": { "ip": null, "date": null, "user_agent": null }, "legal_entity": { "type": null, "business_name": null, "address": { "line1": null, "line2": null, "city": null, "state": null, "postal_code": null, "country": "CA" }, "first_name": null, "last_name": null, "personal_address": { "line1": null, "line2": null, "city": null, "state": null, "postal_code": null, "country": null }, "dob": { "day": null, "month": null, "year": null }, "additional_owners": null, "verification": { "status": "unchecked", "document": null, "details": null } }, "decline_charge_on": { "cvc_failure": false, "avs_failure": false }, "keys": { "secret": "sk_test_kSx0VSZW6TvnoHCfBoVMFXpq", "publishable": "pk_test_MjuNj3ynAShrhv2OgvHoi46X" } }' } />
 	</cffunction>
 
 	<cffunction name="mock_update_account_ok" access="private">
@@ -795,5 +851,9 @@
 	
 	<cffunction name="mock_reversing_transfer_ok" access="private">
 		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "pyr_15i77sFzV7U7txffAAvDxyqa", "amount": 400, "currency": "cad", "created": 1426784888, "object": "refund", "balance_transaction": "txn_15i77sFzV7U7txffQ6nxf0Hp", "metadata": {}, "charge": "py_15i77rFzV7U7txffRp9gEQaF", "receipt_number": null, "reason": null }' } />
+	</cffunction>
+	
+	<cffunction name="mock_update_account_validation_passes_ok" access="private">
+		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "acct_15odyvFUmKIEYcf3", "email": "test20150406172553@test.tst", "statement_descriptor": null, "display_name": null, "timezone": "Etc/UTC", "details_submitted": false, "charges_enabled": true, "transfers_enabled": true, "currencies_supported": [ "cad", "usd" ], "default_currency": "cad", "country": "CA", "object": "account", "business_name": null, "business_url": null, "support_phone": null, "metadata": {}, "managed": true, "product_description": null, "debit_negative_balances": false, "bank_accounts": { "object": "list", "total_count": 1, "has_more": false, "url": "/v1/accounts/acct_15odyvFUmKIEYcf3/bank_accounts", "data": [ { "object": "bank_account", "id": "ba_15odywFUmKIEYcf3q2ZDAw0L", "last4": "6789", "country": "CA", "currency": "cad", "status": "new", "fingerprint": "Z3T7RQTuRWxBOKav", "routing_number": "11000-000", "bank_name": null, "default_for_currency": true } ] }, "verification": { "fields_needed": [], "due_by": null, "contacted": false }, "transfer_schedule": { "delay_days": 7, "interval": "daily" }, "tos_acceptance": { "ip": "184.66.107.116", "date": 1428338336, "user_agent": null }, "legal_entity": { "type": "company", "business_name": null, "address": { "line1": "123 Another Street", "line2": null, "city": "Some City", "state": "A State", "postal_code": "123ABC", "country": "CA" }, "first_name": "John", "last_name": "Smith", "personal_address": { "line1": null, "line2": null, "city": null, "state": null, "postal_code": null, "country": null }, "dob": { "day": 20, "month": 5, "year": 1990 }, "additional_owners": null, "verification": { "status": "unchecked", "document": null, "details": null } }, "decline_charge_on": { "cvc_failure": false, "avs_failure": false } }' } />
 	</cffunction>
 </cfcomponent>
