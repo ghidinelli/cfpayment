@@ -565,9 +565,9 @@
 
 
 
-	<!--- Chris's Additions --->
+<!--- Marketplace --->
 
-		<!--- Accounts --->
+	<!--- Accounts --->
 	<cffunction name="marketplaceCreateConnectedAccount" output="false" access="public" returntype="any" hint="">
 		<cfset var post = addCreateManagedAccountData(post = structNew()) />
 		<cfreturn process(gatewayUrl = getGatewayURL("/accounts"), payload = post) />
@@ -584,7 +584,7 @@
 		<cfreturn process(gatewayUrl = getGatewayURL("/accounts"), payload = structNew(), method="get") />
 	</cffunction>
 
-		<!--- Bank Accounts --->
+	<!--- Bank Accounts --->
 	<cffunction name="marketplaceFetchBankAccounts" output="false" access="public" returntype="any" hint="">
 		<cfargument name="connectedAccount" type="any" required="false" />		
 		<cfreturn process(gatewayUrl = getGatewayURL("/accounts/#arguments.connectedAccount#/bank_accounts"), payload = structNew(), method="get") />
@@ -627,7 +627,7 @@
 		<cfreturn process(gatewayUrl = getGatewayURL("/accounts/#arguments.connectedAccount#/bank_accounts"), payload = post) />
 	</cffunction>
 
-		<!--- Identity Verification --->
+	<!--- Identity Verification --->
 	<cffunction name="marketplaceUploadIdentityFile" output="false" access="public" returntype="any" hint="">
 		<cfargument name="accountSecret" type="any" required="false" />
 		<cfargument name="file" type="any" required="false" />
@@ -783,7 +783,7 @@
 		<cfset rVar = "">
 		
 		<cfswitch expression="#arguments.country#">
-			<cfcase value="USA,United States">
+			<cfcase value="USA,United States,US">
 				<cfset rVar = "US" />
 			</cfcase>
 			<cfcase value="Canada">
