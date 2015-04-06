@@ -152,7 +152,7 @@ component
 			return getService().getStatusSuccessful();
 		}
 		// if we get here, we don't know what the result is
-		throw(type = 'Application', message = 'Unknown BaseCommerce Status: #arguments.status#');
+		throw(type = 'BaseCommerce Status', message = 'Unknown BaseCommerce Status: #arguments.status#');
 	}
 	
 	private string function translateType(required string accountType) {
@@ -162,6 +162,6 @@ component
 			return 'XS_BA_TYPE_SAVINGS';
 		}
 		// if we get here, we don't know what the result is
-		throw(type = 'Application', message = 'Unknown Account Type: #arguments.accountType#');
+		throw(type = 'BaseCommerce Type', message = 'Unknown Account Type: #arguments.accountType#');
 	}
 }	

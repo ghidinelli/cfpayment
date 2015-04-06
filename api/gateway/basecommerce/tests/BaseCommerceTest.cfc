@@ -117,36 +117,18 @@ component
 		assertTrue(accountToken.getMessage() == 'Invalid Routing Number', 'Incorrect error message: "#accountToken.getMessage()#", expected: "Invalid Routing Number"');
 	}
 
-	public void function testCreateAccountWithInvalidAccountTypeFails() {
+	public void function testCreateAccountWithInvalidAccountTypeFails() mxunit:expectedException='BaseCommerce Type' {
 		local.argumentCollection = structNew();
-		local.accountTypeString = 'XS_BA_TYPE_THISWILLFAIL';
-		local.argumentCollection.account = createAccountWithInvalidAccountType(local.accountTypeString);
+		local.argumentCollection.account = createAccountWithInvalidAccountType('XS_BA_TYPE_THISWILLFAIL');
 		offlineInjector(gw, this, 'mockCreateAccountWithInvalidAccountTypeFails', 'accountData');
-		appErrorThrown = false;
-		try {
-			accountToken = gw.store(argumentCollection = local.argumentCollection);
-		} catch(any e) {
-			appErrorThrown = true;
-			expectedMessage = 'Unknown Account Type: #local.accountTypeString#';
-			assertTrue(e.message eq expectedMessage, 'Error message incorrect for app error, received: "#e.message#", expected: "#expectedMessage#"');
-		}
-		assertTrue(appErrorThrown, 'App error should have been thrown');
+		accountToken = gw.store(argumentCollection = local.argumentCollection);
 	}
 
-	public void function testCreateAccountWithMissingAccountTypeFails() {
+	public void function testCreateAccountWithMissingAccountTypeFails() mxunit:expectedException='BaseCommerce Type' {
 		local.argumentCollection = structNew();
 		local.argumentCollection.account = createAccountWithMissingAccountType();
 		offlineInjector(gw, this, 'mockCreateAccountWithMissingAccountTypeFails', 'accountData');
-
-		appErrorThrown = false;
-		try {
-			accountToken = gw.store(argumentCollection = local.argumentCollection);
-		} catch(any e) {
-			appErrorThrown = true;
-			expectedMessage = 'Unknown Account Type: ';
-			assertTrue(e.message eq expectedMessage, 'Error message incorrect for app error, received: "#e.message#", expected: "#expectedMessage#"');
-		}
-		assertTrue(appErrorThrown, 'App error should have been thrown');
+		accountToken = gw.store(argumentCollection = local.argumentCollection);
 	}
 
 	public void function testCreditAccountWithInvalidAmountFails() {
@@ -345,11 +327,11 @@ component
 	}
 
 	private any function mockCreateAccountWithInvalidAccountTypeFails() {
-		throw(type = 'Application', message = 'Unknown Account Type: XS_BA_TYPE_THISWILLFAIL');
+		throw(type = 'BaseCommerce Type', message = 'Unknown Account Type: XS_BA_TYPE_THISWILLFAIL');
 	}
 
 	private any function mockCreateAccountWithMissingAccountTypeFails() {
-		throw(type = 'Application', message = 'Unknown Account Type: ');
+		throw(type = 'BaseCommerce Type', message = 'Unknown Account Type: ');
 	}
 
 	private any function mockCreateAccountWithMissingAccountType() {
@@ -373,18 +355,29 @@ component
 	}
 
 	private any function mockCreditAccountSettlementDateIsTheBusinessDayAfterEffectiveDay() {
-		return {"MERCHANTTRANSACTIONID":0,"EFFECTIVEDATE":"April, 08 2015 00:00:00","TRANSACTIONID":44102,"ACCOUNTTYPE":"CHECKING","METHOD":"CCD","AMOUNT":5.0,"STATUS":0,"SETTLEMENTDATE":"April, 09 2015 00:00:00","TYPE":"CREDIT"};
+		local.nextSaturday = dateAdd('d', 7-dayOfWeek(now()), now());
+		local.effectiveDate = dateFormat(dateAdd('d', 4, local.nextSaturday), 'Mmm, dd yyyy') & ' 00:00:00';
+		local.settlementDate = dateFormat(dateAdd('d', 5, local.nextSaturday), 'Mmm, dd yyyy') & ' 00:00:00';
+		return {"MERCHANTTRANSACTIONID":0,"EFFECTIVEDATE":"#local.effectiveDate#","TRANSACTIONID":44102,"ACCOUNTTYPE":"CHECKING","METHOD":"CCD","AMOUNT":5.0,"STATUS":0,"SETTLEMENTDATE":"#local.settlementDate#","TYPE":"CREDIT"};
 	}
 
 	private any function mockCreditAccountWeekendEffectiveDateMovedToWeekDay() {
-		return {"MERCHANTTRANSACTIONID":0,"EFFECTIVEDATE":"April, 06 2015 00:00:00","TRANSACTIONID":44158,"ACCOUNTTYPE":"CHECKING","METHOD":"CCD","AMOUNT":5.0,"STATUS":0,"SETTLEMENTDATE":"April, 07 2015 00:00:00","TYPE":"CREDIT"};
+		local.nextSaturday = dateAdd('d', 7-dayOfWeek(now()), now());
+		local.effectiveDate = dateFormat(dateAdd('d', 2, local.nextSaturday), 'Mmm, dd yyyy') & ' 00:00:00';
+		local.settlementDate = dateFormat(dateAdd('d', 3, local.nextSaturday), 'Mmm, dd yyyy') & ' 00:00:00';
+		return {"MERCHANTTRANSACTIONID":0,"EFFECTIVEDATE":"#local.effectiveDate#","TRANSACTIONID":44158,"ACCOUNTTYPE":"CHECKING","METHOD":"CCD","AMOUNT":5.0,"STATUS":0,"SETTLEMENTDATE":"#local.settlementDate#","TYPE":"CREDIT"};
 	}
 
 	private any function mockCreditAccountPastEffectiveDate() {
-		return {"MERCHANTTRANSACTIONID":0,"EFFECTIVEDATE":"April, 06 2015 00:00:00","TRANSACTIONID":44160,"ACCOUNTTYPE":"CHECKING","METHOD":"CCD","AMOUNT":5.0,"STATUS":0,"SETTLEMENTDATE":"April, 07 2015 00:00:00","TYPE":"CREDIT"};
+		local.effectiveDate = dateFormat(now(), 'Mmm, dd yyyy') & ' 00:00:00';
+		local.settlementDate = dateFormat(dateAdd('d', 1, now()), 'Mmm, dd yyyy') & ' 00:00:00';
+		return {"MERCHANTTRANSACTIONID":0,"EFFECTIVEDATE":"#local.effectiveDate#","TRANSACTIONID":44160,"ACCOUNTTYPE":"CHECKING","METHOD":"CCD","AMOUNT":5.0,"STATUS":0,"SETTLEMENTDATE":"#local.settlementDate#","TYPE":"CREDIT"};
 	}
 
 	private any function mockCreditAccountFutureEffectiveDate() {
-		return {"MERCHANTTRANSACTIONID":0,"EFFECTIVEDATE":"April, 08 2015 00:00:00","TRANSACTIONID":44161,"ACCOUNTTYPE":"CHECKING","METHOD":"CCD","AMOUNT":5.0,"STATUS":0,"SETTLEMENTDATE":"April, 09 2015 00:00:00","TYPE":"CREDIT"};
+		local.nextSaturday = dateAdd('d', 7-dayOfWeek(now()), now());
+		local.effectiveDate = dateFormat(dateAdd('d', 4, local.nextSaturday), 'Mmm, dd yyyy') & ' 00:00:00';
+		local.settlementDate = dateFormat(dateAdd('d', 5, local.nextSaturday), 'Mmm, dd yyyy') & ' 00:00:00';
+		return {"MERCHANTTRANSACTIONID":0,"EFFECTIVEDATE":"#local.effectiveDate#","TRANSACTIONID":44161,"ACCOUNTTYPE":"CHECKING","METHOD":"CCD","AMOUNT":5.0,"STATUS":0,"SETTLEMENTDATE":"#local.settlementDate#","TYPE":"CREDIT"};
 	}
 }
