@@ -4,21 +4,19 @@ component
 	extends='mxunit.framework.TestCase' {
 
 	public void function setUp() {
-		var gw = structNew();
-
-		gw.path = 'basecommerce.basecommerce';
+		local.gw.path = 'basecommerce.basecommerce';
 		//Test account
-		gw.Username = '';
-		gw.Password = '';
-		gw.MerchantAccount = '';
-		gw.TestMode = true; // defaults to true anyways
+		local.gw.Username = '';
+		local.gw.Password = '';
+		local.gw.MerchantAccount = '';
+		local.gw.TestMode = true;
 
 		// create gw and get reference			
-		variables.svc = createObject('component', 'cfpayment.api.core').init(gw);
+		variables.svc = createObject('component', 'cfpayment.api.core').init(local.gw);
 		variables.gw = variables.svc.getGateway();
 
 		//if set to false, will try to connect to remote service to check these all out
-		variables.localMode = true;
+		variables.localMode = false;
 		variables.debugMode = false;
 	}
 
@@ -63,188 +61,188 @@ component
 
 	//TESTS
 	public void function testCreateAccount() {
-		accountToken = createAccountTest();
+		createAccountTest();
 	}
 
 	public void function testCreditAccount() {
-		accountToken = createAccountTest();
+		local.accountToken = createAccountTest();
 
 		//Credit account
 		local.options = structNew();
-		local.options.tokenId = accountToken.getTokenId();
+		local.options.tokenId = local.accountToken.getTokenId();
 		local.options.method = 'XS_BAT_METHOD_CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
 		local.options.effectiveDate = dateAdd('d', 8, now());
-		offlineInjector(gw, this, 'mockCreditAccountOk', 'transactionData');
-		credit = gw.credit(money = variables.svc.createMoney(500, 'USD'), options = local.options);
-		standardResponseTests(credit);
-		assertTrue(credit.getParsedResult().amount == 5, 'The credit amount requested and the actual credit given is different, should be 5, is: #credit.getParsedResult().amount#');
-		assertTrue(credit.getTransactionId() > 0, 'Invalid transaction id returned: #credit.getTransactionId()#');
-		assertTrue(credit.getParsedResult().type == 'CREDIT', 'Incorrect transaction type, should be "CREDIT", is: "#credit.getParsedResult().type#"');
+		offlineInjector(variables.gw, this, 'mockCreditAccountOk', 'transactionData');
+		local.credit = variables.gw.credit(money = variables.svc.createMoney(500, 'USD'), options = local.options);
+		standardResponseTests(local.credit);
+		assertTrue(local.credit.getParsedResult().amount == 5, 'The credit amount requested and the actual credit given is different, should be 5, is: #local.credit.getParsedResult().amount#');
+		assertTrue(local.credit.getTransactionId() > 0, 'Invalid transaction id returned: #local.credit.getTransactionId()#');
+		assertTrue(local.credit.getParsedResult().type == 'CREDIT', 'Incorrect transaction type, should be "CREDIT", is: "#local.credit.getParsedResult().type#"');
 	}
 
 	public void function testDebitAccount() {
-		accountToken = createAccountTest();
+		local.accountToken = createAccountTest();
 
 		//Debit account
 		local.options = structNew();
 		local.options.tokenId = accountToken.getTokenId();
 		local.options.method = 'XS_BAT_METHOD_CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
-		offlineInjector(gw, this, 'mockDebitAccountOk', 'transactionData');
-		debit = gw.purchase(money = variables.svc.createMoney(400, 'USD'), options = local.options);
-		standardResponseTests(debit);
-		assertTrue(debit.getParsedResult().amount == 4, 'The credit amount requested and the actual credit given is different, should be 4, is: #debit.getParsedResult().amount#');
-		assertTrue(debit.getTransactionId() > 0, 'Invalid transaction id returned: #debit.getTransactionId()#');
-		assertTrue(debit.getParsedResult().type == 'DEBIT', 'Incorrect transaction type, should be "CREDIT", is: "#debit.getParsedResult().type#"');
+		offlineInjector(variables.gw, this, 'mockDebitAccountOk', 'transactionData');
+		local.debit = variables.gw.purchase(money = variables.svc.createMoney(400, 'USD'), options = local.options);
+		standardResponseTests(local.debit);
+		assertTrue(local.debit.getParsedResult().amount == 4, 'The credit amount requested and the actual credit given is different, should be 4, is: #local.debit.getParsedResult().amount#');
+		assertTrue(local.debit.getTransactionId() > 0, 'Invalid transaction id returned: #local.debit.getTransactionId()#');
+		assertTrue(local.debit.getParsedResult().type == 'DEBIT', 'Incorrect transaction type, should be "CREDIT", is: "#local.debit.getParsedResult().type#"');
 	}
 
 	public void function testCreateInvalidAccountFails() {
 		local.argumentCollection = structNew();
 		local.accountNumberString = '7';
 		local.argumentCollection.account = createInvalidAccount(local.accountNumberString);
-		offlineInjector(gw, this, 'mockCreateInvalidAccountFails', 'accountData');
-		accountToken = gw.store(argumentCollection = local.argumentCollection);
-		standardErrorResponseTests(accountToken);
-		assertTrue(accountToken.getMessage() == 'Account Number must be at least 5 digits', 'Incorrect error message: "#accountToken.getMessage()#", expected: "Account Number must be at least 5 digits"');
+		offlineInjector(variables.gw, this, 'mockCreateInvalidAccountFails', 'accountData');
+		local.accountToken = variables.gw.store(argumentCollection = local.argumentCollection);
+		standardErrorResponseTests(local.accountToken);
+		assertTrue(local.accountToken.getMessage() == 'Account Number must be at least 5 digits', 'Incorrect error message: "#local.accountToken.getMessage()#", expected: "Account Number must be at least 5 digits"');
 	}
 
 	public void function testCreateAccountWithInvalidRoutingNumberFails() {
 		local.argumentCollection = structNew();
 		local.accountRoutingNumberString = '123';
 		local.argumentCollection.account = createAccountWithInvalidRoutingNumber(local.accountRoutingNumberString);
-		offlineInjector(gw, this, 'mockCreateAccountWithInvalidRoutingNumberFails', 'accountData');
-		accountToken = gw.store(argumentCollection = local.argumentCollection);
-		standardErrorResponseTests(accountToken);
-		assertTrue(accountToken.getMessage() == 'Invalid Routing Number', 'Incorrect error message: "#accountToken.getMessage()#", expected: "Invalid Routing Number"');
+		offlineInjector(variables.gw, this, 'mockCreateAccountWithInvalidRoutingNumberFails', 'accountData');
+		local.accountToken = variables.gw.store(argumentCollection = local.argumentCollection);
+		standardErrorResponseTests(local.accountToken);
+		assertTrue(local.accountToken.getMessage() == 'Invalid Routing Number', 'Incorrect error message: "#local.accountToken.getMessage()#", expected: "Invalid Routing Number"');
 	}
 
 	public void function testCreateAccountWithInvalidAccountTypeFails() mxunit:expectedException='BaseCommerce Type' {
 		local.argumentCollection = structNew();
 		local.argumentCollection.account = createAccountWithInvalidAccountType('XS_BA_TYPE_THISWILLFAIL');
-		offlineInjector(gw, this, 'mockCreateAccountWithInvalidAccountTypeFails', 'accountData');
-		accountToken = gw.store(argumentCollection = local.argumentCollection);
+		offlineInjector(variables.gw, this, 'mockCreateAccountWithInvalidAccountTypeFails', 'accountData');
+		variables.gw.store(argumentCollection = local.argumentCollection);
 	}
 
 	public void function testCreateAccountWithMissingAccountTypeFails() mxunit:expectedException='BaseCommerce Type' {
 		local.argumentCollection = structNew();
 		local.argumentCollection.account = createAccountWithMissingAccountType();
-		offlineInjector(gw, this, 'mockCreateAccountWithMissingAccountTypeFails', 'accountData');
-		accountToken = gw.store(argumentCollection = local.argumentCollection);
+		offlineInjector(variables.gw, this, 'mockCreateAccountWithMissingAccountTypeFails', 'accountData');
+		variables.gw.store(argumentCollection = local.argumentCollection);
 	}
 
 	public void function testCreditAccountWithInvalidAmountFails() {
-		accountToken = createAccountTest();
+		local.accountToken = createAccountTest();
 
 		//Credit account (unsuccessfully)
 		local.options = structNew();
-		local.options.tokenId = accountToken.getTokenId();
+		local.options.tokenId = local.accountToken.getTokenId();
 		local.options.method = 'XS_BAT_METHOD_CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
-		offlineInjector(gw, this, 'mockCreditDebitAccountWithInvalidAmountFails', 'transactionData');
-		credit = gw.credit(money = variables.svc.createMoney(-1000, 'USD'), options = local.options);
-		standardErrorResponseTests(credit);
-		assertTrue(credit.getMessage() == 'Invalid Amount', 'Incorrect error message: "#credit.getMessage()#", expected: "Invalid Amount"');
+		offlineInjector(variables.gw, this, 'mockCreditDebitAccountWithInvalidAmountFails', 'transactionData');
+		local.credit = variables.gw.credit(money = variables.svc.createMoney(-1000, 'USD'), options = local.options);
+		standardErrorResponseTests(local.credit);
+		assertTrue(local.credit.getMessage() == 'Invalid Amount', 'Incorrect error message: "#local.credit.getMessage()#", expected: "Invalid Amount"');
 	}
 
 	public void function testDebitAccountWithInvalidAmountFails() {
-		accountToken = createAccountTest();
+		local.accountToken = createAccountTest();
 
 		//Credit account (unsuccessfully)
 		local.options = structNew();
-		local.options.tokenId = accountToken.getTokenId();
+		local.options.tokenId = local.accountToken.getTokenId();
 		local.options.method = 'XS_BAT_METHOD_CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
-		offlineInjector(gw, this, 'mockCreditDebitAccountWithInvalidAmountFails', 'transactionData');
-		debit = gw.credit(money = variables.svc.createMoney(-2, 'USD'), options = local.options);
-		standardErrorResponseTests(debit);
-		assertTrue(debit.getMessage() == 'Invalid Amount', 'Incorrect error message: "#debit.getMessage()#", expected: "Invalid Amount"');
+		offlineInjector(variables.gw, this, 'mockCreditDebitAccountWithInvalidAmountFails', 'transactionData');
+		local.debit = variables.gw.credit(money = variables.svc.createMoney(-2, 'USD'), options = local.options);
+		standardErrorResponseTests(local.debit);
+		assertTrue(local.debit.getMessage() == 'Invalid Amount', 'Incorrect error message: "#local.debit.getMessage()#", expected: "Invalid Amount"');
 	}
 
 	public void function testCreditAccountWithInvalidAccountTokenFails() {
 		local.options = structNew();
 		local.options.tokenId = 'lk1j43k324h32j4h32hk***FAKE***32j4h3k432kh43jkh';
 		local.options.method = 'XS_BAT_METHOD_CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
-		offlineInjector(gw, this, 'mockCreditAccountWithInvalidAccountTokenFails', 'transactionData');
-		credit = gw.credit(money = variables.svc.createMoney(-1000, 'USD'), options = local.options);
-		standardErrorResponseTests(credit);
-		assertTrue(credit.getMessage() == 'No bank account exists for given token', 'Incorrect error message: "#credit.getMessage()#", expected: "No bank account exists for given token"');
+		offlineInjector(variables.gw, this, 'mockCreditAccountWithInvalidAccountTokenFails', 'transactionData');
+		local.credit = variables.gw.credit(money = variables.svc.createMoney(-1000, 'USD'), options = local.options);
+		standardErrorResponseTests(local.credit);
+		assertTrue(local.credit.getMessage() == 'No bank account exists for given token', 'Incorrect error message: "#local.credit.getMessage()#", expected: "No bank account exists for given token"');
 	}
 
 	public void function testCreditAccountWithInvalidMethodFails() {
-		accountToken = createAccountTest();
+		local.accountToken = createAccountTest();
 
 		//Credit account (unsuccessfully)
 		local.options = structNew();
-		local.options.tokenId = accountToken.getTokenId();
+		local.options.tokenId = local.accountToken.getTokenId();
 		local.options.method = 'XS_BAT_METHOD_THISWILLFAIL'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
-		offlineInjector(gw, this, 'mockCreditAccountWithInvalidMethodFails', 'transactionData');
-		credit = gw.credit(money = variables.svc.createMoney(1500, 'USD'), options = local.options);
-		standardErrorResponseTests(credit);
-		assertTrue(credit.getMessage() == 'Invalid transaction method passed in: #local.options.method#', 'Incorrect error message: "#credit.getMessage()#", expected: "Invalid transaction method passed in: #local.options.method#"');
+		offlineInjector(variables.gw, this, 'mockCreditAccountWithInvalidMethodFails', 'transactionData');
+		local.credit = variables.gw.credit(money = variables.svc.createMoney(1500, 'USD'), options = local.options);
+		standardErrorResponseTests(local.credit);
+		assertTrue(local.credit.getMessage() == 'Invalid transaction method passed in: #local.options.method#', 'Incorrect error message: "#local.credit.getMessage()#", expected: "Invalid transaction method passed in: #local.options.method#"');
 	}
 
 	public void function testCreditAccountFutureEffectiveDate() {
-		accountToken = createAccountTest();
+		local.accountToken = createAccountTest();
 
 		//Credit account
 		local.effectiveDate = dateAdd('d', 4, nextSaturday()); // Wednesday of next week
 		local.options = structNew();
-		local.options.tokenId = accountToken.getTokenId();
+		local.options.tokenId = local.accountToken.getTokenId();
 		local.options.method = 'XS_BAT_METHOD_CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
 		local.options.effectiveDate = local.effectiveDate;
-		offlineInjector(gw, this, 'mockCreditAccountFutureEffectiveDate', 'transactionData');
-		credit = gw.credit(money = variables.svc.createMoney(500, 'USD'), options = local.options);
-		standardResponseTests(credit);
-		assertTrue(dateCompare(local.effectiveDate, credit.getParsedResult().effectiveDate) == 0, 'Posted effective date (#local.effectiveDate#) and confirmed effective date (#credit.getParsedResult().effectiveDate#) don''t match');
+		offlineInjector(variables.gw, this, 'mockCreditAccountFutureEffectiveDate', 'transactionData');
+		local.credit = variables.gw.credit(money = variables.svc.createMoney(500, 'USD'), options = local.options);
+		standardResponseTests(local.credit);
+		assertTrue(dateCompare(local.effectiveDate, local.credit.getParsedResult().effectiveDate) == 0, 'Posted effective date (#local.effectiveDate#) and confirmed effective date (#local.credit.getParsedResult().effectiveDate#) don''t match');
 	}
 
 	public void function testCreditAccountPastEffectiveDate() {
-		accountToken = createAccountTest();
+		local.accountToken = createAccountTest();
 
 		//Credit account
 		local.effectiveDate = dateAdd('d', -4, removeTimePart(now())); //4 days ago
 		local.options = structNew();
-		local.options.tokenId = accountToken.getTokenId();
+		local.options.tokenId = local.accountToken.getTokenId();
 		local.options.method = 'XS_BAT_METHOD_CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
 		local.options.effectiveDate = local.effectiveDate;
-		offlineInjector(gw, this, 'mockCreditAccountPastEffectiveDate', 'transactionData');
-		credit = gw.credit(money = variables.svc.createMoney(500, 'USD'), options = local.options);
-		standardResponseTests(credit);
-		assertTrue(dateCompare(local.effectiveDate, credit.getParsedResult().effectiveDate) < 0, 'Posted date is in the past, returned effective date should be ammended to curtrent date but isn''t');
+		offlineInjector(variables.gw, this, 'mockCreditAccountPastEffectiveDate', 'transactionData');
+		local.credit = variables.gw.credit(money = variables.svc.createMoney(500, 'USD'), options = local.options);
+		standardResponseTests(local.credit);
+		assertTrue(dateCompare(local.effectiveDate, local.credit.getParsedResult().effectiveDate) < 0, 'Posted date is in the past, returned effective date should be ammended to curtrent date but isn''t');
 	}
 
 	public void function testCreditAccountWeekendEffectiveDateMovedToWeekDay() {
-		accountToken = createAccountTest();
+		local.accountToken = createAccountTest();
 
 		//Credit account
 		local.effectiveDate = nextSaturday();
 		local.options = structNew();
-		local.options.tokenId = accountToken.getTokenId();
+		local.options.tokenId = local.accountToken.getTokenId();
 		local.options.method = 'XS_BAT_METHOD_CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
 		local.options.effectiveDate = local.effectiveDate;
-		offlineInjector(gw, this, 'mockCreditAccountWeekendEffectiveDateMovedToWeekDay', 'transactionData');
-		credit = gw.credit(money = variables.svc.createMoney(500, 'USD'), options = local.options);
-		standardResponseTests(credit);
-		assertTrue(dateCompare(local.effectiveDate, credit.getParsedResult().effectiveDate) < 0, 'Posted date is on the weekend, returned effective date should be ammended to next working day but isn''t');
+		offlineInjector(variables.gw, this, 'mockCreditAccountWeekendEffectiveDateMovedToWeekDay', 'transactionData');
+		local.credit = variables.gw.credit(money = variables.svc.createMoney(500, 'USD'), options = local.options);
+		standardResponseTests(local.credit);
+		assertTrue(dateCompare(local.effectiveDate, local.credit.getParsedResult().effectiveDate) < 0, 'Posted date is on the weekend, returned effective date should be ammended to next working day but isn''t');
 	}
 
 	public void function testCreditAccountSettlementDateIsTheBusinessDayAfterEffectiveDay() {
-		accountToken = createAccountTest();
+		local.accountToken = createAccountTest();
 
 		//Credit account
 		local.effectiveDate = dateAdd('d', 4, nextSaturday()); // Wednesday of next week
 		local.options = structNew();
-		local.options.tokenId = accountToken.getTokenId();
+		local.options.tokenId = local.accountToken.getTokenId();
 		local.options.method = 'XS_BAT_METHOD_CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
 		local.options.effectiveDate = local.effectiveDate;
-		offlineInjector(gw, this, 'mockCreditAccountSettlementDateIsTheBusinessDayAfterEffectiveDay', 'transactionData');
-		credit = gw.credit(money = variables.svc.createMoney(500, 'USD'), options = local.options);
-		standardResponseTests(credit);
-		assertTrue(dateDiff('d', local.effectiveDate, credit.getParsedResult().settlementdate) == 1, 'The settlement date should be the next working day after the effective day');
+		offlineInjector(variables.gw, this, 'mockCreditAccountSettlementDateIsTheBusinessDayAfterEffectiveDay', 'transactionData');
+		local.credit = variables.gw.credit(money = variables.svc.createMoney(500, 'USD'), options = local.options);
+		standardResponseTests(local.credit);
+		assertTrue(dateDiff('d', local.effectiveDate, local.credit.getParsedResult().settlementdate) == 1, 'The settlement date should be the next working day after the effective day');
 	}
 
 	//HELPERS
 	private any function createAccountTest() {
 		local.argumentCollection = structNew();
 		local.argumentCollection.account = createAccount();
-		offlineInjector(gw, this, 'mockCreateAccountOk', 'accountData');
+		offlineInjector(variables.gw, this, 'mockCreateAccountOk', 'accountData');
 		local.accountToken = gw.store(argumentCollection = local.argumentCollection);
 		standardResponseTests(local.accountToken);
 		assertTrue(local.accountToken.getTokenId() != '', 'Token not returned');
@@ -277,7 +275,6 @@ component
 		local.account.setCheckNumber();
 		local.account.setAccountType('checking');
 		local.account.setSEC();
-
 		return local.account;	
 	}
 
