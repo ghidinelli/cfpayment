@@ -86,7 +86,7 @@ component
 			local.bankAccountTransactionObj.setMethod(local.bankAccountTransactionObj[arguments.options.method]);
 		} catch(any e) {
 			local.transactionData.status = getService().getStatusFailure();
-			if(!isDefined('arguments.options')) local.transactionData.message = ['Missing options in arguments'];
+			if(!structKeyExists(arguments, 'options')) local.transactionData.message = ['Missing options in arguments'];
 			else if(!structKeyExists(arguments.options, 'method')) local.transactionData.message = ['Missing message in arguments.options'];
 			else if(arguments.options.method == '') local.transactionData.message = ['Missing transaction method'];
 			else local.transactionData.message = ['Invalid transaction method passed in: #arguments.options.method#'];
@@ -132,23 +132,23 @@ component
 
 	private any function translateStatus(required any basecommerce) {
 		// the basecommerce object has static fields against which we can check for success/failure and map to cfpayment values
-		if(structKeyExists(basecommerce,'XS_BAT_STATUS_FAILED') && basecommerce.isStatus(basecommerce['XS_BAT_STATUS_FAILED'])) {
+		if(structKeyExists(arguments.basecommerce,'XS_BAT_STATUS_FAILED') && arguments.basecommerce.isStatus(arguments.basecommerce['XS_BAT_STATUS_FAILED'])) {
 			return getService().getStatusFailure();
-		} else if(structKeyExists(basecommerce,'XS_BA_STATUS_FAILED') && basecommerce.isStatus(basecommerce.XS_BA_STATUS_FAILED)) {
+		} else if(structKeyExists(arguments.basecommerce,'XS_BA_STATUS_FAILED') && arguments.basecommerce.isStatus(arguments.basecommerce.XS_BA_STATUS_FAILED)) {
 			return getService().getStatusFailure();
-		} else if(structKeyExists(basecommerce,'XS_BAT_STATUS_CREATED') && basecommerce.isStatus(basecommerce.XS_BAT_STATUS_CREATED)) {
+		} else if(structKeyExists(arguments.basecommerce,'XS_BAT_STATUS_CREATED') && arguments.basecommerce.isStatus(arguments.basecommerce.XS_BAT_STATUS_CREATED)) {
 			return getService().getStatusSuccessful();
-		} else if(structKeyExists(basecommerce,'XS_BA_STATUS_ACTIVE') && basecommerce.isStatus(basecommerce.XS_BA_STATUS_ACTIVE)) {
+		} else if(structKeyExists(arguments.basecommerce,'XS_BA_STATUS_ACTIVE') && arguments.basecommerce.isStatus(arguments.basecommerce.XS_BA_STATUS_ACTIVE)) {
 			return getService().getStatusSuccessful();
-		} else if(structKeyExists(basecommerce,'XS_BAT_STATUS_INITIATED') && basecommerce.isStatus(basecommerce.XS_BAT_STATUS_INITIATED)) {
+		} else if(structKeyExists(arguments.basecommerce,'XS_BAT_STATUS_INITIATED') && arguments.basecommerce.isStatus(arguments.basecommerce.XS_BAT_STATUS_INITIATED)) {
 			return getService().getStatusSuccessful();
-		} else if(structKeyExists(basecommerce,'XS_BAT_STATUS_SETTLED') && basecommerce.isStatus(basecommerce.XS_BAT_STATUS_SETTLED)) {
+		} else if(structKeyExists(arguments.basecommerce,'XS_BAT_STATUS_SETTLED') && arguments.basecommerce.isStatus(arguments.basecommerce.XS_BAT_STATUS_SETTLED)) {
 			return getService().getStatusSuccessful();
-		} else if(structKeyExists(basecommerce,'XS_BAT_STATUS_RETURNED') && basecommerce.isStatus(basecommerce.XS_BAT_STATUS_RETURNED)) {
+		} else if(structKeyExists(arguments.basecommerce,'XS_BAT_STATUS_RETURNED') && arguments.basecommerce.isStatus(arguments.basecommerce.XS_BAT_STATUS_RETURNED)) {
 			return getService().getStatusSuccessful();
-		} else if(structKeyExists(basecommerce,'XS_BAT_STATUS_PENDING_SETTLEMENT') && basecommerce.isStatus(basecommerce.XS_BAT_STATUS_PENDING_SETTLEMENT)) {
+		} else if(structKeyExists(arguments.basecommerce,'XS_BAT_STATUS_PENDING_SETTLEMENT') && arguments.basecommerce.isStatus(arguments.basecommerce.XS_BAT_STATUS_PENDING_SETTLEMENT)) {
 			return getService().getStatusSuccessful();
-		} else if(structKeyExists(basecommerce,'XS_BAT_STATUS_CANCELED') && basecommerce.isStatus(basecommerce.XS_BAT_STATUS_CANCELED)) {
+		} else if(structKeyExists(arguments.basecommerce,'XS_BAT_STATUS_CANCELED') && arguments.basecommerce.isStatus(arguments.basecommerce.XS_BAT_STATUS_CANCELED)) {
 			return getService().getStatusSuccessful();
 		}
 		// if we get here, we don't know what the result is
