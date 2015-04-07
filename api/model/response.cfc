@@ -235,11 +235,11 @@
 
 
 	<!---  Usage: getMessage / setMessage  methods for Message value --->
-	<cffunction name="getMessage" access="public" output="false" returntype="any" hint="Human-readable transaction result">
+	<cffunction name="getMessage" access="public" output="false" returntype="string" hint="Human-readable transaction result">
 		<cfreturn variables.cfpayment.Message />
 	</cffunction>
 	<cffunction name="setMessage" access="public" output="false" returntype="any">
-		<cfargument name="Message" type="any" required="true" />
+		<cfargument name="Message" type="string" required="true" />
 		<cfset variables.cfpayment.Message = arguments.Message />
 		<cfreturn this />
 	</cffunction>
@@ -273,7 +273,7 @@
 		<cfreturn 'U' /><!--- unknown - AVS invalid or could not be verified --->
 	</cffunction>
 
-	<cffunction name="getAVSMessage" output="false" access="public" returntype="any" hint="Get the human-readable AVS response">
+	<cffunction name="getAVSMessage" output="false" access="public" returntype="string" hint="Get the human-readable AVS response">
 		<cfset var ret = "" />
 		<cfif structKeyExists(variables.cfpayment.ResponseAVS, getAVSCode())>
 			<cfset ret = variables.cfpayment.ResponseAVS[getAVSCode()] />
@@ -281,7 +281,7 @@
 		<cfreturn ret />
 	</cffunction>
 
-	<cffunction name="getCVVMessage" output="false" access="public" returntype="any" hint="Get the human-readable CVV response">
+	<cffunction name="getCVVMessage" output="false" access="public" returntype="string" hint="Get the human-readable CVV response">
 		<cfset var ret = "" />
 		<cfif structKeyExists(variables.cfpayment.ResponseCVV, getCVVCode())>
 			<cfset ret = variables.cfpayment.ResponseCVV[getCVVCode()] />
