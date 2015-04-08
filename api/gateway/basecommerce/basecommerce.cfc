@@ -11,13 +11,15 @@ component
 	}
 
 	//Implement primary methods
-	public any function purchase(required any money, struct options=structNew()) {
+	public any function purchase(required any money, required any account, struct options=structNew()) {
 		arguments.options.batType = 'XS_BAT_TYPE_DEBIT';
+		arguments.options.tokenId = arguments.account.getID();
 		return populateResponse(transactionData(argumentcollection = arguments));
 	}
 	
-	public any function credit(required any money, struct options=structNew()) {
+	public any function credit(required any money, required any account, struct options=structNew()) {
 		arguments.options.batType = 'XS_BAT_TYPE_CREDIT';
+		arguments.options.tokenId = arguments.account.getID();
 		return populateResponse(transactionData(argumentcollection = arguments));
 	}
 	
@@ -83,13 +85,12 @@ component
 		//Check that transaction method is valid, otherwise return error
 		try {
 			//local.bankAccountTransactionObj[arguments.options.method] is accessing the java object's field, simmilar to accessing struct values in CF
-			local.bankAccountTransactionObj.setMethod(local.bankAccountTransactionObj[arguments.options.method]);
+			local.bankAccountTransactionObj.setMethod(local.bankAccountTransactionObj[translateSEC(arguments.options.sec)]);
 		} catch(any e) {
 			local.transactionData.status = getService().getStatusFailure();
-			if(!structKeyExists(arguments, 'options')) local.transactionData.message = ['Missing options in arguments'];
-			else if(!structKeyExists(arguments.options, 'method')) local.transactionData.message = ['Missing message in arguments.options'];
-			else if(arguments.options.method == '') local.transactionData.message = ['Missing transaction method'];
-			else local.transactionData.message = ['Invalid transaction method passed in: #arguments.options.method#'];
+			if(!structKeyExists(arguments.options, 'method') || !len(arguments.option.sec)) {
+				local.transactionData.message = ['Missing transaction method in arguments.options'];
+			}
 			return local.transactionData;
 		}
 
@@ -112,7 +113,7 @@ component
 			local.transactionData.message = local.bankAccountTransactionObj.getMessages();
 		} else if(local.bankAccountTransactionObj.isStatus(local.bankAccountTransactionObj.XS_BAT_STATUS_CREATED)) {
 			//Get BaseCommerce returned data and insert into intermediate struct for later insertion into cfpayment response object
-			local.transactionData.tokenId = local.bankAccountTransactionObj.getToken();
+			local.transactionData.tokenId = arguments.options.tokenId;
 			local.transactionData.transactionId = local.bankAccountTransactionObj.getBankAccountTransactionId();
 			local.transactionData.type = local.bankAccountTransactionObj.getType();
 			local.transactionData.status = translateStatus(local.bankAccountTransactionObj);
@@ -154,7 +155,22 @@ component
 		// if we get here, we don't know what the result is
 		throw(type = 'BaseCommerce Status', message = 'Unknown BaseCommerce Status: #arguments.status#');
 	}
-	
+
+	private string function translateSEC(required string sec) {
+		if(arguments.sec == 'CCD') {
+			return 'XS_BAT_METHOD_CCD';
+		} else if(arguments.sec == 'PPD') {
+			return 'XS_BAT_METHOD_PPD';
+		} else if(arguments.sec == 'WEB') {
+			return 'XS_BAT_METHOD_WEB';
+		} else if(arguments.sec == 'TEL') {
+			return 'XS_BAT_METHOD_TEL';
+		}
+
+		// if we get here, we don't know what the result is
+		throw(type = 'BaseCommerce Method', message = 'Unknown Account SEC: #arguments.sec#');
+	}
+
 	private string function translateType(required string accountType) {
 		if(arguments.accountType == 'CHECKING') {
 			return 'XS_BA_TYPE_CHECKING';
