@@ -16,7 +16,7 @@ component
 		variables.gw = variables.svc.getGateway();
 
 		//if set to false, will try to connect to remote service to check these all out
-		variables.localMode = false;
+		variables.localMode = true;
 		variables.debugMode = false;
 	}
 
@@ -68,12 +68,12 @@ component
 		local.accountToken = createAccountTest();
 
 		//Credit account
+		local.account = variables.svc.createToken(id = local.accountToken.getTokenId());
 		local.options = structNew();
-		local.options.tokenId = local.accountToken.getTokenId();
-		local.options.method = 'XS_BAT_METHOD_CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
+		local.options.sec = 'CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
 		local.options.effectiveDate = dateAdd('d', 8, now());
 		offlineInjector(variables.gw, this, 'mockCreditAccountOk', 'transactionData');
-		local.credit = variables.gw.credit(money = variables.svc.createMoney(500, 'USD'), options = local.options);
+		local.credit = variables.gw.credit(money = variables.svc.createMoney(500, 'USD'), account = local.account, options = local.options);
 		standardResponseTests(local.credit);
 		assertTrue(local.credit.getParsedResult().amount == 5, 'The credit amount requested and the actual credit given is different, should be 5, is: #local.credit.getParsedResult().amount#');
 		assertTrue(local.credit.getTransactionId() > 0, 'Invalid transaction id returned: #local.credit.getTransactionId()#');
@@ -84,11 +84,11 @@ component
 		local.accountToken = createAccountTest();
 
 		//Debit account
+		local.account = variables.svc.createToken(id = local.accountToken.getTokenId());
 		local.options = structNew();
-		local.options.tokenId = accountToken.getTokenId();
-		local.options.method = 'XS_BAT_METHOD_CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
+		local.options.sec = 'CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
 		offlineInjector(variables.gw, this, 'mockDebitAccountOk', 'transactionData');
-		local.debit = variables.gw.purchase(money = variables.svc.createMoney(400, 'USD'), options = local.options);
+		local.debit = variables.gw.purchase(money = variables.svc.createMoney(400, 'USD'), account = local.account, options = local.options);
 		standardResponseTests(local.debit);
 		assertTrue(local.debit.getParsedResult().amount == 4, 'The credit amount requested and the actual credit given is different, should be 4, is: #local.debit.getParsedResult().amount#');
 		assertTrue(local.debit.getTransactionId() > 0, 'Invalid transaction id returned: #local.debit.getTransactionId()#');
@@ -133,11 +133,11 @@ component
 		local.accountToken = createAccountTest();
 
 		//Credit account (unsuccessfully)
+		local.account = variables.svc.createToken(id = local.accountToken.getTokenId());
 		local.options = structNew();
-		local.options.tokenId = local.accountToken.getTokenId();
-		local.options.method = 'XS_BAT_METHOD_CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
+		local.options.sec = 'CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
 		offlineInjector(variables.gw, this, 'mockCreditDebitAccountWithInvalidAmountFails', 'transactionData');
-		local.credit = variables.gw.credit(money = variables.svc.createMoney(-1000, 'USD'), options = local.options);
+		local.credit = variables.gw.credit(money = variables.svc.createMoney(-1000, 'USD'), account = local.account, options = local.options);
 		standardErrorResponseTests(local.credit);
 		assertTrue(local.credit.getMessage() == 'Invalid Amount', 'Incorrect error message: "#local.credit.getMessage()#", expected: "Invalid Amount"');
 	}
@@ -146,21 +146,21 @@ component
 		local.accountToken = createAccountTest();
 
 		//Credit account (unsuccessfully)
+		local.account = variables.svc.createToken(id = local.accountToken.getTokenId());
 		local.options = structNew();
-		local.options.tokenId = local.accountToken.getTokenId();
-		local.options.method = 'XS_BAT_METHOD_CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
+		local.options.sec = 'CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
 		offlineInjector(variables.gw, this, 'mockCreditDebitAccountWithInvalidAmountFails', 'transactionData');
-		local.debit = variables.gw.credit(money = variables.svc.createMoney(-2, 'USD'), options = local.options);
+		local.debit = variables.gw.credit(money = variables.svc.createMoney(-2, 'USD'), account = local.account, options = local.options);
 		standardErrorResponseTests(local.debit);
 		assertTrue(local.debit.getMessage() == 'Invalid Amount', 'Incorrect error message: "#local.debit.getMessage()#", expected: "Invalid Amount"');
 	}
 
 	public void function testCreditAccountWithInvalidAccountTokenFails() {
+		local.account = variables.svc.createToken(id = 'lk1j43k324h32j4h32hk***FAKE***32j4h3k432kh43jkh');
 		local.options = structNew();
-		local.options.tokenId = 'lk1j43k324h32j4h32hk***FAKE***32j4h3k432kh43jkh';
-		local.options.method = 'XS_BAT_METHOD_CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
+		local.options.sec = 'CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
 		offlineInjector(variables.gw, this, 'mockCreditAccountWithInvalidAccountTokenFails', 'transactionData');
-		local.credit = variables.gw.credit(money = variables.svc.createMoney(-1000, 'USD'), options = local.options);
+		local.credit = variables.gw.credit(money = variables.svc.createMoney(-1000, 'USD'), account = local.account, options = local.options);
 		standardErrorResponseTests(local.credit);
 		assertTrue(local.credit.getMessage() == 'No bank account exists for given token', 'Incorrect error message: "#local.credit.getMessage()#", expected: "No bank account exists for given token"');
 	}
@@ -169,26 +169,26 @@ component
 		local.accountToken = createAccountTest();
 
 		//Credit account (unsuccessfully)
+		local.account = variables.svc.createToken(id = local.accountToken.getTokenId());
 		local.options = structNew();
-		local.options.tokenId = local.accountToken.getTokenId();
-		local.options.method = 'XS_BAT_METHOD_THISWILLFAIL'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
+		local.options.sec = 'THISWILLFAIL'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
 		offlineInjector(variables.gw, this, 'mockCreditAccountWithInvalidMethodFails', 'transactionData');
-		local.credit = variables.gw.credit(money = variables.svc.createMoney(1500, 'USD'), options = local.options);
+		local.credit = variables.gw.credit(money = variables.svc.createMoney(1500, 'USD'), account = local.account, options = local.options);
 		standardErrorResponseTests(local.credit);
-		assertTrue(local.credit.getMessage() == 'Invalid transaction method passed in: #local.options.method#', 'Incorrect error message: "#local.credit.getMessage()#", expected: "Invalid transaction method passed in: #local.options.method#"');
+		assertTrue(local.credit.getMessage() == 'Invalid transaction method passed in: XS_BAT_METHOD_#local.options.sec#', 'Incorrect error message: "#local.credit.getMessage()#", expected: "Invalid transaction method passed in: #local.options.sec#"');
 	}
 
 	public void function testCreditAccountFutureEffectiveDate() {
 		local.accountToken = createAccountTest();
 
 		//Credit account
+		local.account = variables.svc.createToken(id = local.accountToken.getTokenId());
 		local.effectiveDate = dateAdd('d', 4, nextSaturday()); // Wednesday of next week
 		local.options = structNew();
-		local.options.tokenId = local.accountToken.getTokenId();
-		local.options.method = 'XS_BAT_METHOD_CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
+		local.options.sec = 'CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
 		local.options.effectiveDate = local.effectiveDate;
 		offlineInjector(variables.gw, this, 'mockCreditAccountFutureEffectiveDate', 'transactionData');
-		local.credit = variables.gw.credit(money = variables.svc.createMoney(500, 'USD'), options = local.options);
+		local.credit = variables.gw.credit(money = variables.svc.createMoney(500, 'USD'), account = local.account, options = local.options);
 		standardResponseTests(local.credit);
 		assertTrue(dateCompare(local.effectiveDate, local.credit.getParsedResult().effectiveDate) == 0, 'Posted effective date (#local.effectiveDate#) and confirmed effective date (#local.credit.getParsedResult().effectiveDate#) don''t match');
 	}
@@ -197,13 +197,13 @@ component
 		local.accountToken = createAccountTest();
 
 		//Credit account
+		local.account = variables.svc.createToken(id = local.accountToken.getTokenId());
 		local.effectiveDate = dateAdd('d', -4, removeTimePart(now())); //4 days ago
 		local.options = structNew();
-		local.options.tokenId = local.accountToken.getTokenId();
-		local.options.method = 'XS_BAT_METHOD_CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
+		local.options.sec = 'CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
 		local.options.effectiveDate = local.effectiveDate;
 		offlineInjector(variables.gw, this, 'mockCreditAccountPastEffectiveDate', 'transactionData');
-		local.credit = variables.gw.credit(money = variables.svc.createMoney(500, 'USD'), options = local.options);
+		local.credit = variables.gw.credit(money = variables.svc.createMoney(500, 'USD'), account = local.account, options = local.options);
 		standardResponseTests(local.credit);
 		assertTrue(dateCompare(local.effectiveDate, local.credit.getParsedResult().effectiveDate) < 0, 'Posted date is in the past, returned effective date should be ammended to curtrent date but isn''t');
 	}
@@ -212,13 +212,13 @@ component
 		local.accountToken = createAccountTest();
 
 		//Credit account
+		local.account = variables.svc.createToken(id = local.accountToken.getTokenId());
 		local.effectiveDate = nextSaturday();
 		local.options = structNew();
-		local.options.tokenId = local.accountToken.getTokenId();
-		local.options.method = 'XS_BAT_METHOD_CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
+		local.options.sec = 'CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
 		local.options.effectiveDate = local.effectiveDate;
 		offlineInjector(variables.gw, this, 'mockCreditAccountWeekendEffectiveDateMovedToWeekDay', 'transactionData');
-		local.credit = variables.gw.credit(money = variables.svc.createMoney(500, 'USD'), options = local.options);
+		local.credit = variables.gw.credit(money = variables.svc.createMoney(500, 'USD'), account = local.account, options = local.options);
 		standardResponseTests(local.credit);
 		assertTrue(dateCompare(local.effectiveDate, local.credit.getParsedResult().effectiveDate) < 0, 'Posted date is on the weekend, returned effective date should be ammended to next working day but isn''t');
 	}
@@ -227,13 +227,13 @@ component
 		local.accountToken = createAccountTest();
 
 		//Credit account
+		local.account = variables.svc.createToken(id = local.accountToken.getTokenId());
 		local.effectiveDate = dateAdd('d', 4, nextSaturday()); // Wednesday of next week
 		local.options = structNew();
-		local.options.tokenId = local.accountToken.getTokenId();
-		local.options.method = 'XS_BAT_METHOD_CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
+		local.options.sec = 'CCD'; //XS_BAT_METHOD_CCD, XS_BAT_METHOD_PPD, XS_BAT_METHOD_TEL, XS_BAT_METHOD_WEB
 		local.options.effectiveDate = local.effectiveDate;
 		offlineInjector(variables.gw, this, 'mockCreditAccountSettlementDateIsTheBusinessDayAfterEffectiveDay', 'transactionData');
-		local.credit = variables.gw.credit(money = variables.svc.createMoney(500, 'USD'), options = local.options);
+		local.credit = variables.gw.credit(money = variables.svc.createMoney(500, 'USD'), account = local.account, options = local.options);
 		standardResponseTests(local.credit);
 		assertTrue(dateDiff('d', local.effectiveDate, local.credit.getParsedResult().settlementdate) == 1, 'The settlement date should be the next working day after the effective day');
 	}
