@@ -143,7 +143,14 @@
 		<cfargument name="account" type="any" required="true" />
 		<cfargument name="money" type="any" required="false" />
 
-		<cfset var post = addCreditCard(post = structNew(), account = arguments.account) />
+		<cfset var post = "" />
+
+		<cfif getService().getAccountType(account) EQ "creditcard">
+			<cfset post = addCreditCard(post = structNew(), account = arguments.account) />
+		<cfelseif getService().getAccountType(account) EQ "eft">
+			<cfset post = addBankAccount(post = structNew(), account = arguments.account) />
+		</cfif>
+		
 		<cfreturn process(gatewayUrl = getGatewayURL("/tokens"), payload = post) />
 	</cffunction>
 
@@ -206,6 +213,12 @@
 	</cffunction>
 
 
+	<cffunction name="getToken" output="false" access="public" returntype="any" hint="Retrieve details about a one-time use token">
+		<cfargument name="id" type="any" required="true" />
+		<cfreturn process(gatewayUrl = getGatewayURL("/tokens/#arguments.id#"), payload = {}, options = {}, method = "get") />
+	</cffunction>
+
+
 	<cffunction name="createToken" output="false" access="public" returntype="any" hint="Convert a credit card or bank account into a one-time Stripe token for charging/attaching to a customer, or disbursing/attaching to a recipient (note, using this rather than Stripe.js means you are responsible for ALL PCI DSS compliance)">
 		<cfargument name="account" type="any" required="true" />
 		<cfargument name="options" type="struct" required="false" default="#structNew()#" />
@@ -261,7 +274,7 @@
 		<cfreturn process(gatewayUrl = getGatewayURL("/accounts"), payload = post, options = options) />
 	</cffunction>
 
-
+	
 
 	<!--- determine capability of this gateway --->
 	<cffunction name="getIsCCEnabled" access="public" output="false" returntype="boolean" hint="determine whether or not this gateway can accept credit card transactions">
