@@ -75,7 +75,7 @@
 		</cfscript>
 
 		<!--- if set to false, will try to connect to remote service to check these all out --->
-		<cfset localMode = true />
+		<cfset localMode = false />
 
 	</cffunction>
 
@@ -158,7 +158,7 @@
 		<cfset offlineInjector(gw, this, "mock_store_ok", "doHttpCall") />
 		<cfset response = gw.store(account = token) />
 
-		<cfset var customer = variables.svc.createToken() />
+		<cfset local.customer = variables.svc.createToken() />
 		<cfset customer.setId(response.getTransactionId()) />
 
 		<!--- this will be rejected by gateway because the card number is not valid --->
@@ -304,6 +304,42 @@
 	</cffunction>
 
 
+	<cffunction name="testTokenizeCardAndFetchResult" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
+		<cfargument name="gw" type="any" required="true" />
+		<cfset var response = "" />
+		<cfset var token = variables.svc.createToken() />
+		
+		<cfset offlineInjector(gw, this, "mock_token_ok", "doHttpCall") />
+		<cfset response = gw.validate(money = variables.svc.createMoney(5000, gw.currency), account = createValidCard()) />
+
+		<cfset response = gw.getToken(id = response.getTransactionID()) />
+
+		<cfset assertTrue(response.getSuccess() AND structKeyExists(response.getParsedResult(), "created"), "The validate did not succeed") />
+		<cfset assertTrue(left(response.getTransactionID(), 3) EQ "tok", "We did not get back a token ID begining with tok_") />
+		<cfset assertTrue(response.getParsedResult().used EQ false, "The token should be new and unused") />
+		<cfset assertTrue(response.getStatusCode() EQ 200, "Status code should be 200, was: #response.getStatusCode()#") />
+		<cfset assertTrue(NOT response.hasError(), "Store should not have errors but did") />
+	</cffunction>
+
+
+	<cffunction name="testTokenizeBankAccountAndFetchResult" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
+		<cfargument name="gw" type="any" required="true" />
+		<cfset var response = "" />
+		<cfset var token = variables.svc.createToken() />
+		
+		<cfset offlineInjector(gw, this, "mock_banktoken_ok", "doHttpCall") />
+		<cfset response = gw.validate(money = variables.svc.createMoney(5000, gw.currency), account = createValidBankAccount()) />
+
+		<cfset response = gw.getToken(id = response.getTransactionID()) />
+
+		<cfset assertTrue(response.getSuccess() AND structKeyExists(response.getParsedResult(), "created"), "The validate did not succeed") />
+		<cfset assertTrue(left(response.getTransactionID(), 4) EQ "btok", "We did not get back a token ID begining with btok_") />
+		<cfset assertTrue(response.getParsedResult().used EQ false, "The token should be new and unused") />
+		<cfset assertTrue(response.getStatusCode() EQ 200, "Status code should be 200, was: #response.getStatusCode()#") />
+		<cfset assertTrue(NOT response.hasError(), "Store should not have errors but did") />
+	</cffunction>
+
+
 	<cffunction name="testMissingArgumentsThrowsException" access="public" returntype="void" output="false" mxunit:expectedException="any">
 	
 		<cfset var money = variables.svc.createMoney(5000) /><!--- in cents, $50.00 --->
@@ -375,7 +411,7 @@
 	<!--- PRIVATE HELPERS, MOCKS, ETC --->
 
 
-	<cffunction name="castToUTC" output="false" access="public" returntype="any">
+	<cffunction name="castToUTC" output="false" access="private" returntype="any">
 		<cfargument name="dtm" required="yes" type="any" />
 
 		<cfscript>
@@ -398,7 +434,7 @@
 	<cffunction name="createValidCard" access="private" returntype="any" output="false">
 		<!--- these values simulate a valid card with matching avs/cvv --->
 		<cfset var account = variables.svc.createCreditCard() />
-		<cfset account.setAccount(4242424242424242) />
+		<cfset account.setAccount(371449635398431) />
 		<cfset account.setMonth(10) />
 		<cfset account.setYear(year(now())+1) />
 		<cfset account.setVerificationValue(999) />
@@ -483,10 +519,29 @@
 		<cfreturn account />	
 	</cffunction>
 	
+	<cffunction name="createValidBankAccount" access="private" returntype="any" output="false">
+		<cfset var account = variables.svc.createEFT() />
+		<cfset account.setAccount("000123456789") />
+		<cfset account.setRoutingNumber("110000000") />
+		<cfset account.setAccountType("checking") />
+		<cfset account.setSEC("CCD") />
+		<cfset account.setFirstName("John") />
+		<cfset account.setLastName("Doe") />
+		<cfset account.setAddress("123 Business Lane") />
+		<cfset account.setPostalCode("77777") />
+		<cfset account.setCountry("US") />
+
+		<cfreturn account />	
+	</cffunction>
 
 
 	<cffunction name="mock_token_ok" access="private">
 		<cfset var http = { StatusCode = '200 OK', FileContent = '{ "id": "tok_1IZvRgzvQlffjs", "livemode": false, "created": 1360974256, "used": false, "object": "token", "card": { "object": "card", "last4": "4242", "type": "Visa", "exp_month": 10, "exp_year": 2014, "fingerprint": "sBxTyx7XVdjznwyt", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "" } }' } />
+		<cfreturn http />
+	</cffunction>
+
+	<cffunction name="mock_banktoken_ok" access="private">
+		<cfset var http = { StatusCode = '200 OK', FileContent = '{ "id": "btok_61uQEmLSSGMlgg", "livemode": false, "created": 1428628004, "used": false, "object": "token", "type": "bank_account", "bank_account": { "object": "bank_account", "id": "ba_61uQcOc8nQmcpz", "last4": "6789", "country": "US", "currency": "usd", "status": "new", "fingerprint": "qkcoF3CJjVSJl0g2", "routing_number": "110000000", "bank_name": "STRIPE TEST BANK", "default_for_currency": false } }' } />
 		<cfreturn http />
 	</cffunction>
 	
