@@ -553,23 +553,52 @@
 	</cffunction>	
 
 
-	<cffunction name="testDirectDepositEFT" access="public" returntype="void" output="false">
+	<cffunction name="testDirectDepositWithEFT" access="public" returntype="void" output="false">
 	
-		<cfset var account = variables.svc.createEFT() />
+		<cfset var account = createValidEFT() />
 		<cfset var money = variables.svc.createMoney(500) /><!--- in cents, $5000.00 --->
 		<cfset var response = "" />
 		<cfset var report = "" />
-		<cfset var options = structNew() />
 
-		<cfset account.setAccount("22034-234233") />
-		<cfset account.setRoutingNumber("121000358") />
-		<cfset account.setFirstName("Test Account") />
-		<cfset account.setAccountType("checking") />
-		<cfset account.setSEC("CCD") />
-
-		<cfset response = gw.credit(money = money, account = account, options = options) />
+		<cfset response = gw.credit(money = money, account = account, options = {"dup_seconds": 0}) />
 		<cfset debug(response.getMemento()) />
 		<cfset assertTrue(response.getSuccess(), "The direct deposit did not succeed") />
+
+	</cffunction>
+
+
+	<cffunction name="testDirectDepositWithToken" access="public" returntype="void" output="false">
+
+		<cfset local.token = variables.svc.createToken(createUUID()) />
+		<cfset local.response = gw.store(account = createValidEFT()) />
+		<cfset token.setID(response.getTokenID()) />
+		<cfset assertTrue(response.getSuccess(), "The store did not succeed") />
+
+		<cfset local.money = variables.svc.createMoney(500) /><!--- in cents, $5000.00 --->
+	
+		<cfset response = gw.credit(money = money, account = token, options = {"dup_seconds": 0}) />
+		<cfset assertTrue(response.getSuccess(), "The direct deposit did not succeed") />
+
+	</cffunction>
+	
+
+	<cffunction name="testDirectDepositWithTokenID" access="public" returntype="void" output="false">
+
+		<cfset local.response = gw.store(account = createValidEFT()) />
+		<cfset assertTrue(response.getSuccess(), "The store did not succeed") />
+		<cfset local.money = variables.svc.createMoney(500) /><!--- in cents, $5000.00 --->
+
+		<cfset local.response = gw.credit(money = money, options = {"tokenId": response.getTokenID(), "dup_seconds": 0}) />
+		<cfset assertTrue(response.getSuccess(), "The direct deposit did not succeed") />
+
+	</cffunction>
+			
+
+	<cffunction name="testDirectDepositWithoutAccountThrowsError" access="public" returntype="void" output="false" mxunit:expectedException="cfpayment.InvalidAccount">
+	
+		<cfset local.money = variables.svc.createMoney(500) /><!--- in cents, $5000.00 --->
+		<cfset local.response = gw.credit(money = money) />
+		<cfset assertTrue(false, "Should have thrown an error") />
 
 	</cffunction>
 	
