@@ -26,7 +26,7 @@ gw = svc.getGateway();
 
 
 // create the account
-account = svc.createCreditCard().setAccount(4242424242424242).setMonth(10).setYear(year(now())+1))
+account = svc.createCreditCard().setAccount(4242424242424242).setMonth(10).setYear(year(now())+1)
              .setFirstName("John").setLastName("Doe");
 
 // in cents = $50.00, defaults to USD but can take any ISO currency code
