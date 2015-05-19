@@ -19,8 +19,8 @@
 <cfcomponent displayname="Stripe Gateway" extends="cfpayment.api.gateway.base" hint="Stripe Gateway" output="false">
 
 	<cfset variables.cfpayment.GATEWAY_NAME = "Stripe" />
-	<cfset variables.cfpayment.GATEWAY_VERSION = "1.0.6" />
-	<cfset variables.cfpayment.API_VERSION = "2015-02-18" />
+	<cfset variables.cfpayment.GATEWAY_VERSION = "1.0.7" />
+	<cfset variables.cfpayment.API_VERSION = "2015-04-07" />
 	<!--- stripe test mode uses different credentials instead of different urls --->
 	<cfset variables.cfpayment.GATEWAY_URL = "https://api.stripe.com/v1" />
 
@@ -77,17 +77,47 @@
 		<cfset variables.cfpayment.API_VERSION = arguments[1] />
 	</cffunction>
 
-	<cffunction name="purchase" output="false" access="public" returntype="any" hint="Authorize + Capture in one step - only approach supported by Stripe">
+	<cffunction name="authorize" output="false" access="public" returntype="any" hint="Authorize but don't capture a credit card">
+		<cfargument name="money" type="any" required="true" />
+		<cfargument name="account" type="any" required="false" />
+		<cfargument name="options" type="struct" required="false" default="#structNew()#" />
+
+		<cfset arguments.options["capture"] = false />
+		<cfreturn purchase(argumentCollection = arguments) />
+	</cffunction>
+
+
+	<cffunction name="capture" output="false" access="public" returntype="any" hint="Capture a previously authorized charge">
+		<cfargument name="transactionId" type="string" required="true" />
+		<cfargument name="options" type="struct" required="false" default="#structNew()#" />
+
+		<!--- application_fee is a money object, just like the amount to be charged --->
+		<cfif structKeyExists(arguments.options, "application_fee")>
+			<cfset post["application_fee"] = arguments.options.application_fee.getCents() />
+			<cfset structDelete(arguments.options, "application_fee") />
+		</cfif>
+
+		<cfreturn process(gatewayUrl = getGatewayUrl("/charges/#arguments.transactionId#/capture"), payload = post, options = options) />
+	</cffunction>
+			
+
+	<cffunction name="purchase" output="false" access="public" returntype="any" hint="Authorize + Capture in one step">
 		<cfargument name="money" type="any" required="true" />
 		<cfargument name="account" type="any" required="false" />		
-		<cfargument name="options" type="struct" required="false" default="#structNew()#" />				
+		<cfargument name="options" type="struct" required="false" default="#structNew()#" hint="Key options are connectedaccount, destination and application_fee" />
 		
 		<cfset var post = {} />
 		<cfset var response = "" />
 
 		<cfset post["amount"] = arguments.money.getCents() />		
 		<cfset post["currency"] = lCase(arguments.money.getCurrency()) /><!--- iso currency code must be lower case? --->
-		
+
+		<!--- application_fee is a money object, just like the amount to be charged --->
+		<cfif structKeyExists(arguments.options, "application_fee")>
+			<cfset post["application_fee"] = arguments.options.application_fee.getCents() />
+			<cfset structDelete(arguments.options, "application_fee") />
+		</cfif>
+
 		<cfif structKeyExists(arguments, "account")>
 		
 			<cfswitch expression="#getService().getAccountType(arguments.account)#">
@@ -139,7 +169,7 @@
 	</cffunction>
 
 	
-	<cffunction name="validate" output="false" access="public" returntype="any" hint="Convert credit card details to a one-time token for charging later.  To store payment details for use later, use a customer object with store().">
+	<cffunction name="validate" output="false" access="public" returntype="any" hint="Convert payment details to a one-time token for charging once.  To store payment details for repeat use, convert to a customer object with store().">
 		<cfargument name="account" type="any" required="true" />
 		<cfargument name="money" type="any" required="false" />
 
@@ -249,7 +279,7 @@
 		<cfset var post = {} />
 		<cfset post["customer"] = arguments.customer />
 		
-		<cfreturn process(gatewayUrl = getGatewayURL("/tokens"), payload = post, headers = headers) />
+		<cfreturn process(gatewayUrl = getGatewayURL("/tokens"), payload = post, options = {connectedAccount = arguments.connectedAccount}) />
 	</cffunction>
 
 	<cffunction name="createAccount" output="false" access="public" returntype="any" hint="Provisions a marketplace account">
@@ -295,21 +325,7 @@
 		<cfset var response = "" />
 		<cfset var p = arguments.payload /><!--- shortcut (by reference) --->
 
-		<!--- add authentication, if its not provided --->
-		<cfif structKeyExists(headers,"authorization") AND headers["authorization"] neq "">
-			<cfset headers["authorization"] = "Bearer #headers['authorization']#" />
-		<cfelse>
-			<cfset headers["authorization"] = "Bearer #getSecretKey()#" />
-		</cfif>
-		<!--- if we want to override the stripe API version, we can set it in the config with "ApiVersion".  Using 'latest' overrides to current version --->
-		<cfif len(getApiVersion())>
-			<!--- https://groups.google.com/a/lists.stripe.com/forum/#!topic/api-discuss/V4sYRlHwalc --->
-			<cfset headers["Stripe-Version"] = getApiVersion() />
-		</cfif>
-		<!--- help track where this request was made from --->
-		<cfset headers["User-Agent"] = "Stripe/v1 cfpayment/#variables.cfpayment.GATEWAY_VERSION#" />
-
-		<!--- process standard and common CFPAYMENT mappings into Braintree-specific values --->
+		<!--- process standard and common CFPAYMENT mappings into gateway-specific values --->
 		<cfif structKeyExists(arguments.options, "description")>
 			<cfset p["description"] = arguments.options.description />
 		</cfif>
@@ -317,10 +333,37 @@
 			<cfset p["customer"] = arguments.options.tokenId />
 		</cfif>
 
+		<!--- add baseline authentication --->
+		<cfset headers["authorization"] = "Bearer #getSecretKey()#" />
+
+		<!--- add connect authentication on behalf of a Connect/Marketplace customer --->
+		<cfif structKeyExists(arguments.options, "connectedAccount")>
+			<cfset headers["Stripe-Account"] = arguments.options.connectedAccount />
+			<!--- cfset headers["authorization"] = "Bearer #arguments.options.connectedAccount#" / --->
+			<cfset structDelete(arguments.options, "connectedAccount") />
+		</cfif>
+
+		<!--- if we want to override the stripe API version, we can set it in the config with "ApiVersion".  Using 'latest' overrides to current version --->
+		<cfif len(getApiVersion())>
+			<!--- https://groups.google.com/a/lists.stripe.com/forum/#!topic/api-discuss/V4sYRlHwalc --->
+			<cfset headers["Stripe-Version"] = getApiVersion() />
+		</cfif>
+
+		<!--- help track where this request was made from --->
+		<cfset headers["User-Agent"] = "Stripe/v1 cfpayment/#variables.cfpayment.GATEWAY_VERSION#" />
+
 		<!--- add dynamic statement descriptors which show up on CC statement alongside merchant name: https://stripe.com/docs/api#create_charge --->
 		<cfif structKeyExists(arguments.options, "statement_descriptor")>
 			<cfset p["statement_descriptor"] = reReplace(arguments.options.statement_descriptor, "[<>""']", "", "ALL") />
+			<cfset structDelete(arguments.options, "statement_descriptor") />
 		</cfif>
+
+
+		<!--- finally, copy in any additional keys like destination, etc, stripe always wants lower-case --->
+		<cfloop collection="#arguments.options#" item="local.key">
+			<cfset p[lcase(key)] = arguments.options[key] />
+		</cfloop>
+	
 
 		<!--- Stripe returns errors with http status like 400,402 or 404 (https://stripe.com/docs/api#errors) --->		
 		<cfset response = createResponse(argumentCollection = super.process(url = arguments.gatewayUrl, payload = payload, headers = headers, method = arguments.method, files = files)) />
@@ -329,64 +372,71 @@
 		<cfif isJSON(response.getResult())>
 
 			<cfset results = deserializeJSON(response.getResult()) />
+			<cfdump var="#results#" output="console" />			
 			<cfset response.setParsedResult(results) />
 			
 			<!--- handle common response fields --->
-			<cfif structKeyExists(results, "card") OR structKeyExists(results, "active_card")>
-
-				<!--- have the same fields below but different depending on context from charging or creating customers --->
-				<cfif structKeyExists(results, "active_card")>
-					<cfset results.card = results.active_card />
+			<cfif structKeyExists(results, "card")
+				  OR (structKeyExists(results, "source") AND results.source.object EQ "card")>
+				  
+				<cfif structKeyExists(results, "card") AND NOT structKeyExists(results, "source")>
+					<cfset results["source"] = results.card />
 				</cfif>
 
 				<!--- translate to normalized cfpayment CVV codes --->			
-				<cfif structKeyExists(results.card, "cvc_check")>
-					<cfif results.card.cvc_check EQ "pass">
-						<cfset response.setCVVCode("M") />
-					<cfelseif results.card.cvc_check EQ "fail">
-						<cfset response.setCVVCode("N") />
-					<cfelse>
-						<cfset response.setCVVCode("P") />
-					</cfif>
+				<cfif structKeyExists(results.source, "cvc_check") AND results.source.cvc_check EQ "pass">
+					<cfset response.setCVVCode("M") />
+				<cfelseif structKeyExists(results.source, "cvc_check") AND results.source.cvc_check EQ "fail">
+					<cfset response.setCVVCode("N") />
+				<cfelse>
+					<cfset response.setCVVCode("P") />
 				</cfif>
 
-				<!--- translate to normalized cfpayment AVS codes --->
-				<cfif structKeyExists(results.card, "address_zip_check")>
-					<cfif results.card.address_zip_check EQ "pass" AND results.card.address_line1_check EQ "pass">
-						<cfset response.setAVSCode("M") />
-					<cfelseif results.card.address_zip_check EQ "pass">
-						<cfset response.setAVSCode("P") />
-					<cfelseif results.card.address_line1_check EQ "pass">
-						<cfset response.setAVSCode("B") />
-					<cfelseif results.card.address_zip_check EQ "unchecked" OR results.card.address_line1_check EQ "unchecked">
-						<cfif results.card.country EQ "US">
-							<cfset response.setAVSCode("S") />
-						<cfelse>
-							<cfset response.setAVSCode("G") />
-						</cfif>
+				<!--- translate to normalized cfpayment AVS codes.  Watch out that either address_line1_check or address_zip_check can be null OR "unchecked"; null throws error trying to access --->
+				<cfif structKeyExists(results.source, "address_zip_check") AND results.source.address_zip_check EQ "pass" 
+					  AND structKeyExists(results.source, "address_line1_check") AND results.source.address_line1_check EQ "pass">
+					<cfset response.setAVSCode("M") />
+				<cfelseif structKeyExists(results.source, "address_zip_check") AND results.source.address_zip_check EQ "pass">
+					<cfset response.setAVSCode("P") />
+				<cfelseif structKeyExists(results.source, "address_line1_check") AND results.source.address_line1_check EQ "pass">
+					<cfset response.setAVSCode("B") />
+				<cfelseif (structKeyExists(results.source, "address_zip_check") AND results.source.address_zip_check EQ "unchecked")
+						  OR (structKeyExists(results.source, "address_line1_check") AND results.source.address_line1_check EQ "unchecked")>
+					<cfif results.source.address_country EQ "US">
+						<cfset response.setAVSCode("S") />
 					<cfelse>
-						<cfset response.setAVSCode("N") />
+						<cfset response.setAVSCode("G") />
 					</cfif>
+				<cfelse>
+					<cfset response.setAVSCode("N") />
 				</cfif>
+
 				
-				<cfif structKeyExists(results.card, "fingerprint")>
-					<cfset response.setAuthorization(results.card.fingerprint) />
+				<!--- if you authorize without capture, you use the charge id to capture it later, which is the same as the transaction id, but for normality, put it here --->
+				<cfif structKeyExists(results, "captured") AND NOT results.captured AND structKeyExists(results, "id")>
+					<cfset response.setAuthorization(results.id) />
 				</cfif>
+			
+			<cfelseif structKeyExists(results, "bank_account")
+					  OR (structKeyExists(results, "source") AND results.source.object EQ "bank_account")>
+
+				<cfif structKeyExists(results, "bank_account") AND NOT structKeyExists(results, "source")>
+					<cfset results["source"] = results.bank_account />
+				</cfif>
+			
+				<!--- placeholder - not sure if we will do anything here? --->
+
 			</cfif>
+			
 			
 			<cfif structKeyExists(results, "id")>
 				<cfset response.setTransactionID(results.id) />
 			</cfif>
 				
-			<cfif structKeyExists(results, "customer") AND results.customer NEQ "null">
+			<cfif structKeyExists(results, "customer") AND len(results.customer)>
 				<cfset response.setTokenID(results.customer) />
 			</cfif>
 			
-			<!--- not sure if this is right? 
-			<cfif structKeyExists(results, "bank_account") AND structKeyExists(results.bank_account, "id")>
-				<cfset response.setTransactionId(results.bank_account.id) />
-			</cfif> --->
-
 		</cfif>
 		
 		<!--- now add custom handling of status codes for Stripe which overrides base.cfc --->
@@ -677,8 +727,10 @@
 		<cfset local.post = structNew() />
   		<cfset local.post["amount"] = arguments.amount.getCents() />
   		<cfset local.post["currency"] = lCase(arguments.amount.getCurrency()) />
-  		<cfset local.post["source"] = arguments.source />
   		<cfset local.post["description"] = arguments.description />
+
+
+  		<cfset local.post["source"] = arguments.source />
 		<cfreturn process(gatewayUrl = getGatewayURL("/charges"), payload = local.post, headers = local.headers) />
 	</cffunction>
 
@@ -687,26 +739,36 @@
 		<cfargument name="amount" type="any" required="false" />		
 		<cfargument name="token" type="any" required="false" />		
 		<cfargument name="application_fee" type="any" required="false" />		
+
+		<cfreturn purchase(money = arguments.amount, account = arguments.token, options = {connectedAccount: arguments.connectedAccount, application_fee: arguments.application_fee}) />
+
 		<cfset local.headers = structNew() />
 		<cfset local.post = structNew() />
-  		<cfset local.headers["authorization"] = arguments.connectedAccount />
 		<cfset local.post["amount"] = arguments.amount.getCents() />		
 		<cfset local.post["currency"] = lCase(arguments.amount.getCurrency()) />
+
+
+  		<cfset local.headers["authorization"] = arguments.connectedAccount />
   		<cfset local.post["source"] = arguments.token />
   		<cfset local.post["application_fee"] = arguments.application_fee.getCents() />
+	
+	
 		<cfreturn process(gatewayUrl = getGatewayURL("/charges"), payload = local.post, headers = local.headers) />
 	</cffunction>
 
 	<cffunction name="marketplaceDestinationCharge" output="false" access="public" returntype="any" hint="">
 		<cfargument name="destination" type="any" required="false" />		
 		<cfargument name="amount" type="any" required="false" />		
-		<cfargument name="cardToken" type="any" required="false" />		
+		<cfargument name="token" type="any" required="false" />		
 		<cfargument name="application_fee" type="any" required="false" />		
 		<cfset local.post = structNew() />
-  		<cfset local.post["destination"] = arguments.destination />
   		<cfset local.post["amount"] = arguments.amount.getCents() />
   		<cfset local.post["currency"] = lCase(arguments.amount.getCurrency()) />
-  		<cfset local.post["card"] = arguments.cardToken />
+
+
+
+  		<cfset local.post["destination"] = arguments.destination />
+  		<cfset local.post["source"] = arguments.token />
   		<cfset local.post["application_fee"] = arguments.application_fee.getCents() />
 		<cfreturn process(gatewayUrl = getGatewayURL("/charges"), payload = local.post) />
 	</cffunction>
