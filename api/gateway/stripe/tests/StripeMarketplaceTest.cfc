@@ -50,7 +50,7 @@
 			local.gw.TestMode = true; // defaults to true anyways
 
 			// $CAD credentials (provided by support@stripe.com)
-			local.gw.TestSecretKey = 'sk_test_Zx4885WE43JGqPjqGzaWap8a';
+			local.gw.TestSecretKey = 'sk_test_zHQajGEqUithBnfId6C2pkzq';
 			local.gw.TestPublishableKey = '';
 
 			variables.svc = createObject("component", "cfpayment.api.core").init(local.gw);
@@ -76,7 +76,7 @@
 
 		<!--- if set to false, will try to connect to remote service to check these all out --->
 		<cfset variables.localMode = false />
-		<cfset variables.debugMode = false />
+		<cfset variables.debugMode = true />
 	</cffunction>
 
 
@@ -450,6 +450,7 @@
 		<!---Create a token for the customer with the connected account--->
 		<cfset offlineInjector(arguments.gw, this, "mock_get_token_for_customer_ok", "doHttpCall") />
 		<cfset local.customerToken = arguments.gw.getCustomerTokenForSpecificAccount(customer = local.customer.getParsedResult().id, connectedAccount = local.connectedAccount.getParsedResult().keys.secret) />
+		<cfset debug(local.customerToken.getRequestData()) />
 		<cfset standardResponseTests(response = local.customerToken, expectedObjectName = "token", expectedIdPrefix="tok_") />
 
 		<!--- Direct Charge To Connected Account --->
@@ -480,7 +481,7 @@
 		<cfset local.argumentCollection = structNew()>
 		<cfset local.argumentCollection.destination = local.connectedAccount.getParsedResult().id>
 		<cfset local.argumentCollection.amount = variables.svc.createMoney(1000, arguments.gw.currency)>
-		<cfset local.argumentCollection.cardToken = local.token.getParsedResult().id>
+		<cfset local.argumentCollection.token = local.token.getParsedResult().id>
 		<cfset local.argumentCollection.application_fee = variables.svc.createMoney(200, arguments.gw.currency)>
 		<cfset offlineInjector(arguments.gw, this, "mock_destination_charge_ok", "doHttpCall") />
 		<cfset local.charge = arguments.gw.marketplaceDestinationCharge(argumentCollection = local.argumentCollection) />
@@ -568,7 +569,7 @@
 		<cfset local.argumentCollection = structNew()>
 		<cfset local.argumentCollection.destination = local.connectedAccount.getParsedResult().id>
 		<cfset local.argumentCollection.amount = variables.svc.createMoney(1000, arguments.gw.currency)>
-		<cfset local.argumentCollection.cardToken = local.token.getParsedResult().id>
+		<cfset local.argumentCollection.token = local.token.getParsedResult().id>
 		<cfset local.argumentCollection.application_fee = variables.svc.createMoney(200, arguments.gw.currency)>
 		<cfset offlineInjector(arguments.gw, this, "mock_destination_charge_ok", "doHttpCall") />
 		<cfset local.charge = arguments.gw.marketplaceDestinationCharge(argumentCollection = local.argumentCollection) />
