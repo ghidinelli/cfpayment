@@ -572,7 +572,7 @@
 
 
 	<!--- stripe createResponse() overrides the getSuccess/hasError() responses --->
-	<cffunction name="createResponse" access="public" output="false" returntype="any" hint="Create a Braintree response object with status set to unprocessed">
+	<cffunction name="createResponse" access="public" output="false" returntype="any" hint="Create a Stripe response object with status set to unprocessed">
 		<cfreturn createObject("component", "cfpayment.api.gateway.stripe.response").init(argumentCollection = arguments, service = getService()) />
 	</cffunction>
 
