@@ -25,8 +25,8 @@ svc = createObject("component", "cfpayment.api.core").init(cfg);
 gw = svc.getGateway();
 
 
-// create the account; setters return 'this' to allow method chaining like jquery
-account = svc.createCreditCard().setAccount(4242424242424242).setMonth(10).setYear(year(now())+1))
+// create the account
+account = svc.createCreditCard().setAccount(4242424242424242).setMonth(10).setYear(year(now())+1)
              .setFirstName("John").setLastName("Doe");
 
 // in cents = $50.00, defaults to USD but can take any ISO currency code
