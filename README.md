@@ -7,6 +7,13 @@ Rather than roll your own credit card, ACH or alternative payment gateway with e
 
 Tens of millions of dollars have been processed successfully.  Inspired by Ruby's ActiveMerchant.
 
+Compatibility Note
+==================
+
+Effort has been made to keep cfpayment compatible with ACF at least as far back as CF8.  However, with the widespread elimination of SSL 3.0 and TLS 1.0 in response to security issues and the introduction of SAN/SNI and SHA-256 certificates, versions of (Adobe) ColdFusion as recent as 10 are becoming increasingly unable to make secure CFHTTP calls to remote gateways.  As of 5/26/15, Authorize.net uses SHA-256 certificates which Java 1.6 (part of CF7/CF8) does not support.  Other gateways such as Paypal are making similar upgrades and more are expected to follow.
+
+If you are using an older version, you should consider upgrading, trying another engine such as Railo/Lucee, or using a the customer tag CFX_HTTP5 if you are on Windows.
+
 Install
 =======
 
