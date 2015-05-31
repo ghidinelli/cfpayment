@@ -1,4 +1,4 @@
-<cfcomponent name="StripeTest" extends="mxunit.framework.TestCase" output="false">
+<cfcomponent name="StripeTest" extends="BaseStripeTest" output="false">
 
 <!---
 	
@@ -42,52 +42,6 @@
 	invalid_cvc: Use a two digit number e.g. 99.
 
 --->
-	<cffunction name="setUp" returntype="void" access="public">	
-		<cfscript>  
-			local.gw = structNew();
-			local.gw.path = "stripe.stripe";
-			local.gw.GatewayID = 2;
-			local.gw.TestMode = true; // defaults to true anyways
-
-			// $CAD credentials (provided by support@stripe.com)
-			gw.TestSecretKey = 'sk_test_zHQajGEqUithBnfId6C2pkzq';
-			local.gw.TestPublishableKey = '';
-
-			variables.svc = createObject("component", "cfpayment.api.core").init(local.gw);
-			variables.cad = variables.svc.getGateway();
-			variables.cad.currency = "CAD"; // ONLY FOR UNIT TEST
-
-			// $USD credentials - from PHP unit tests on github
-			local.gw.TestSecretKey = 'tGN0bIwXnHdwOa85VABjPdSn8nWY7G7I';
-			local.gw.TestPublishableKey = '';
-			variables.svc = createObject("component", "cfpayment.api.core").init(local.gw);
-			variables.usd = variables.svc.getGateway();
-			variables.usd.currency = "USD"; // ONLY FOR UNIT TEST
-
-			// create default
-			variables.gw = variables.usd;
-			
-			// for dataprovider testing
-			variables.gateways = [usd, cad];
-		</cfscript>
-
-		<!--- if set to false, will try to connect to remote service to check these all out --->
-		<cfset variables.localMode = false />
-	</cffunction>
-
-
-	<cffunction name="offlineInjector" access="private">
-		<cfif variables.localMode>
-			<cfset injectMethod(argumentCollection = arguments) />
-		</cfif>
-		<!--- if not local mode, don't do any mock substitution so the service connects to the remote service! --->
-	</cffunction>
-
-
-	<cffunction name="testStripeSetters" output="false" access="public" returntype="any">
-		<cfset assertTrue(variables.gw.getTestSecretKey() EQ 'tGN0bIwXnHdwOa85VABjPdSn8nWY7G7I', "The test secret key was not set through the init config object, was: #variables.gw.getTestSecretKey()#") />
-	</cffunction>
-
 
 	<cffunction name="testGatewayURL" output="false" access="public" returntype="any" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
@@ -132,25 +86,38 @@
 		<cfset assertTrue(NOT local.response.getSuccess(), "Validation did succeed but should have failed") />
 		<cfset assertTrue(local.response.getStatusCode() EQ 402, "Status code should be 402, was: #local.response.getStatusCode()#") />
 		<cfset assertTrue(local.response.hasError(), "Validation should have errors but did not") />
-	</cffunction>	
+	</cffunction>
 
 
-	<cffunction name="testPurchaseWithCustomerAccount" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
+	<cffunction name="testPurchaseWithStripeJSToken" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
 		<cfset local.token = variables.svc.createToken() />
 
 		<cfset offlineInjector(arguments.gw, this, "mock_token_ok", "doHttpCall") />
 		<cfset local.response = arguments.gw.validate(money = variables.svc.createMoney(5000, arguments.gw.currency), account = createValidCard()) />
 		<cfset local.token.setID(local.response.getTransactionId()) />
+
+		<cfset offlineInjector(arguments.gw, this, "mock_purchase_ok", "doHttpCall") />
+		<cfset local.response = arguments.gw.purchase(money = variables.svc.createMoney(5000, arguments.gw.currency), account = token) />
+		<cfset assertTrue(local.response.getSuccess(), "The #arguments.gw.currency# purchase failed but should have succeeded") />
+		<cfset assertTrue(local.response.getStatusCode() EQ 200, "Status code should be 200, was: #local.response.getStatusCode()#") />
+		<cfset assertTrue(NOT local.response.hasError(), "Purchase should not have errors but did") />
+	</cffunction>
+
+
+	<cffunction name="testPurchaseWithCustomerAccount" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
+		<cfargument name="gw" type="any" required="true" />
+
+		<cfset offlineInjector(arguments.gw, this, "mock_token_ok", "doHttpCall") />
+		<cfset local.response = arguments.gw.validate(money = variables.svc.createMoney(5000, arguments.gw.currency), account = createValidCard()) />
+		<cfset local.token = variables.svc.createToken().setID(local.response.getTransactionId()) />
+
 		<cfset offlineInjector(arguments.gw, this, "mock_store_ok", "doHttpCall") />
 		<cfset local.response = arguments.gw.store(account = token) />
+		<cfset local.customer = variables.svc.createToken().setId(local.response.getTransactionId()) />
 
-		<cfset local.customer = variables.svc.createToken() />
-		<cfset local.customer.setId(local.response.getTransactionId()) />
-
-		<!--- this will be rejected by gateway because the card number is not valid --->
 		<cfset offlineInjector(arguments.gw, this, "mock_purchase_ok", "doHttpCall") />
-		<cfset local.response = arguments.gw.purchase(money = variables.svc.createMoney(5000, arguments.gw.currency), account = local.customer) />
+		<cfset local.response = arguments.gw.purchase(money = variables.svc.createMoney(5000, arguments.gw.currency), options = {customer: local.customer}) />
 		<cfset assertTrue(local.response.getSuccess(), "The #arguments.gw.currency# purchase failed but should have succeeded") />
 		<cfset assertTrue(local.response.getStatusCode() EQ 200, "Status code should be 200, was: #local.response.getStatusCode()#") />
 		<cfset assertTrue(NOT local.response.hasError(), "Purchase should not have errors but did") />
@@ -159,7 +126,7 @@
 
 	<cffunction name="testPurchaseWithCardSuccess" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
-		<!--- this will be rejected by gateway because the card number is not valid --->
+
 		<cfset offlineInjector(arguments.gw, this, "mock_purchase_ok", "doHttpCall") />
 		<cfset local.response = arguments.gw.purchase(money = variables.svc.createMoney(5000, arguments.gw.currency), account = createValidCard()) />
 		<cfset assertTrue(local.response.getSuccess(), "The #arguments.gw.currency# purchase failed but should have succeeded") />
@@ -170,7 +137,7 @@
 
 	<cffunction name="testPurchaseAuthorizeWithoutCapture" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
-		<!--- this will be rejected by gateway because the card number is not valid --->
+
 		<cfset offlineInjector(arguments.gw, this, "mock_purchase_no_capture", "doHttpCall") />
 		<cfset local.response = arguments.gw.purchase(money = variables.svc.createMoney(5000, arguments.gw.currency), account = createValidCard(), options = {"capture": false}) />
 
@@ -187,7 +154,7 @@
 
 	<cffunction name="testPurchaseWithStatementDescriptor" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
-		<!--- this will be rejected by gateway because the card number is not valid --->
+
 		<cfset offlineInjector(arguments.gw, this, "mock_purchase_ok", "doHttpCall") />
 		<cfset local.response = arguments.gw.purchase(money = variables.svc.createMoney(5000, arguments.gw.currency), account = createValidCard(), options = {"statement_descriptor": "Test <Descriptor>"}) />
 		<cfset assertTrue(local.response.getSuccess(), "The #arguments.gw.currency# purchase failed but should have succeeded") />
@@ -198,7 +165,7 @@
 	
 	<cffunction name="testPurchaseDecline" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
-		<!--- this will be rejected by gateway because the card number is not valid --->
+
 		<cfset offlineInjector(arguments.gw, this, "mock_incorrect_number", "doHttpCall") />
 		<cfset local.response = arguments.gw.purchase(money = variables.svc.createMoney(5000, arguments.gw.currency), account = createInvalidCard()) />
 		<cfset assertTrue(NOT local.response.getSuccess(), "The #arguments.gw.currency# purchase succeeded but should have failed") />
@@ -263,7 +230,7 @@
 
 		<cfset assertTrue(local.response.getSuccess(), "The #arguments.gw.currency# list did not succeed but should have") />
 		<cfset assertTrue(local.response.getStatusCode() EQ 200, "Status code for #arguments.gw.currency# should be 200, was: #local.response.getStatusCode()#") />
-		<cfset assertTrue(arrayLen(local.response.getParsedResult().data) EQ 10, "#arguments.gw.currency# list without count should have returned 10 results, was: #arrayLen(local.response.getParsedResult().data)#") />
+		<cfset assertTrue(arrayLen(local.response.getParsedResult().data) GT 2, "#arguments.gw.currency# list without count should have returned more than 2 results, was: #arrayLen(local.response.getParsedResult().data)#") />
 	</cffunction>
 
 
@@ -291,9 +258,12 @@
 		<cfset assertTrue(local.response.getSuccess() AND structKeyExists(local.response.getParsedResult(), "created"), "The store did not succeed") />
 		<cfset assertTrue(local.response.getStatusCode() EQ 200, "Status code should be 200, was: #local.response.getStatusCode()#") />
 		<cfset assertTrue(NOT local.response.hasError(), "Store should not have errors but did") />
+		<cfset assertTrue(structKeyExists(local.response.getParsedResult(), "object") AND local.response.getParsedResult().object EQ "customer", "Should be a customer response") />
+		<cfset assertTrue(structKeyExists(local.response.getParsedResult(), "default_source"), "Should have default_source value") />
 		<cfset assertTrue(structKeyExists(local.response.getParsedResult(), "sources"), "Should have sources key") />
 		<cfset assertTrue(structKeyExists(local.response.getParsedResult().sources, "data"), "Should have data key") />
 		<cfset assertTrue(arrayLen(local.response.getParsedResult().sources.data), "Data key should be an array with a length") />
+		<cfset assertTrue(local.response.getParsedResult().sources.data[1].last4 EQ "4242", "Last4 should have been 4242") />
 	</cffunction>
 
 
@@ -304,7 +274,7 @@
 		
 		<cfset offlineInjector(gw, this, "mock_token_ok", "doHttpCall") />
 		<cfset response = gw.validate(money = variables.svc.createMoney(5000, gw.currency), account = createValidCard()) />
-		<cfset response = gw.getToken(id = response.getTransactionID()) />
+		<cfset response = gw.getAccountToken(id = response.getTransactionID()) />
 
 		<cfset assertTrue(response.getSuccess() AND structKeyExists(response.getParsedResult(), "created"), "The validate did not succeed") />
 		<cfset assertTrue(left(response.getTransactionID(), 3) EQ "tok", "We did not get back a token ID begining with tok_") />
@@ -346,7 +316,7 @@
 		
 		<cfset offlineInjector(gw, this, "mock_banktoken_ok", "doHttpCall") />
 		<cfset response = gw.validate(money = variables.svc.createMoney(5000, gw.currency), account = createValidBankAccount()) />
-		<cfset response = gw.getToken(id = response.getTransactionID()) />
+		<cfset response = gw.getAccountToken(id = response.getTransactionID()) />
 
 		<cfset assertTrue(response.getSuccess() AND structKeyExists(response.getParsedResult(), "created"), "The validate did not succeed") />
 		<cfset assertTrue(left(response.getTransactionID(), 4) EQ "btok", "We did not get back a token ID begining with btok_") />
@@ -367,26 +337,40 @@
 
 	<cffunction name="testPurchaseThenRefundFull" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
-		<!--- this will be rejected by gateway because the card number is not valid --->
+
 		<cfset offlineInjector(arguments.gw, this, "mock_purchase_ok", "doHttpCall") />
 		<cfset local.response = arguments.gw.purchase(money = variables.svc.createMoney(5000, arguments.gw.currency), account = createValidCard()) />
 		<cfset offlineInjector(arguments.gw, this, "mock_refund_full_ok", "doHttpCall") />
 		<cfset local.response = arguments.gw.refund(transactionid = local.response.getTransactionID()) />
+
+		<cfset assertTrue(local.response.getParsedResult().object EQ "refund", "It was not a refund object") />
 		<cfset assertTrue(local.response.getSuccess(), "You can refund a purchase in full") />
-		<cfset assertTrue(local.response.getParsedResult().amount_refunded EQ 5000, "The full refund should be for $50.00") />
+		<cfset assertTrue(local.response.getParsedResult().amount EQ 5000, "The full refund should be for $50.00") />
 	</cffunction>
 
 
-	<cffunction name="testPurchaseThenRefundPartial" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
+	<cffunction name="testPurchaseThenRefundPartialMultiple" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
-		<!--- this will be rejected by gateway because the card number is not valid --->
+
 		<cfset offlineInjector(arguments.gw, this, "mock_purchase_ok", "doHttpCall") />
-		<cfset local.response = arguments.gw.purchase(money = variables.svc.createMoney(5000, arguments.gw.currency), account = createValidCard()) />
+		<cfset local.charge = arguments.gw.purchase(money = variables.svc.createMoney(6000, arguments.gw.currency), account = createValidCard()) />
 		
 		<cfset offlineInjector(arguments.gw, this, "mock_refund_partial_ok", "doHttpCall") />
-		<cfset local.response = arguments.gw.refund(transactionid = local.response.getTransactionID(), money = variables.svc.createMoney(2500, arguments.gw.currency)) />
-		<cfset assertTrue(local.response.getSuccess(), "You can refund a purchase in full") />
-		<cfset assertTrue(local.response.getParsedResult().amount_refunded EQ 2500, "The partial refund should be for $25.00") />
+		<cfset local.response = arguments.gw.refund(transactionid = local.charge.getTransactionID(), money = variables.svc.createMoney(2500, arguments.gw.currency)) />
+		<cfset assertTrue(local.response.getSuccess(), "You can refund a purchase partially") />
+		<cfset assertTrue(local.response.getParsedResult().object EQ "refund", "It was not a refund object") />
+		<cfset assertTrue(local.response.getParsedResult().amount EQ 2500, "The partial refund should be for $25.00") />
+		
+		<cfset offlineInjector(arguments.gw, this, "mock_refund_partial_ok", "doHttpCall") />
+		<cfset local.response = arguments.gw.refund(transactionid = local.charge.getTransactionID(), money = variables.svc.createMoney(2500, arguments.gw.currency)) />
+		<cfset assertTrue(local.response.getSuccess(), "You can refund a purchase partially more than once if it adds up less than the total") />
+		<cfset assertTrue(local.response.getParsedResult().object EQ "refund", "It was not a refund object") />
+		<cfset assertTrue(local.response.getParsedResult().amount EQ 2500, "The partial refund should be for $25.00") />
+		
+		
+		<cfset offlineInjector(arguments.gw, this, "mock_refund_partial_exceed_total", "doHttpCall") />
+		<cfset local.response = arguments.gw.refund(transactionid = local.charge.getTransactionID(), money = variables.svc.createMoney(2500, arguments.gw.currency)) />
+		<cfset assertTrue(NOT local.response.getSuccess(), "You can't refund more than the original amount") />
 	</cffunction>
 
 
@@ -414,6 +398,15 @@
 	</cffunction>
 
 
+	<cffunction name="testBalance" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
+		<cfargument name="gw" type="any" required="true" />
+
+		<cfset offlineInjector(arguments.gw, this, "mock_balance_ok", "doHttpCall") />
+		<cfset local.balance = arguments.gw.getBalance() />
+		<cfset debug(local.balance.getParsedResult()) />
+		<cfset assertTrue(balance.getParsedResult().object EQ "balance", "A balance object wasn't returned") />
+
+	</cffunction>
 
 
 	<!--- PRIVATE HELPERS, MOCKS, ETC --->
@@ -560,7 +553,7 @@
 	</cffunction>
 	
 	<cffunction name="mock_store_ok" access="private">
-		<cfreturn { StatusCode = '200 OK', FileContent = '{ "object": "customer", "created": 1360991479, "id": "cus_1IeYQ4dYTTI4Bt", "livemode": false, "description": null, "active_card": { "object": "card", "last4": "4242", "type": "Visa", "exp_month": 10, "exp_year": 2014, "fingerprint": "Z0VUjeIIj0HObMhK", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass" }, "email": null, "delinquent": false, "subscription": null, "discount": null, "account_balance": 0 }' } />
+		<cfreturn { StatusCode = '200 OK', FileContent = '{ "object": "customer", "created": 1432945593, "id": "cus_6Kd4buPkQzXZ8U", "livemode": false, "description": null, "email": null, "delinquent": false, "metadata": {}, "subscriptions": { "object": "list", "total_count": 0, "has_more": false, "url": "/v1/customers/cus_6Kd4buPkQzXZ8U/subscriptions", "data": [] }, "discount": null, "account_balance": 0, "currency": null, "sources": { "object": "list", "total_count": 1, "has_more": false, "url": "/v1/customers/cus_6Kd4buPkQzXZ8U/sources", "data": [ { "id": "card_6Kd4Wb2XRoLFg2", "object": "card", "last4": "4242", "brand": "Visa", "funding": "credit", "exp_month": 10, "exp_year": 2016, "fingerprint": "1ixkL2I767wWNjSd", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass", "dynamic_last4": null, "metadata": {}, "customer": "cus_6Kd4buPkQzXZ8U" } ] }, "default_source": "card_6Kd4Wb2XRoLFg2" }' } />
 	</cffunction>
 
 	<cffunction name="mock_purchase_ok" access="private">
@@ -572,13 +565,17 @@
 	</cffunction>
 	
 	<cffunction name="mock_refund_full_ok" access="private">
-		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "ch_1IfncE2zg8NMw9", "object": "charge", "created": 1360996094, "livemode": false, "paid": true, "amount": 5000, "currency": "usd", "refunded": true, "fee": 0, "fee_details": [ { "amount": 175, "currency": "usd", "type": "stripe_fee", "description": "Stripe processing fees", "application": null, "amount_refunded": 175 } ], "card": { "object": "card", "last4": "4242", "type": "Visa", "exp_month": 10, "exp_year": 2014, "fingerprint": "Z0VUjeIIj0HObMhK", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass" }, "failure_message": null, "amount_refunded": 5000, "customer": null, "invoice": null, "description": null, "dispute": null }' } />
+		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "re_6KvatBzwQDGk5H", "amount": 5000, "currency": "usd", "created": 1433014494, "object": "refund", "balance_transaction": "txn_6KvaD6WPm0mCFs", "metadata": {}, "charge": "ch_6KvaiViAHtNFQI", "receipt_number": null, "reason": null }' } />
 	</cffunction>
 	
 	<cffunction name="mock_refund_partial_ok" access="private">
-		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "ch_1IfpWrsmQSA3IA", "object": "charge", "created": 1360996197, "livemode": false, "paid": true, "amount": 5000, "currency": "usd", "refunded": false, "fee": 102, "fee_details": [ { "amount": 175, "currency": "usd", "type": "stripe_fee", "description": "Stripe processing fees", "application": null, "amount_refunded": 73 } ], "card": { "object": "card", "last4": "4242", "type": "Visa", "exp_month": 10, "exp_year": 2014, "fingerprint": "Z0VUjeIIj0HObMhK", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass" }, "failure_message": null, "amount_refunded": 2500, "customer": null, "invoice": null, "description": null, "dispute": null }' } />
+		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "re_6KvcMiHdQozrMG", "amount": 2500, "currency": "usd", "created": 1433014617, "object": "refund", "balance_transaction": "txn_6Kvcbog0NEvfHR", "metadata": {}, "charge": "ch_6KvcKBRM9QcQJk", "receipt_number": null, "reason": null }' } />
 	</cffunction>
-	
+
+	<cffunction name="mock_refund_partial_exceed_total" access="private">
+		<cfreturn { StatusCode = '400', FileContent = '{ "error": { "type": "invalid_request_error", "message": "Refund amount ($25.00) is greater than unrefunded amount on charge ($10.00)", "param": "amount" } }' } />
+	</cffunction>
+	 
 	<cffunction name="mock_invalid_cvc" access="private">
 		<cfreturn { StatusCode = '402', FileContent = '{ "error": { "message": "Your card''s security code is invalid", "type": "card_error", "param": "cvc", "code": "invalid_cvc" } }' } />
 	</cffunction>
@@ -596,7 +593,7 @@
 	</cffunction>
 
 	<cffunction name="mock_invalid_address1" access="private">
-		<cfreturn { StatusCode = '200', FileContent = '{ "id": "ch_1IeAMjrHpnj7dV", "object": "charge", "created": 1360990030, "livemode": false, "paid": true, "amount": 5000, "currency": "usd", "refunded": false, "fee": 175, "fee_details": [ { "amount": 175, "currency": "usd", "type": "stripe_fee", "description": "Stripe processing fees", "application": null, "amount_refunded": 0 } ], "source": { "object": "card", "last4": "0028", "type": "Visa", "exp_month": 10, "exp_year": 2014, "fingerprint": "1YqKn8Y7DbGMP8a1", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "fail", "address_zip_check": "pass" }, "failure_message": null, "amount_refunded": 0, "customer": null, "invoice": null, "description": null, "dispute": null }' } />
+		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "ch_1IeAMjrHpnj7dV", "object": "charge", "created": 1360990030, "livemode": false, "paid": true, "amount": 5000, "currency": "usd", "refunded": false, "fee": 175, "fee_details": [ { "amount": 175, "currency": "usd", "type": "stripe_fee", "description": "Stripe processing fees", "application": null, "amount_refunded": 0 } ], "source": { "object": "card", "last4": "0028", "type": "Visa", "exp_month": 10, "exp_year": 2014, "fingerprint": "1YqKn8Y7DbGMP8a1", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "fail", "address_zip_check": "pass" }, "failure_message": null, "amount_refunded": 0, "customer": null, "invoice": null, "description": null, "dispute": null }' } />
 	</cffunction>
 
 	<cffunction name="mock_list_charges_count_10" access="private">
@@ -611,6 +608,11 @@
 	</cffunction>
 
 	<cffunction name="mock_list_charges_count_2" access="private">
-		<cfreturn { StatusCode = '200', FileContent = '{ "object": "list", "count": 31800, "url": "/v1/charges", "data": [ { "id": "ch_1IxL1nrwUu7kmF", "object": "charge", "created": 1361061326, "livemode": false, "paid": true, "amount": 5000, "currency": "usd", "refunded": false, "fee": 175, "fee_details": [ { "amount": 175, "currency": "usd", "type": "stripe_fee", "description": "Stripe processing fees", "application": null, "amount_refunded": 0 } ], "card": { "object": "card", "last4": "4242", "type": "Visa", "exp_month": 10, "exp_year": 2014, "fingerprint": "Z0VUjeIIj0HObMhK", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass" }, "failure_message": null, "amount_refunded": 0, "customer": null, "invoice": null, "description": null, "dispute": null }, { "id": "ch_1IxLLW6cPV1kIK", "object": "charge", "created": 1361061323, "livemode": false, "paid": true, "amount": 5000, "currency": "usd", "refunded": false, "fee": 102, "fee_details": [ { "amount": 175, "currency": "usd", "type": "stripe_fee", "description": "Stripe processing fees", "application": null, "amount_refunded": 73 } ], "card": { "object": "card", "last4": "4242", "type": "Visa", "exp_month": 10, "exp_year": 2014, "fingerprint": "Z0VUjeIIj0HObMhK", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass" }, "failure_message": null, "amount_refunded": 2500, "customer": null, "invoice": null, "description": null, "dispute": null } ] } ' } />
+		<cfreturn { StatusCode = '200 OK', FileContent = '{ "object": "list", "count": 31800, "url": "/v1/charges", "data": [ { "id": "ch_1IxL1nrwUu7kmF", "object": "charge", "created": 1361061326, "livemode": false, "paid": true, "amount": 5000, "currency": "usd", "refunded": false, "fee": 175, "fee_details": [ { "amount": 175, "currency": "usd", "type": "stripe_fee", "description": "Stripe processing fees", "application": null, "amount_refunded": 0 } ], "card": { "object": "card", "last4": "4242", "type": "Visa", "exp_month": 10, "exp_year": 2014, "fingerprint": "Z0VUjeIIj0HObMhK", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass" }, "failure_message": null, "amount_refunded": 0, "customer": null, "invoice": null, "description": null, "dispute": null }, { "id": "ch_1IxLLW6cPV1kIK", "object": "charge", "created": 1361061323, "livemode": false, "paid": true, "amount": 5000, "currency": "usd", "refunded": false, "fee": 102, "fee_details": [ { "amount": 175, "currency": "usd", "type": "stripe_fee", "description": "Stripe processing fees", "application": null, "amount_refunded": 73 } ], "card": { "object": "card", "last4": "4242", "type": "Visa", "exp_month": 10, "exp_year": 2014, "fingerprint": "Z0VUjeIIj0HObMhK", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass" }, "failure_message": null, "amount_refunded": 2500, "customer": null, "invoice": null, "description": null, "dispute": null } ] }' } />
 	</cffunction>
+	
+	<cffunction name="mock_balance_ok" access="private">
+		<cfreturn { StatusCode = '200 OK', FileContent = '{ "pending": [ { "amount": -3090, "currency": "cad" } ], "available": [ { "amount": 13412, "currency": "cad" } ], "livemode": false, "object": "balance" }' } />
+	</cffunction>
+	
 </cfcomponent>
