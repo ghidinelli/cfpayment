@@ -9,7 +9,6 @@
 			<cfset variables.credentials = { "CAD": {"TestSecretKey": "sk_test_Zx4885WE43JGqPjqGzaWap8a", "TestPublishableKey": ""}
 											,"USD": {"TestSecretKey": "tGN0bIwXnHdwOa85VABjPdSn8nWY7G7I", "TestPublishableKey": ""}
 											} />
-											<cflog file="application" text="file not found: #expandPath("./credentials.cfm")#" />
 		</cfif>
 	
 		<cfscript>  
