@@ -538,75 +538,113 @@
 
 			<cfset results = deserializeJSON(response.getResult()) />
 			<cfset response.setParsedResult(results) />
-			
-			<!--- handle common response fields --->
-			<cfif structKeyExists(results, "card")
-				  OR (structKeyExists(results, "source") AND results.source.object EQ "card")>
-				  
-				<cfif structKeyExists(results, "card") AND NOT structKeyExists(results, "source")>
-					<cfset results["source"] = results.card />
-				</cfif>
 
-				<!--- translate to normalized cfpayment CVV codes --->			
-				<cfif structKeyExists(results.source, "cvc_check") AND results.source.cvc_check EQ "pass">
-					<cfset response.setCVVCode("M") />
-				<cfelseif structKeyExists(results.source, "cvc_check") AND results.source.cvc_check EQ "fail">
-					<cfset response.setCVVCode("N") />
-				<cfelse>
-					<cfset response.setCVVCode("P") />
-				</cfif>
-
-				<!--- translate to normalized cfpayment AVS codes.  Watch out that either address_line1_check or address_zip_check can be null OR "unchecked"; null throws error trying to access --->
-				<cfif structKeyExists(results.source, "address_zip_check") AND results.source.address_zip_check EQ "pass" 
-					  AND structKeyExists(results.source, "address_line1_check") AND results.source.address_line1_check EQ "pass">
-					<cfset response.setAVSCode("M") />
-				<cfelseif structKeyExists(results.source, "address_zip_check") AND results.source.address_zip_check EQ "pass">
-					<cfset response.setAVSCode("P") />
-				<cfelseif structKeyExists(results.source, "address_line1_check") AND results.source.address_line1_check EQ "pass">
-					<cfset response.setAVSCode("B") />
-				<cfelseif (structKeyExists(results.source, "address_zip_check") AND results.source.address_zip_check EQ "unchecked")
-						  OR (structKeyExists(results.source, "address_line1_check") AND results.source.address_line1_check EQ "unchecked")>
-					<cfif results.source.address_country EQ "US">
-						<cfset response.setAVSCode("S") />
-					<cfelse>
-						<cfset response.setAVSCode("G") />
-					</cfif>
-				<cfelse>
-					<cfset response.setAVSCode("N") />
-				</cfif>
-
-				
-				<!--- if you authorize without capture, you use the charge id to capture it later, which is the same as the transaction id, but for normality, put it here --->
-				<cfif structKeyExists(results, "captured") AND NOT results.captured AND structKeyExists(results, "id")>
-					<cfset response.setAuthorization(results.id) />
-				</cfif>
-			
-			<cfelseif structKeyExists(results, "bank_account")
-					  OR (structKeyExists(results, "source") AND results.source.object EQ "bank_account")>
-
-				<cfif structKeyExists(results, "bank_account") AND NOT structKeyExists(results, "source")>
-					<cfset results["source"] = results.bank_account />
-				</cfif>
-			
-				<!--- placeholder - not sure if we will do anything here? --->
-
-			</cfif>
-			
-			
+			<!--- take object-specific IDs like tok_*, ch_*, re_*, etc and always put it as the transaction id --->
 			<cfif structKeyExists(results, "id")>
 				<cfset response.setTransactionID(results.id) />
 			</cfif>
-				
-			<cfif structKeyExists(results, "customer") AND len(results.customer)>
-				<cfset response.setTokenID(results.customer) />
-			</cfif>
 			
+			<!--- the available 'types': list, customer, charge, token, card, bank_account, refund, application_fee, transfer, transfer_reversal, account, file_upload --->
+			<cfif structKeyExists(results, "object")>
+			
+				<cfswitch expression="#results.object#">
+					<cfcase value="account">
+					
+						<cfset response.setTokenID(results.id) />
+						
+					</cfcase>	
+					<cfcase value="bank_account">
+					
+						<cfset response.setTokenID(results.id) />
+						
+					</cfcase>					
+					<cfcase value="charge">
+						
+						<cfset response.setCVVCode(normalizeCVV(results.source)) />
+						<cfset response.setAVSCode(normalizeAVS(results.source)) />
+						
+						<!--- if you authorize without capture, you use the charge id to capture it later, which is the same as the transaction id, but for normality, put it here --->
+						<cfif structKeyExists(results, "captured") AND NOT results.captured AND structKeyExists(results, "id")>
+							<cfset response.setAuthorization(results.id) />
+						</cfif>
+
+					</cfcase>
+					<cfcase value="customer">
+					
+						<!--- customers have a "sources" key with, by default, one card on file 
+							  you can add more cards to a customer using the card api, but otherwise
+							  adding a new one actually replaces the previous one on file.
+							  we make the assumption today that we only have one until someone needs more
+						--->
+						<cfset response.setCVVCode(normalizeCVV(results.sources.data[1])) />
+						<cfset response.setAVSCode(normalizeAVS(results.sources.data[1])) />
+			
+						<cfset response.setTokenID(results.id) />
+						
+					</cfcase>
+					<cfcase value="token">
+					
+						<!--- stripe does not check AVS/CVV at the token stage - only once converted to a customer or in a charge --->
+						<!--- could be results.source.object EQ card or bank_account --->
+						<cfset response.setTokenID(results.id) />
+					
+					</cfcase>				
+				</cfswitch>
+			
+			</cfif>
+
 		</cfif>
 		
 		<!--- now add custom handling of status codes for Stripe which overrides base.cfc --->
 		<cfset handleHttpStatus(response = response) />
 
 		<cfreturn response />
+	</cffunction>
+
+	
+	<cffunction name="normalizeCVV" output="false" access="private" returntype="string">
+		<cfargument name="source" type="any" required="true" hint="A structure that contains a cvc_check key" />
+	
+		<!--- translate to normalized cfpayment CVV codes --->			
+		<cfif structKeyExists(arguments.source, "cvc_check") AND arguments.source.cvc_check EQ "pass">
+			<cfreturn "M" />
+		<cfelseif structKeyExists(arguments.source, "cvc_check") AND arguments.source.cvc_check EQ "fail">
+			<cfreturn "N" />
+		<cfelseif structKeyExists(arguments.source, "cvc_check") AND arguments.source.cvc_check EQ "unchecked">
+			<cfreturn "U" />
+		<cfelseif NOT structKeyExists(arguments.source, "cvc_check")>
+			<!--- indicates it wasn't checked --->
+			<cfreturn "" />
+		<cfelse>
+			<cfreturn "P" />
+		</cfif>
+	</cffunction>
+
+
+	<cffunction name="normalizeAVS" output="false" access="private" returntype="string">
+		<cfargument name="source" type="any" required="true" hint="A structure that contains address_line1_check and address_zip_check keys" />
+	
+		<!--- translate to normalized cfpayment AVS codes.  Options are pass, fail, unavailable and unchecked.  Watch out that either address_line1_check or address_zip_check can be null OR "unchecked"; null throws error trying to access --->
+		<cfif structKeyExists(arguments.source, "address_zip_check") AND arguments.source.address_zip_check EQ "pass" 
+			  AND structKeyExists(arguments.source, "address_line1_check") AND arguments.source.address_line1_check EQ "pass">
+			<cfreturn "M" />
+		<cfelseif structKeyExists(arguments.source, "address_zip_check") AND arguments.source.address_zip_check EQ "pass">
+			<cfreturn "P" />
+		<cfelseif structKeyExists(arguments.source, "address_line1_check") AND arguments.source.address_line1_check EQ "pass">
+			<cfreturn "B" />
+		<cfelseif (structKeyExists(arguments.source, "address_zip_check") AND arguments.source.address_zip_check EQ "unchecked")
+				  OR (structKeyExists(arguments.source, "address_line1_check") AND arguments.source.address_line1_check EQ "unchecked")>
+			<cfif arguments.source.country EQ "US">
+				<cfreturn "S" />
+			<cfelse>
+				<cfreturn "G" />
+			</cfif>
+		<cfelseif NOT structKeyExists(arguments.source, "address_zip_check") AND NOT structKeyExists(arguments.source, "address_line1_check")>
+			<!--- indicates it wasn't checked --->
+			<cfreturn "" />
+		<cfelse>
+			<cfreturn "N" />
+		</cfif>
 	</cffunction>
 
 
@@ -659,7 +697,7 @@
 					break;
 
 				case "401": // Unauthorized - No valid API key provided.
-					response.setMessage("There is a configuration error preventing the transaction from completing successfully.  Please call 415.462.5603 for customer service.  (Original issue: Invalid API key)");
+					response.setMessage("There is a configuration error preventing the transaction from completing successfully. (Original issue: Invalid API key)");
 					response.setStatus(getService().getStatusFailure());
 					break;
 
