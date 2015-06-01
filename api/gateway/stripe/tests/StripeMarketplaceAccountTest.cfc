@@ -346,6 +346,7 @@
 		
 		<cfset assertTrue(bankAccount.getParsedResult().object EQ "bank_account", "Object type wasn't bank_account") />
 		<cfset assertTrue(bankAccount.getParsedResult().last4 EQ "6789", "last4 didn't match") />
+		<cfset assertTrue(bankAccount.getTransactionId() EQ bankAccount.getTokenID(), "The token ID should be put into the token field when created, was: #bankAccount.getTokenID()#") />
 	</cffunction>
 
 

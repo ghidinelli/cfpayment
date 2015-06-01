@@ -56,6 +56,9 @@
 		<cfset assertTrue(local.response.getSuccess() AND structKeyExists(local.response.getParsedResult(), "created"), "The validation did not succeed") />
 		<cfset assertTrue(local.response.getStatusCode() EQ 200, "Status code should be 200, was: #local.response.getStatusCode()#") />
 		<cfset assertTrue(NOT local.response.hasError(), "Validation should not have errors but did") />
+		<cfset assertTrue(local.response.getTransactionId() EQ local.response.getTokenID(), "The token ID should be put into the token field when created, was: #local.response.getTokenID()#") />
+		<cfset assertTrue(local.response.getAVSCode() EQ "", "AVS isn't checked on validate, was: #local.response.getAVSCode()#") />
+		<cfset assertTrue(local.response.getCVVCode() EQ "", "CVV isn't checked on validate, was: #local.response.getCVVCode()#") />
 	</cffunction>
 	
 
@@ -114,10 +117,14 @@
 
 		<cfset offlineInjector(arguments.gw, this, "mock_store_ok", "doHttpCall") />
 		<cfset local.response = arguments.gw.store(account = token) />
+		<cfset assertTrue(local.response.getAVSCode() EQ "M", "AVS wasn't matched, was: #local.response.getAVSCode()#") />
+		<cfset assertTrue(local.response.getCVVCode() EQ "M", "CVV wasn't matched, was: #local.response.getCVVCode()#") />
+		<cfset assertTrue(local.response.getTransactionId() EQ local.response.getTokenID(), "The customer ID should be put into the token field when stored, was: #local.response.getTokenID()#") />
 		<cfset local.customer = variables.svc.createToken().setId(local.response.getTransactionId()) />
 
 		<cfset offlineInjector(arguments.gw, this, "mock_purchase_ok", "doHttpCall") />
 		<cfset local.response = arguments.gw.purchase(money = variables.svc.createMoney(5000, arguments.gw.currency), options = {customer: local.customer}) />
+		<cfset debug(response.getResult()) />
 		<cfset assertTrue(local.response.getSuccess(), "The #arguments.gw.currency# purchase failed but should have succeeded") />
 		<cfset assertTrue(local.response.getStatusCode() EQ 200, "Status code should be 200, was: #local.response.getStatusCode()#") />
 		<cfset assertTrue(NOT local.response.hasError(), "Purchase should not have errors but did") />
@@ -140,7 +147,7 @@
 
 		<cfset offlineInjector(arguments.gw, this, "mock_purchase_no_capture", "doHttpCall") />
 		<cfset local.response = arguments.gw.purchase(money = variables.svc.createMoney(5000, arguments.gw.currency), account = createValidCard(), options = {"capture": false}) />
-
+		<cfset debug(response.getResult()) />
 		<cfset assertTrue(local.response.getSuccess(), "The #arguments.gw.currency# purchase failed but should have succeeded") />
 		<cfset assertTrue(local.response.getStatusCode() EQ 200, "Status code should be 200, was: #local.response.getStatusCode()#") />
 		<cfset assertTrue(NOT local.response.hasError(), "Purchase should not have errors but did") />
@@ -289,11 +296,11 @@
 
 		<cfset offlineInjector(arguments.gw, this, "mock_token_ok_unchecked_avs", "doHttpCall") />
 		<cfset local.response = arguments.gw.validate(money = variables.svc.createMoney(5000, arguments.gw.currency), account = createValidCardWithoutAddress()) />
-
 		<cfset assertTrue(local.response.getSuccess(), "The #arguments.gw.currency# tokenization failed but should have succeeded even if address is unchecked") />
 		<cfset assertTrue(local.response.getStatusCode() EQ 200, "Status code should be 200, was: #local.response.getStatusCode()#") />
 		<cfset assertTrue(NOT local.response.hasError(), "Validate should not have errors but did") />
-		<cfset assertTrue(local.response.getAVSCode() EQ "G", "AVS should have been G, was: #local.response.getAVSCode()#") />
+		<cfset assertTrue(local.response.getAVSCode() EQ "", "AVS should have been blank because AVS isn't checked for tokens, was: #local.response.getAVSCode()#") />
+		<cfset assertTrue(local.response.getCVVCode() EQ "", "CVV should have been blank because CVV isn't checked for tokens, was: #local.response.getCVVCode()#") />
 	</cffunction>
 
 
@@ -306,6 +313,22 @@
 		<cfset assertTrue(local.response.getSuccess(), "The #arguments.gw.currency# tokenization failed but should have succeeded even if address is unchecked") />
 		<cfset assertTrue(local.response.getStatusCode() EQ 200, "Status code should be 200, was: #local.response.getStatusCode()#") />
 		<cfset assertTrue(NOT local.response.hasError(), "Validate should not have errors but did") />
+		<cfset assertTrue(local.response.getAVSCode() EQ "", "AVS should have been blank because AVS isn't checked for tokens, was: #local.response.getAVSCode()#") />
+		<cfset assertTrue(local.response.getCVVCode() EQ "", "CVV should have been blank because CVV isn't checked for tokens, was: #local.response.getCVVCode()#") />
+	</cffunction>
+
+
+	<cffunction name="testPurchaseWithNullChecks" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
+		<cfargument name="gw" type="any" required="true" />
+
+		<cfset offlineInjector(arguments.gw, this, "mock_purchase_ok_null_checks", "doHttpCall") />
+		<cfset local.response = arguments.gw.purchase(money = variables.svc.createMoney(5000, arguments.gw.currency), account = createValidCardWithoutAVSMatch()) />
+		<cfset debug(response.getParsedResult()) />
+		<cfset debug(response.getResult()) />
+		<cfset assertTrue(local.response.getSuccess(), "The #arguments.gw.currency# tokenization failed but should have succeeded even if address is unchecked") />
+		<cfset assertTrue(local.response.getStatusCode() EQ 200, "Status code should be 200, was: #local.response.getStatusCode()#") />
+		<cfset assertTrue(NOT local.response.hasError(), "Validate should not have errors but did") />
+		<cfset assertTrue(local.response.getAVSCode() EQ "", "AVS should have been blank because AVS isn't checked for tokens, was: #local.response.getAVSCode()#") />
 	</cffunction>
 	
 
@@ -316,7 +339,11 @@
 		
 		<cfset offlineInjector(gw, this, "mock_banktoken_ok", "doHttpCall") />
 		<cfset response = gw.validate(money = variables.svc.createMoney(5000, gw.currency), account = createValidBankAccount()) />
+		<cfset debug(local.response.getParsedResult()) />
+		<cfset debug(local.response.getResult()) />
 		<cfset response = gw.getAccountToken(id = response.getTransactionID()) />
+		<cfset debug(local.response.getParsedResult()) />
+		<cfset debug(local.response.getResult()) />
 
 		<cfset assertTrue(response.getSuccess() AND structKeyExists(response.getParsedResult(), "created"), "The validate did not succeed") />
 		<cfset assertTrue(left(response.getTransactionID(), 4) EQ "btok", "We did not get back a token ID begining with btok_") />
@@ -403,10 +430,47 @@
 
 		<cfset offlineInjector(arguments.gw, this, "mock_balance_ok", "doHttpCall") />
 		<cfset local.balance = arguments.gw.getBalance() />
-		<cfset debug(local.balance.getParsedResult()) />
 		<cfset assertTrue(balance.getParsedResult().object EQ "balance", "A balance object wasn't returned") />
 
 	</cffunction>
+
+
+	<cffunction name="testNormalizeAVSCVV" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
+		<cfargument name="gw" type="any" required="true" />
+
+		<cfset makePublic(arguments.gw, "normalizeAVS") />
+		<cfset makePublic(arguments.gw, "normalizeCVV") />
+		
+		<cfset local.response = {"object": "card", "country": arguments.gw.country, "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass" } />
+		<cfset assertTrue(gw.normalizeAVS(response) EQ "M", "AVS should have passed, was #gw.normalizeAVS(response)#") />
+		<cfset assertTrue(gw.normalizeCVV(response) EQ "M", "CVV should have passed, was #gw.normalizeCVV(response)#") />
+
+		<cfset local.response = {"object": "card", "country": arguments.gw.country, "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "fail" } />
+		<cfset assertTrue(gw.normalizeAVS(response) EQ "B", "AVS should have passed, was #gw.normalizeAVS(response)#") />
+
+		<cfset local.response = {"object": "card", "country": arguments.gw.country, "cvc_check": "pass", "address_line1_check": "fail", "address_zip_check": "pass" } />
+		<cfset assertTrue(gw.normalizeAVS(response) EQ "P", "AVS should have passed, was #gw.normalizeAVS(response)#") />
+
+		<cfset local.response = {"object": "card", "country": arguments.gw.country, "cvc_check": "unchecked", "address_line1_check": "unchecked", "address_zip_check": "unchecked" } />
+		<cfif gw.country EQ "US">
+			<cfset assertTrue(gw.normalizeAVS(response) EQ "S", "AVS should be marked as unsupported (US), was #gw.normalizeAVS(response)#") />
+		<cfelse>
+			<cfset assertTrue(gw.normalizeAVS(response) EQ "G", "AVS should be marked as unsupported (Foreign), was #gw.normalizeAVS(response)#") />
+		</cfif>
+		<cfset assertTrue(gw.normalizeCVV(response) EQ "U", "CVV should be marked as unsupported, was #gw.normalizeCVV(response)#") />
+
+
+		<cfset local.response = {"object": "card", "country": arguments.gw.country, "cvc_check": "fail", "address_line1_check": "fail", "address_zip_check": "fail" } />
+		<cfset assertTrue(gw.normalizeAVS(response) EQ "N", "AVS should have failed, was #gw.normalizeAVS(response)#") />
+		<cfset assertTrue(gw.normalizeCVV(response) EQ "N", "CVV should have failed, was #gw.normalizeCVV(response)#") />
+
+		<cfset local.response = {"object": "card", "country": arguments.gw.country } />
+		<cfset assertTrue(gw.normalizeAVS(response) EQ "", "AVS should have failed, was #gw.normalizeAVS(response)#") />
+		<cfset assertTrue(gw.normalizeCVV(response) EQ "", "CVV should have failed, was #gw.normalizeCVV(response)#") />
+
+	</cffunction>
+	
+
 
 
 	<!--- PRIVATE HELPERS, MOCKS, ETC --->
@@ -435,7 +499,7 @@
 		<cfset local.account.setVerificationValue(999) />
 		<cfset local.account.setFirstName("John") />
 		<cfset local.account.setLastName("Doe") />
-		<cfset local.account.setAddress("888") />
+		<cfset local.account.setAddress("888 Anywhere Lane") />
 		<cfset local.account.setPostalCode("77777") />
 		<cfreturn local.account />	
 	</cffunction>
@@ -480,6 +544,8 @@
 	<cffunction name="createValidCardWithoutAVSMatch" access="private" returntype="any" output="false">
 		<cfset local.account = createValidCard() />
 		<cfset local.account.setAccount(4000000000000010) />
+		<cfset local.account.setAddress("") />
+		<cfset local.account.setPostalCode("") />
 		<cfreturn local.account />	
 	</cffunction>
 
@@ -536,7 +602,7 @@
 
 
 	<cffunction name="mock_token_ok" access="private">
-		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "tok_1IZvRgzvQlffjs", "livemode": false, "created": 1360974256, "used": false, "object": "token", "card": { "object": "card", "last4": "4242", "type": "Visa", "exp_month": 10, "exp_year": 2014, "fingerprint": "sBxTyx7XVdjznwyt", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "" } }' } />
+		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "tok_6Lc9jlTa7yU2ky", "livemode": false, "created": 1433172850, "used": false, "object": "token", "type": "card", "card": { "id": "card_6Lc90vCQf7EDwh", "object": "card", "last4": "4242", "brand": "Visa", "funding": "credit", "exp_month": 10, "exp_year": 2016, "fingerprint": "sBxTyx7XVdjznwyt", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "unchecked", "address_line1_check": "unchecked", "address_zip_check": "unchecked", "dynamic_last4": null, "metadata": {} }, "client_ip": "127.0.0.1" }' } />
 	</cffunction>
 
 	<cffunction name="mock_token_ok_unchecked_avs" access="private">
@@ -546,22 +612,27 @@
 	<cffunction name="mock_token_ok_null_checks" access="private">
 		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "tok_65NT77fCo4cCEO", "livemode": true, "created": 1429428006, "used": false, "object": "token", "type": "card", "card": { "id": "card_65NT1zXyit19Gk", "object": "card", "last4": "4001", "brand": "American Express", "funding": "unknown", "exp_month": 1, "exp_year": 2018, "fingerprint": "m4KxtLGciUBrRaMk", "country": null, "name": "Joe Blow", "address_line1": "123 Some Way", "address_line2": null, "address_city": "Calgary", "address_state": "AB ", "address_zip": "T3H2W6", "address_country": "CA", "cvc_check": null, "address_line1_check": null, "address_zip_check": null, "dynamic_last4": null }, "client_ip": "224.14.138.168" }' } />
 	</cffunction>
+	
+	<cffunction name="mock_purchase_ok_null_checks" access="private">
+		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "ch_6LecnZjGNp3pHH", "object": "charge", "created": 1433182020, "livemode": false, "paid": true, "status": "succeeded", "amount": 5000, "currency": "cad", "refunded": false, "source": { "id": "card_6LecB3TU5xmZEt", "object": "card", "last4": "4242", "brand": "Visa", "funding": "credit", "exp_month": 10, "exp_year": 2016, "fingerprint": "sBxTyx7XVdjznwyt", "country": "US", "name": "John Doe", "address_line1": "888 Anywhere Lane", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": null, "address_line1_check": null, "address_zip_check": null, "dynamic_last4": null, "metadata": {}, "customer": "cus_6LecAtEEFyvRtx" }, "captured": true, "balance_transaction": "txn_6Lecqn02qYxb83", "failure_message": null, "failure_code": null, "amount_refunded": 0, "customer": "cus_6LecAtEEFyvRtx", "invoice": null, "description": null, "dispute": null, "metadata": {}, "statement_descriptor": "TEST DESCRIPTOR", "fraud_details": {}, "receipt_email": null, "receipt_number": null, "shipping": null, "destination": null, "application_fee": null, "refunds": { "object": "list", "total_count": 0, "has_more": false, "url": "/v1/charges/ch_6LecnZjGNp3pHH/refunds", "data": [] } }' } />
+	</cffunction>
+
 
 	<cffunction name="mock_banktoken_ok" access="private">
-		<cfset var http = { StatusCode = '200 OK', FileContent = '{ "id": "btok_61uQEmLSSGMlgg", "livemode": false, "created": 1428628004, "used": false, "object": "token", "type": "bank_account", "bank_account": { "object": "bank_account", "id": "ba_61uQcOc8nQmcpz", "last4": "6789", "country": "US", "currency": "usd", "status": "new", "fingerprint": "qkcoF3CJjVSJl0g2", "routing_number": "110000000", "bank_name": "STRIPE TEST BANK", "default_for_currency": false } }' } />
+		<cfset var http = { StatusCode = '200 OK', FileContent = '{ "id": "btok_6LcgqhP4t39mYj", "livemode": false, "created": 1433174792, "used": false, "object": "token", "type": "bank_account", "bank_account": { "object": "bank_account", "id": "ba_6LcgvRGvZtugSp", "last4": "6789", "country": "US", "currency": "usd", "status": "new", "fingerprint": "MYme1jP2GEKoZ0xi", "routing_number": "110000000", "bank_name": "STRIPE TEST BANK" }, "client_ip": null } ' } />
 		<cfreturn http />
 	</cffunction>
 	
 	<cffunction name="mock_store_ok" access="private">
-		<cfreturn { StatusCode = '200 OK', FileContent = '{ "object": "customer", "created": 1432945593, "id": "cus_6Kd4buPkQzXZ8U", "livemode": false, "description": null, "email": null, "delinquent": false, "metadata": {}, "subscriptions": { "object": "list", "total_count": 0, "has_more": false, "url": "/v1/customers/cus_6Kd4buPkQzXZ8U/subscriptions", "data": [] }, "discount": null, "account_balance": 0, "currency": null, "sources": { "object": "list", "total_count": 1, "has_more": false, "url": "/v1/customers/cus_6Kd4buPkQzXZ8U/sources", "data": [ { "id": "card_6Kd4Wb2XRoLFg2", "object": "card", "last4": "4242", "brand": "Visa", "funding": "credit", "exp_month": 10, "exp_year": 2016, "fingerprint": "1ixkL2I767wWNjSd", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass", "dynamic_last4": null, "metadata": {}, "customer": "cus_6Kd4buPkQzXZ8U" } ] }, "default_source": "card_6Kd4Wb2XRoLFg2" }' } />
+		<cfreturn { StatusCode = '200 OK', FileContent = '{ "object": "customer", "created": 1433173085, "id": "cus_6LcD0oto8ndYMz", "livemode": false, "description": null, "email": null, "delinquent": false, "metadata": {}, "subscriptions": { "object": "list", "total_count": 0, "has_more": false, "url": "/v1/customers/cus_6LcD0oto8ndYMz/subscriptions", "data": [] }, "discount": null, "account_balance": 0, "currency": null, "sources": { "object": "list", "total_count": 1, "has_more": false, "url": "/v1/customers/cus_6LcD0oto8ndYMz/sources", "data": [ { "id": "card_6LcDpYvajJeulk", "object": "card", "last4": "4242", "brand": "Visa", "funding": "credit", "exp_month": 10, "exp_year": 2016, "fingerprint": "sBxTyx7XVdjznwyt", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass", "dynamic_last4": null, "metadata": {}, "customer": "cus_6LcD0oto8ndYMz" } ] }, "default_source": "card_6LcDpYvajJeulk" }' } />
 	</cffunction>
 
 	<cffunction name="mock_purchase_ok" access="private">
-		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "ch_1IehV2hFFglF0v", "object": "charge", "created": 1360991963, "livemode": false, "paid": true, "amount": 5000, "currency": "usd", "refunded": false, "fee": 175, "fee_details": [ { "amount": 175, "currency": "usd", "type": "stripe_fee", "description": "Stripe processing fees", "application": null, "amount_refunded": 0 } ], "card": { "object": "card", "last4": "4242", "type": "Visa", "exp_month": 10, "exp_year": 2014, "fingerprint": "Z0VUjeIIj0HObMhK", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass" }, "failure_message": null, "amount_refunded": 0, "customer": null, "invoice": null, "description": null, "dispute": null, "statement_descriptor": "TEST DESCRIPTOR" }' } />
+		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "ch_6LecnZjGNp3pHH", "object": "charge", "created": 1433182020, "livemode": false, "paid": true, "status": "succeeded", "amount": 5000, "currency": "cad", "refunded": false, "source": { "id": "card_6LecB3TU5xmZEt", "object": "card", "last4": "4242", "brand": "Visa", "funding": "credit", "exp_month": 10, "exp_year": 2016, "fingerprint": "sBxTyx7XVdjznwyt", "country": "US", "name": "John Doe", "address_line1": "888 Anywhere Lane", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass", "dynamic_last4": null, "metadata": {}, "customer": "cus_6LecAtEEFyvRtx" }, "captured": true, "balance_transaction": "txn_6Lecqn02qYxb83", "failure_message": null, "failure_code": null, "amount_refunded": 0, "customer": "cus_6LecAtEEFyvRtx", "invoice": null, "description": null, "dispute": null, "metadata": {}, "statement_descriptor": "TEST DESCRIPTOR", "fraud_details": {}, "receipt_email": null, "receipt_number": null, "shipping": null, "destination": null, "application_fee": null, "refunds": { "object": "list", "total_count": 0, "has_more": false, "url": "/v1/charges/ch_6LecnZjGNp3pHH/refunds", "data": [] } }' } />
 	</cffunction>
 
 	<cffunction name="mock_purchase_no_capture" access="private">
-		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "ch_1IehV2hFFglF0v", "object": "charge", "created": 1360991963, "livemode": false, "paid": true, "amount": 5000, "currency": "usd", "refunded": false, "fee": 175, "fee_details": [ { "amount": 175, "currency": "usd", "type": "stripe_fee", "description": "Stripe processing fees", "application": null, "amount_refunded": 0 } ], "captured": false, "card": { "object": "card", "last4": "4242", "type": "Visa", "exp_month": 10, "exp_year": 2014, "fingerprint": "Z0VUjeIIj0HObMhK", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass" }, "failure_message": null, "amount_refunded": 0, "customer": null, "invoice": null, "description": null, "dispute": null, "statement_descriptor": "TEST DESCRIPTOR" }' } />
+		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "ch_6LeebvuUK9psRD", "object": "charge", "created": 1433182109, "livemode": false, "paid": true, "status": "succeeded", "amount": 5000, "currency": "cad", "refunded": false, "source": { "id": "card_6LeeNzLM92Plhm", "object": "card", "last4": "4242", "brand": "Visa", "funding": "credit", "exp_month": 10, "exp_year": 2016, "fingerprint": "sBxTyx7XVdjznwyt", "country": "US", "name": "John Doe", "address_line1": "888 Anywhere Lane", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass", "dynamic_last4": null, "metadata": {}, "customer": null }, "captured": false, "balance_transaction": null, "failure_message": null, "failure_code": null, "amount_refunded": 0, "customer": null, "invoice": null, "description": null, "dispute": null, "metadata": {}, "statement_descriptor": null, "fraud_details": {}, "receipt_email": null, "receipt_number": null, "shipping": null, "destination": null, "application_fee": null, "refunds": { "object": "list", "total_count": 0, "has_more": false, "url": "/v1/charges/ch_6LeebvuUK9psRD/refunds", "data": [] } }' } />
 	</cffunction>
 	
 	<cffunction name="mock_refund_full_ok" access="private">
