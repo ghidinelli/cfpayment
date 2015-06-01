@@ -124,7 +124,6 @@
 
 		<cfset offlineInjector(arguments.gw, this, "mock_purchase_ok", "doHttpCall") />
 		<cfset local.response = arguments.gw.purchase(money = variables.svc.createMoney(5000, arguments.gw.currency), options = {customer: local.customer}) />
-		<cfset debug(response.getResult()) />
 		<cfset assertTrue(local.response.getSuccess(), "The #arguments.gw.currency# purchase failed but should have succeeded") />
 		<cfset assertTrue(local.response.getStatusCode() EQ 200, "Status code should be 200, was: #local.response.getStatusCode()#") />
 		<cfset assertTrue(NOT local.response.hasError(), "Purchase should not have errors but did") />
@@ -147,7 +146,6 @@
 
 		<cfset offlineInjector(arguments.gw, this, "mock_purchase_no_capture", "doHttpCall") />
 		<cfset local.response = arguments.gw.purchase(money = variables.svc.createMoney(5000, arguments.gw.currency), account = createValidCard(), options = {"capture": false}) />
-		<cfset debug(response.getResult()) />
 		<cfset assertTrue(local.response.getSuccess(), "The #arguments.gw.currency# purchase failed but should have succeeded") />
 		<cfset assertTrue(local.response.getStatusCode() EQ 200, "Status code should be 200, was: #local.response.getStatusCode()#") />
 		<cfset assertTrue(NOT local.response.hasError(), "Purchase should not have errors but did") />
@@ -323,8 +321,7 @@
 
 		<cfset offlineInjector(arguments.gw, this, "mock_purchase_ok_null_checks", "doHttpCall") />
 		<cfset local.response = arguments.gw.purchase(money = variables.svc.createMoney(5000, arguments.gw.currency), account = createValidCardWithoutAVSMatch()) />
-		<cfset debug(response.getParsedResult()) />
-		<cfset debug(response.getResult()) />
+
 		<cfset assertTrue(local.response.getSuccess(), "The #arguments.gw.currency# tokenization failed but should have succeeded even if address is unchecked") />
 		<cfset assertTrue(local.response.getStatusCode() EQ 200, "Status code should be 200, was: #local.response.getStatusCode()#") />
 		<cfset assertTrue(NOT local.response.hasError(), "Validate should not have errors but did") />
@@ -339,11 +336,7 @@
 		
 		<cfset offlineInjector(gw, this, "mock_banktoken_ok", "doHttpCall") />
 		<cfset response = gw.validate(money = variables.svc.createMoney(5000, gw.currency), account = createValidBankAccount()) />
-		<cfset debug(local.response.getParsedResult()) />
-		<cfset debug(local.response.getResult()) />
 		<cfset response = gw.getAccountToken(id = response.getTransactionID()) />
-		<cfset debug(local.response.getParsedResult()) />
-		<cfset debug(local.response.getResult()) />
 
 		<cfset assertTrue(response.getSuccess() AND structKeyExists(response.getParsedResult(), "created"), "The validate did not succeed") />
 		<cfset assertTrue(left(response.getTransactionID(), 4) EQ "btok", "We did not get back a token ID begining with btok_") />
