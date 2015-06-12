@@ -765,10 +765,10 @@
 				</cfif>
 				
 				<!--- handle common "success" fields --->
-				<cfif structKeyExists(results, "avs_response")>
+				<cfif structKeyExists(results, "avs_response") AND len(results.avs_response.xmlText)>
 					<cfset response.setAVSCode(results.avs_response.xmlText) />
 				</cfif>
-				<cfif structKeyExists(results, "csc_response")>
+				<cfif structKeyExists(results, "csc_response") AND len(results.csc_response.xmlText)>
 					<cfset response.setCVVCode(results.csc_response.xmlText) />
 				</cfif>				
 			
