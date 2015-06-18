@@ -218,10 +218,10 @@
 					</cfif>
 					
 					<!--- handle common "success" fields --->
-					<cfif structKeyExists(results, "avsresponse")>
+					<cfif structKeyExists(results, "avsresponse") AND len(results.avsresponse)>
 						<cfset response.setAVSCode(results.avsresponse) />					
 					</cfif>
-					<cfif structKeyExists(results, "cvvresponse")>
+					<cfif structKeyExists(results, "cvvresponse") AND len(results.cvvresponse)>
 						<cfset response.setCVVCode(results.cvvresponse) />					
 					</cfif>				
 	
