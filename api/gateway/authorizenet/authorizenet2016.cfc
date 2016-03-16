@@ -93,9 +93,11 @@
 			};
 			var format = "application/xml";
 			response = createResponse(argumentCollection = super.process(payload = payload, headers={"Content-Type": format}));
-					// do some meta-checks for gateway-level errors (as opposed to auth/decline errors)
+
+
+
+			// do some meta-checks for gateway-level errors (as opposed to auth/decline errors)
 			if (NOT response.hasError()) {
-		
 				// we need to have a result; otherwise that's an error in itself
 				if (len(response.getResult())) {
 				
@@ -103,28 +105,51 @@
 					results = parseResponse(response.getResult(), format);
 
 					
+					//TODO: check results.createTransactionResponse.transactionResponse is a valid response
+					var res = results.createTransactionResponse.transactionResponse;
+
+
+
 					// handle common response fields
-					if (structKeyExists(results, "x_resp_code"))
-						response.setMessage(results.x_resp_code);
+					if (structKeyExists(res, "responseCode")){
+							response.setMessage(res.responseCode);
+					}
+					
 
-					if (structKeyExists(results, "x_reason_text"))
-						response.setMessage(response.getMessage() & ": " & results.x_reason_text);
-
-					if (structKeyExists(results, "x_trans_ID"))
-						response.setTransactionID(results.x_trans_ID);
-
-					if (structKeyExists(results, "x_approval_code"))
-						response.setAuthorization(results.x_approval_code);
+					
 
 					// handle common "success" fields
-					if (structKeyExists(results, "x_AVS_code"))
-						response.setAVSCode(results.x_AVS_code);					
+					if (structKeyExists(res, "avsResultCode")){
+						response.setAVSCode(res.avsResultCode);					
+					}
 
-					if (structKeyExists(results, "x_card_code_resp"))
-						response.setCVVCode(results.x_card_code_resp);					
+
+				
+				
+					if(structKeyExists(res, "errors")){
+						response.setMessage(response.getMessage() & ": " & res.errors.error.errorText);
+					}
+				
+					if(structKeyExists(res, "transId")){
+						response.setTransactionID(res.transId);
+					}
+				
+
+
+					if (structKeyExists(res, "authCode")){
+						response.setAuthorization(res.authCode);
+					}
+
+					
+
+					if (structKeyExists(res, "cvvResultCode")){
+						response.setCVVCode(res.cvvResultCode);					
+					}
 	
+
+				
 					// see if the response was successful
-					switch (results.x_resp_code) {
+					switch (res.responseCode) {
 						case "1": {
 							response.setStatus(getService().getStatusSuccessful());
 							break;
@@ -147,14 +172,16 @@
 				}
 			}
 
+		
+			//Not sure what this is doing 
 			if (response.getStatus() EQ getService().getStatusSuccessful()) {
-				if (results.x_type EQ "auth_only")
+				if (p.transactionRequest.transactionType EQ "authCaptureTransaction")
 					structInsert(results, "result", "APPROVED", "yes");
 				else
 					structInsert(results, "result", "CAPTURED", "yes");
 			}
 			else if (response.getStatus() EQ getService().getStatusDeclined()) {
-				if (results.x_type EQ "auth_only")
+				if (p.transactionRequest.transactionType EQ "authCaptureTransaction")
 					structInsert(results, "result", "NOT APPROVED", "yes");
 				else
 					structInsert(results, "result", "NOT CAPTURED", "yes");
@@ -411,8 +438,7 @@
 
 	</cffunction>
 
-
-	<cffunction name="convertToXML" output="false" access="private">
+	<cffunction name="convertToXML" output="false" access="private" hint="converts the payload to the expected XML">
 		<cfargument name="payload" type="struct">
 		<cfdump var="#payload#">
 		<cfset p = payload.createTransactionRequest>
