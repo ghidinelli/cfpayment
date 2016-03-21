@@ -53,21 +53,20 @@ component
 						account=account, 
 						options=options);
 	
-
+		var results = {};
 
 	//Now go and process it
 		var result  = super.process(payload = payload);
 
+
+
 		var resp = createResponse(argumentCollection=result);
 
-		
-
+	
 
 	// do some meta-checks for gateway-level errors (as opposed to auth/decline errors)
 			if (NOT resp.hasError()) {
-
-				
-		
+	
 				// we need to have a result; otherwise that's an error in itself
 				if (len(resp.getResult())) {
 				
@@ -138,35 +137,26 @@ component
 			}
 
 
+		
 
-				dump(resp.getStatus() EQ getService().getStatusDeclined());
-					dump(resp.getMemento());
-					abort;
-					
 			if (resp.getStatus() EQ getService().getStatusSuccessful()) {
-				if (results.x_type EQ "auth_only")
-					structInsert(results, "result", "APPROVED", "yes");
-				else
-					structInsert(results, "result", "CAPTURED", "yes");
+				result["result"] = "CAPTURED";
 			}
 			else if (resp.getStatus() EQ getService().getStatusDeclined()) {
-				if (results.x_type EQ "auth_only")
-					structInsert(results, "result", "NOT APPROVED", "yes");
-				else
-					structInsert(results, "result", "NOT CAPTURED", "yes");
+				result["result"] = "NOT CAPTURED";
+				
 			}
 			else {
-				structInsert(results, "result", "ERROR", "yes");
+				result["result"] = "ERROR";
+				
 			}
 
 
-
-		dump(resp.getMemento());
-		dump(resp.hasError());
-
-		abort;
+		// store parsed result
+		resp.setParsedResult(result);
 		
-		//we generate 
+		return resp;
+	
 	}
 
 	function authorize(){
@@ -236,6 +226,17 @@ component
 			var res = HTTP.send();
 			
 		return res.getPrefix();
+	}
+
+	/*
+		@hint: intercepts the call so that the result can be parsed nicer-er
+	*/
+	function createResponse(){
+
+
+
+		
+		return super.createResponse(argumentCollection=arguments);
 	}
 
 	function getMerchantAuthentication(){
