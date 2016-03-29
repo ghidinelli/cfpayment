@@ -20,6 +20,7 @@
 --->
 
 <cfcomponent>
+	<cfset variables.validTransactions = "authCaptureTransaction,authOnlyTransaction,priorAuthCaptureTransaction">
 
 	<cffunction name="createTransactionRequest" returntype="xml" hint="Main entry point for generating all the xml">
 		<cfargument name="transactionType">
@@ -31,6 +32,10 @@
 
 		<cfif !isValidTransactionType(transactionType)>
 			<cfthrow type="cfpayment.UnknownTransactionType" message="transactionType, #transactionType# is not known">
+		</cfif>
+
+		<cfif transactionType EQ "priorAuthCaptureTransaction" && NOT structKeyExists(options, "refTransId")>
+			<cfthrow type="cfpayment.RequiredOptionMissing" message="transactionType, #transactionType# requires a refTransId in the options">
 		</cfif>
 
 		<cfxml variable="local.xml">
@@ -48,8 +53,14 @@
 			  <transactionRequest>
 			    <transactionType>#transactionType#</transactionType>
 			    <amount>#money.getAmount()#</amount>
-			   
 
+			    <cfif transactionType EQ "priorAuthCaptureTransaction">
+ 					<refTransId>#options.refTransId#</refTransId>
+			    </cfif>
+
+	
+
+			   <cfif isDefined("arguments.account")>
 			   <payment>
 			      <creditCard>
 			        <cardNumber>#account.getAccount()#</cardNumber>
@@ -57,6 +68,7 @@
 			        <cardCode>#account.getVerificationValue()#</cardCode>
 			      </creditCard>
 			    </payment>
+			    </cfif>
 
 
 
@@ -113,6 +125,7 @@
 				</customer>
 				</cfif>
 				
+				<cfif isDefined("arguments.account")>
 				<billTo>
 					<firstName>#account.getfirstName()#</firstName>
 					<lastName>#account.getlastName()#</lastName>
@@ -123,7 +136,7 @@
 					<zip>#account.getPostalCode()#</zip>
 					<country>#account.getcountry()#</country>
 				</billTo>
-				
+				</cfif>
 
 				<cfif structKeyExists(options, "shipTo")>
 				<cfset var shipTo = options.shipTo>
@@ -176,7 +189,7 @@
 
 	<cffunction name="isValidTransactionType" access="private" returntype="boolean" hint="Checks whether the transaction type is valid">
 		<cfargument name="type" type="string">
-		<cfreturn listFindNoCase("authCaptureTransaction", arguments.type)>
+		<cfreturn listFindNoCase(variables.validTransactions, arguments.type)>
 	</cffunction>
 
 </cfcomponent>

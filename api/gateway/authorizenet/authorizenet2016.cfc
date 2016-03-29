@@ -36,13 +36,9 @@ component
 
 
 	function purchase(Any required money, Any requred account, Struct options={} ){
-
-
 		if(lcase(listLast(getMetaData(arguments.account).fullname, ".")) NEQ "creditcard"){
 			throw("The account type #lcase(listLast(getMetaData(arguments.account).fullname, "."))# is not supported by this gateway.", "", "cfpayment.InvalidAccount");
 		}
-
-
 
 		//need a refID presume?
 		var RequestXMLProcessor = new AuthorizenetXMlRequest();
@@ -55,80 +51,34 @@ component
 	
 		var results = {};
 
-	//Now go and process it
+		//Now go and process it
 		var result  = super.process(payload = payload);
 
-
-
+		result.parsedResults = XMLParse(result.result);
 		var resp = createResponse(argumentCollection=result);
-
-	
-
-	// do some meta-checks for gateway-level errors (as opposed to auth/decline errors)
+		
+		
+			// do some meta-checks for gateway-level errors (as opposed to auth/decline errors)
 			if (NOT resp.hasError()) {
-	
+					
 				// we need to have a result; otherwise that's an error in itself
 				if (len(resp.getResult())) {
-				
 					var xmlResponse = XMLParse(resp.getResult());
-					var transResponse = xmlResponse.createTransactionResponse.transactionResponse;
 
+					//Successful response, deal with the actual codes. 
+					var hasTransactionResponse = structKeyExists(xmlResponse, "createTransactionResponse") && structKeyExists(xmlResponse.createTransactionResponse, "transactionResponse");
 
-				
-					
-					// handle common response fields
-					if (structKeyExists(transResponse, "responseCode"))
-						resp.setMessage(transResponse.responseCode.XMLText);
+					var hasErrorRsponse = structKeyExists(xmlResponse, "ErrorResponse");
 
-
-					if (isDefined("transResponse.errors.error.errorText"))
-						resp.setMessage(resp.getMessage() & ": " & transResponse.errors.error.errorText.XMLText);
-
-					if (structKeyExists(transResponse, "transId"))
-						resp.setTransactionID(transResponse.transId.XMLText);
-
-
-
-				
-					
-					if (structKeyExists(transResponse, "authCode"))
-						resp.setAuthorization(transResponse.authCode.XmlText);
-
-
-
-					
-					// handle common "success" fields
-					if (structKeyExists(transResponse, "avsResultCode"))
-						resp.setAVSCode(transResponse.avsResultCode.XmlText);					
-
-					if (structKeyExists(transResponse, "cvvResultCode"))
-						resp.setCVVCode(transResponse.cvvResultCode.XmlText);					
-	
-					
-
-
-
-					
-					// see if the response was successful
-					switch (transResponse.responseCode) {
-						case "1": {
-							resp.setStatus(getService().getStatusSuccessful());
-							break;
-						}
-						case "2": {
-							resp.setStatus(getService().getStatusDeclined());
-							break;
-						}
-						case "4": {
-							resp.setStatus(5); // On hold (this status value is not currently defined in core.cfc)
-							break;
-						}
-						default: {
-							resp.setStatus(getService().getStatusFailure()); // only other known state is 3 meaning, "error in transaction data or system error"
-						}
+					if(hasTransactionResponse){
+						processTransactionResponse(xmlResponse, resp);
 					}
-				
-				
+
+					else if(hasErrorRsponse) {
+
+						processErrorResponse(xmlResponse, resp);
+
+					}
 
 				}
 				else {
@@ -159,11 +109,84 @@ component
 	
 	}
 
-	function authorize(){
+	function authorize(Any required money, Any requred account, Struct options={}){
+		if(lcase(listLast(getMetaData(arguments.account).fullname, ".")) NEQ "creditcard"){
+			throw("The account type #lcase(listLast(getMetaData(arguments.account).fullname, "."))# is not supported by this gateway.", "", "cfpayment.InvalidAccount");
+		}
+
+		var RequestXMLProcessor = new AuthorizenetXMlRequest();
+		var payload = RequestXMLProcessor.createTransactionRequest(
+						transactionType="authOnlyTransaction",
+						merchantAuthentication=getMerchantAuthentication(),
+						money=arguments.money,
+						account=account, 
+						options=options);
+
+			//Now go and process it
+		var result  = super.process(payload = payload);
+		var resp = createResponse(argumentCollection=result);
+		
+		// do some meta-checks for gateway-level errors (as opposed to auth/decline errors)
+			if (NOT resp.hasError()) {
+					
+				// we need to have a result; otherwise that's an error in itself
+				if (len(resp.getResult())) {
+					var xmlResponse = XMLParse(resp.getResult());
+					resp.setParsedResult(xmlResponse);
+
+					//Successful response, deal with the actual codes. 
+					var hasTransactionResponse = structKeyExists(xmlResponse, "createTransactionResponse") && structKeyExists(xmlResponse.createTransactionResponse, "transactionResponse");
+
+					var hasErrorRsponse = structKeyExists(xmlResponse, "ErrorResponse");
+
+					if(hasTransactionResponse){
+						processTransactionResponse(xmlResponse, resp);
+					}
+
+					else if(hasErrorRsponse) {
+
+						processErrorResponse(xmlResponse, resp);
+
+					}
+				}
+				else {
+					resp.setStatus(getService().getStatusUnknown()); // Authorize.net didn't return a response
+				}
+			}
+
+
+		
+
+			if (resp.getStatus() EQ getService().getStatusSuccessful()) {
+				result["result"] = "CAPTURED";
+			}
+			else if (resp.getStatus() EQ getService().getStatusDeclined()) {
+				result["result"] = "NOT CAPTURED";
+				
+			}
+			else {
+				result["result"] = "ERROR";
+				
+			}
+
+		return resp;
 
 	}
 
-	function capture(){
+	function capture(Any required money, String required authorization, Struct options={}){
+		options.refTransID = authorization;
+
+		var RequestXMLProcessor = new AuthorizenetXMlRequest();
+		var payload = RequestXMLProcessor.createTransactionRequest(
+						transactionType="priorAuthCaptureTransaction",
+						merchantAuthentication=getMerchantAuthentication(),
+						money=money,
+						account=nullValue(), 
+						options=options);
+
+
+		dump(payload);
+		abort;
 
 	}
 
@@ -179,6 +202,71 @@ component
 
 	}
 
+
+
+
+	private void function processTransactionResponse(XML xmlResponse, Any resultObj){
+
+		var transResponse = xmlResponse.createTransactionResponse.transactionResponse;
+		// handle common response fields
+		if(structKeyExists(transResponse, "responseCode")){
+			resultObj.setMessage(transResponse.responseCode.XMLText);
+		}
+		if (structKeyExists(transResponse, "transId")){
+			resultObj.setTransactionID(transResponse.transId.XMLText);
+		}
+		
+		if (structKeyExists(transResponse, "authCode")){
+			resultObj.setAuthorization(transResponse.authCode.XmlText);
+		}
+		// handle common "success" fields
+		if (structKeyExists(transResponse, "avsResultCode")){
+			resultObj.setAVSCode(transResponse.avsResultCode.XmlText);					
+		}
+
+		if (structKeyExists(transResponse, "cvvResultCode")){
+			resultObj.setCVVCode(transResponse.cvvResultCode.XmlText);					
+		}
+		if (isDefined("transResponse.errors.error.errorText")){
+			resultObj.setMessage(resultObj.getMessage() & ": " & transResponse.errors.error.errorText.XMLText);
+		}
+
+						// see if the response was successful
+		switch (transResponse.responseCode.XmlText) {
+			case "1": {
+				resultObj.setStatus(getService().getStatusSuccessful());
+				break;
+			}
+			case "2": {
+				resultObj.setStatus(getService().getStatusDeclined());
+				break;
+			}
+			case "4": {
+				resultObj.setStatus(5); // On hold (this status value is not currently defined in core.cfc)
+				break;
+			}
+			default: {
+				resultObj.setStatus(getService().getStatusFailure()); // only other known state is 3 meaning, "error in transaction data or system error"
+			}
+		}
+
+	}
+
+	private void function processErrorResponse(XML xmlResponse, Any resultObj){
+
+		resultObj.setStatus(getService().getStatusFailure());
+		resultObj.setMessage("There has been an error");
+		
+
+		if(isDefined("xmlResponse.ErrorResponse.messages.message")){
+			if(structKeyExists(xmlResponse.ErrorResponse.messages.message, "code")){
+				resultObj.setMessage(xmlResponse.ErrorResponse.messages.message.code.xmlText);
+			}
+			if(structKeyExists(xmlResponse.ErrorResponse.messages.message, "text")){
+				resultObj.setMessage(resultObj.getMessage() & ": " & xmlResponse.ErrorResponse.messages.message.text.xmlText);
+			}
+		}
+	}
 	/*
 		@hint: wrapper around the http call
 	*/
