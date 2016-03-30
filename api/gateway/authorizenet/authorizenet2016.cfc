@@ -36,6 +36,7 @@ component
 
 
 	function purchase(Any required money, Any requred account, Struct options={} ){
+
 		if(lcase(listLast(getMetaData(arguments.account).fullname, ".")) NEQ "creditcard"){
 			throw("The account type #lcase(listLast(getMetaData(arguments.account).fullname, "."))# is not supported by this gateway.", "", "cfpayment.InvalidAccount");
 		}
@@ -70,6 +71,9 @@ component
 
 					var hasErrorRsponse = structKeyExists(xmlResponse, "ErrorResponse");
 
+
+					
+					
 					if(hasTransactionResponse){
 						processTransactionResponse(xmlResponse, resp);
 					}
@@ -79,6 +83,8 @@ component
 						processErrorResponse(xmlResponse, resp);
 
 					}
+
+					
 
 				}
 				else {
@@ -183,23 +189,178 @@ component
 						money=money,
 						account=nullValue(), 
 						options=options);
+		var result  = super.process(payload = payload);
+		var resp = createResponse(argumentCollection=result);
+
+		// do some meta-checks for gateway-level errors (as opposed to auth/decline errors)
+			if (NOT resp.hasError()) {
+					
+				// we need to have a result; otherwise that's an error in itself
+				if (len(resp.getResult())) {
+					var xmlResponse = XMLParse(resp.getResult());
+					resp.setParsedResult(xmlResponse);
+
+					//Successful response, deal with the actual codes. 
+					var hasTransactionResponse = structKeyExists(xmlResponse, "createTransactionResponse") && structKeyExists(xmlResponse.createTransactionResponse, "transactionResponse");
+
+					var hasErrorRsponse = structKeyExists(xmlResponse, "ErrorResponse");
+
+					if(hasTransactionResponse){
+						processTransactionResponse(xmlResponse, resp);
+					}
+
+					else if(hasErrorRsponse) {
+
+						processErrorResponse(xmlResponse, resp);
+
+					}
+				}
+				else {
+					resp.setStatus(getService().getStatusUnknown()); // Authorize.net didn't return a response
+				}
+			}
 
 
-		dump(payload);
-		abort;
+		
+
+			if (resp.getStatus() EQ getService().getStatusSuccessful()) {
+				result["result"] = "CAPTURED";
+			}
+			else if (resp.getStatus() EQ getService().getStatusDeclined()) {
+				result["result"] = "NOT CAPTURED";
+				
+			}
+			else {
+				result["result"] = "ERROR";
+				
+			}
+
+		return resp;
 
 	}
 
-	function credit() {
+	function credit(Any required transactionID, Any required money, Any requred account, Struct options={}) {
 
+		var RequestXMLProcessor = new AuthorizenetXMlRequest();
+		var payload = RequestXMLProcessor.createTransactionRequest(
+						transactionType="refundTransaction",
+						merchantAuthentication=getMerchantAuthentication(),
+						money=money,
+						account=account, 
+						options=options);
+		var result  = super.process(payload = payload);
+		var resp = createResponse(argumentCollection=result);
+
+		// do some meta-checks for gateway-level errors (as opposed to auth/decline errors)
+			if (NOT resp.hasError()) {
+					
+				// we need to have a result; otherwise that's an error in itself
+				if (len(resp.getResult())) {
+					var xmlResponse = XMLParse(resp.getResult());
+					resp.setParsedResult(xmlResponse);
+
+					//Successful response, deal with the actual codes. 
+					var hasTransactionResponse = structKeyExists(xmlResponse, "createTransactionResponse") && structKeyExists(xmlResponse.createTransactionResponse, "transactionResponse");
+
+					var hasErrorRsponse = structKeyExists(xmlResponse, "ErrorResponse");
+
+					if(hasTransactionResponse){
+						processTransactionResponse(xmlResponse, resp);
+					}
+
+					else if(hasErrorRsponse) {
+
+						processErrorResponse(xmlResponse, resp);
+
+					}
+				}
+				else {
+					resp.setStatus(getService().getStatusUnknown()); // Authorize.net didn't return a response
+				}
+			}
+
+
+		
+
+			if (resp.getStatus() EQ getService().getStatusSuccessful()) {
+				result["result"] = "REFUNDED";
+			}
+			else if (resp.getStatus() EQ getService().getStatusDeclined()) {
+				result["result"] = "NOT REFUNDED";
+				
+			}
+			else {
+				result["result"] = "ERROR";
+				
+			}
+
+		return resp;
+		
 	}
 
-	function void() {
+	function void(Any required transactionID, Struct options={}) {
 
+		options.refTransID = transactionID;
+        
+        var RequestXMLProcessor = new AuthorizenetXMlRequest();
+		var payload = RequestXMLProcessor.createTransactionRequest(
+						transactionType="voidTransaction",
+						merchantAuthentication=getMerchantAuthentication(),
+						money=nullValue(),
+						account=nullValue(), 
+						options=options);
+
+		var result  = super.process(payload = payload);
+		var resp = createResponse(argumentCollection=result);
+
+		// do some meta-checks for gateway-level errors (as opposed to auth/decline errors)
+			if (NOT resp.hasError()) {
+					
+				// we need to have a result; otherwise that's an error in itself
+				if (len(resp.getResult())) {
+					var xmlResponse = XMLParse(resp.getResult());
+					resp.setParsedResult(xmlResponse);
+
+					//Successful response, deal with the actual codes. 
+					var hasTransactionResponse = structKeyExists(xmlResponse, "createTransactionResponse") && structKeyExists(xmlResponse.createTransactionResponse, "transactionResponse");
+
+					var hasErrorRsponse = structKeyExists(xmlResponse, "ErrorResponse");
+
+					if(hasTransactionResponse){
+						processTransactionResponse(xmlResponse, resp);
+					}
+
+					else if(hasErrorRsponse) {
+
+						processErrorResponse(xmlResponse, resp);
+
+					}
+				}
+				else {
+					resp.setStatus(getService().getStatusUnknown()); // Authorize.net didn't return a response
+				}
+			}
+
+
+		
+
+			if (resp.getStatus() EQ getService().getStatusSuccessful()) {
+				result["result"] = "VOIDED";
+			}
+			else if (resp.getStatus() EQ getService().getStatusDeclined()) {
+				result["result"] = "NOT VOIDED";
+				
+			}
+			else {
+				result["result"] = "ERROR";
+				
+			}
+
+		return resp;
 	}
 
 	function store() {
-
+		throw("MethodNotImplemented");
 	}
 
 
@@ -255,8 +416,12 @@ component
 	private void function processErrorResponse(XML xmlResponse, Any resultObj){
 
 		resultObj.setStatus(getService().getStatusFailure());
-		resultObj.setMessage("There has been an error");
+
 		
+		resultObj.setMessage("There has been an error");
+
+				
+
 
 		if(isDefined("xmlResponse.ErrorResponse.messages.message")){
 			if(structKeyExists(xmlResponse.ErrorResponse.messages.message, "code")){
@@ -266,6 +431,9 @@ component
 				resultObj.setMessage(resultObj.getMessage() & ": " & xmlResponse.ErrorResponse.messages.message.text.xmlText);
 			}
 		}
+
+
+
 	}
 	/*
 		@hint: wrapper around the http call

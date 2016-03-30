@@ -20,7 +20,7 @@
 --->
 
 <cfcomponent>
-	<cfset variables.validTransactions = "authCaptureTransaction,authOnlyTransaction,priorAuthCaptureTransaction">
+	<cfset variables.validTransactions = "authCaptureTransaction,authOnlyTransaction,priorAuthCaptureTransaction,refundTransaction,voidTransaction">
 
 	<cffunction name="createTransactionRequest" returntype="xml" hint="Main entry point for generating all the xml">
 		<cfargument name="transactionType">
@@ -52,9 +52,12 @@
 			  
 			  <transactionRequest>
 			    <transactionType>#transactionType#</transactionType>
-			    <amount>#money.getAmount()#</amount>
+			    <cfif structKeyExists(arguments, "money")>
+			    	<amount>#money.getAmount()#</amount>
+			    </cfif>
+			    
 
-			    <cfif transactionType EQ "priorAuthCaptureTransaction">
+			    <cfif structKeyExists(options, "refTransId")>
  					<refTransId>#options.refTransId#</refTransId>
 			    </cfif>
 
