@@ -22,6 +22,17 @@
 <cfcomponent>
 	<cfset variables.validTransactions = "authCaptureTransaction,authOnlyTransaction,priorAuthCaptureTransaction,refundTransaction,voidTransaction">
 
+	<cfset variables.validCustomerRequestTypes = "createCustomerProfileRequest,getCustomerProfileRequest">
+
+
+	<cfset variables.testmode = true>
+
+	<cffunction name="init">
+		<cfargument name="testMode" required="true" type="boolean">
+		<cfset variables.testmode = arguments.testmode>
+		<cfreturn this>
+	</cffunction>
+
 	<cffunction name="createTransactionRequest" returntype="xml" hint="Main entry point for generating all the xml">
 		<cfargument name="transactionType">
 		<cfargument name="merchantAuthentication" hint="The merchant ids">
@@ -38,6 +49,8 @@
 			<cfthrow type="cfpayment.RequiredOptionMissing" message="transactionType, #transactionType# requires a refTransId in the options">
 		</cfif>
 
+
+		  
 		<cfxml variable="local.xml">
 			<cfoutput>
 				
@@ -52,7 +65,7 @@
 			  
 			  <transactionRequest>
 			    <transactionType>#transactionType#</transactionType>
-			    <cfif structKeyExists(arguments, "money")>
+			    <cfif structKeyExists(arguments, "money") && !isNull(money)>
 			    	<amount>#money.getAmount()#</amount>
 			    </cfif>
 			    
@@ -61,9 +74,10 @@
  					<refTransId>#options.refTransId#</refTransId>
 			    </cfif>
 
-	
 
-			   <cfif isDefined("arguments.account")>
+			 
+
+			   <cfif !IsNull(account) >
 			   <payment>
 			      <creditCard>
 			        <cardNumber>#account.getAccount()#</cardNumber>
@@ -128,7 +142,7 @@
 				</customer>
 				</cfif>
 				
-				<cfif isDefined("arguments.account")>
+				<cfif !isNull(account)>
 				<billTo>
 					<firstName>#account.getfirstName()#</firstName>
 					<lastName>#account.getlastName()#</lastName>
@@ -190,9 +204,84 @@
 		<cfreturn local.xml>
 	</cffunction>
 
+
+	<cffunction name="createCustomerRequest" returntype="xml" hint="Creates the customer requests XML items">
+		<cfargument name="requestType" hint="the type of transaction we need to carry out">
+		<cfargument name="merchantAuthentication" hint="The merchant ids">
+		<cfargument name="customer" required="false">
+		<cfargument name="options" default="#StructNew()#">
+
+		<cfif !isValidCustomerRequestType(requestType)>
+			<cfthrow type="cfpayment.UnknownCustomerRequestType" message="Request type, #requestType# is not a valid request type">
+		</cfif>
+
+
+		<cfset paymentProfile = customer.getPaymentProfiles()>
+
+		<cfxml variable="local.xml">
+		<cfoutput>
+
+
+			<#requestType# xmlns="AnetApi/xml/v1/schema/AnetApiSchema.xsd">
+				<merchantAuthentication>
+					<name>#merchantAuthentication.name#</name>
+					<transactionKey>#merchantAuthentication.transactionKey#</transactionKey>
+				</merchantAuthentication>
+
+				<cfif requestType EQ "getCustomerProfileRequest">
+					<customerProfileId>#customer.getMerchantCustomerID()#</customerProfileId>
+				</cfif> 
+				
+
+				<cfif requestType EQ "createCustomerProfileRequest">
+					<profile>
+					<cfif !isEmpty(customer.getMerchantCustomerID())>
+						<merchantCustomerId>#customer.getMerchantCustomerID()#</merchantCustomerId>
+					</cfif>
+					<cfif !isEmpty(customer.getdescription())>
+						<description>#customer.getdescription()#</description>
+					</cfif>
+					<cfif !isEmpty(customer.getemail())>
+						<email>#customer.getemail()#</email>
+					</cfif>
+
+						<cfif !isNull(paymentProfile)>
+							<paymentProfiles>
+								<customerType>#paymentProfile.getCustomerType()#</customerType>
+								<cfif !isNull(paymentProfile.getPaymentMethods())>
+								<cfset creditcard = paymentProfile.getPaymentMethods()>
+									<payment>
+										<creditCard>
+											<cardNumber>#creditcard.getAccount()#</cardNumber>
+											<expirationDate>#DateFormat(creditcard.getExpirationDate(), "YYYY-MM")#</expirationDate>
+										</creditCard>
+									</payment>
+								</cfif>
+							</paymentProfiles>
+						</cfif>
+						
+					</profile>
+					<cfif variables.testmode>
+						<validationMode>testMode</validationMode>
+					</cfif>
+				</cfif>
+
+				
+			</#requestType#>
+		</cfoutput>
+		</cfxml>
+
+
+		<cfreturn local.xml>
+	</cffunction>
+
 	<cffunction name="isValidTransactionType" access="private" returntype="boolean" hint="Checks whether the transaction type is valid">
 		<cfargument name="type" type="string">
 		<cfreturn listFindNoCase(variables.validTransactions, arguments.type)>
+	</cffunction>
+	<cffunction name="isValidCustomerRequestType" access="private" returntype="boolean" hint="Checks whether the customer transaction type is valid">
+		<cfargument name="type" type="string">
+		<cfreturn listFindNoCase(variables.validCustomerRequestTypes, arguments.type)>
 	</cffunction>
 
 </cfcomponent>
