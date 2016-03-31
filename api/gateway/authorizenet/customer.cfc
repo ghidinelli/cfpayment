@@ -18,11 +18,14 @@
 */
 component accessors="true" {
 
-	property name="merchantCustomerId" getter="true" setter="true";
-	property name="description" getter="true" setter="true";
-	property name="email" getter="true" setter="true";
+	//primary id set by authorise.net
+	property name="customerProfileId" 	getter="true" setter="true";
+	property name="merchantCustomerId" 	getter="true" setter="true";
+	property name="description" 		getter="true" setter="true";
+	property name="email" 				getter="true" setter="true";
 
-	property name="paymentProfiles" getter="true" setter="true";
+	
+	property name="paymentProfiles"		type="array" getter="true" setter="true";
 
 
 	/*
@@ -40,7 +43,49 @@ component accessors="true" {
 			return true;
 		}
 
+		if(!isNull(getCustomerProfileId()) && !isEmpty(getCustomerProfileId())){
+			return true;
+		}
+
+
 		return false;
 	}
 
+
+
+	public customer function populate(XML responseXML){
+
+
+		setMerchantCustomerId(getXMLElementText(responseXML, "merchantCustomerId"));
+		setDescription(getXMLElementText(responseXML, "description"));
+		setEmail(getXMLElementText(responseXML, "email"));
+		
+
+		//TODO: find out if this is actually correct and we get an array of paymentProfiles back, documentation is lacking at this point:
+		//http://developer.authorize.net/api/reference/#customer-profiles-create-customer-profile
+
+		var paymentProfiles = XMLSearch(responseXML, "//:paymentProfiles");
+		for(var paymentProfile in paymentProfiles){
+			var pp = new paymentProfile().populate(paymentProfile);
+			addPaymentProfile(pp);
+			
+		}
+
+		
+		return this;
+	}
+
+	private function getXMLElementText(XML responseXML, String elementName, default=""){
+		var searchItem = XMLSearch(responseXML, "//:#elementName#");
+		return ArrayLen(searchItem)?searchItem[1].xmlText : default;
+	}
+
+	public void function addPaymentProfile(PaymentProfile profile){
+
+		var profiles = getPaymentProfiles();
+			profiles = isNull(profiles) ? [] : profiles;
+
+			profiles.append(profile);
+			setPaymentProfiles(profiles);
+	}
 }

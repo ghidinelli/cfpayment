@@ -22,7 +22,7 @@
 <cfcomponent>
 	<cfset variables.validTransactions = "authCaptureTransaction,authOnlyTransaction,priorAuthCaptureTransaction,refundTransaction,voidTransaction">
 
-	<cfset variables.validCustomerRequestTypes = "createCustomerProfileRequest,getCustomerProfileRequest">
+	<cfset variables.validCustomerRequestTypes = "createCustomerProfileRequest,getCustomerProfileRequest,getCustomerProfileIdsRequest,updateCustomerProfileRequest,deleteCustomerProfileRequest,createCustomerPaymentProfileRequest">
 
 
 	<cfset variables.testmode = true>
@@ -209,6 +209,7 @@
 		<cfargument name="requestType" hint="the type of transaction we need to carry out">
 		<cfargument name="merchantAuthentication" hint="The merchant ids">
 		<cfargument name="customer" required="false">
+		<cfargument name="paymentProfile" required="false">
 		<cfargument name="options" default="#StructNew()#">
 
 		<cfif !isValidCustomerRequestType(requestType)>
@@ -216,8 +217,12 @@
 		</cfif>
 
 
-		<cfset paymentProfile = customer.getPaymentProfiles()>
+		<cfif requestType EQ "createCustomerPaymentProfileRequest">
 
+			
+
+		</cfif>
+		
 		<cfxml variable="local.xml">
 		<cfoutput>
 
@@ -228,12 +233,51 @@
 					<transactionKey>#merchantAuthentication.transactionKey#</transactionKey>
 				</merchantAuthentication>
 
-				<cfif requestType EQ "getCustomerProfileRequest">
-					<customerProfileId>#customer.getMerchantCustomerID()#</customerProfileId>
+				<cfif ListFindNoCase("getCustomerProfileRequest,deleteCustomerProfileRequest,createCustomerPaymentProfileRequest", requestType)>
+				<!--- They require it so throw a message --->
+					<cfif isEmpty(customer.getCustomerProfileId())>
+						<cfthrow type="cfpayment.missingAttributeException" message="The customerProfileId is required for this transaction">
+					</cfif>
+					<customerProfileId>#customer.getCustomerProfileId()#</customerProfileId>
 				</cfif> 
 				
 
-				<cfif requestType EQ "createCustomerProfileRequest">
+				<cfif requestType EQ "createCustomerPaymentProfileRequest">
+					<cfif isEmpty(paymentProfile)>
+						<cfthrow type="cfpayment.missingAttributeException" message="The paymentProfile is required for this transaction">
+					</cfif>
+
+					<cfset card = paymentProfile.getPaymentMethods()>
+			
+					<paymentProfile>
+					    <billTo>
+					      <firstName>#card.getfirstName()#</firstName>
+					      <lastName>#card.getlastName()#</lastName>
+					      <company>#card.getCompany()#</company>
+					      <address>#card.getAddress()#</address>
+					      <city>#card.getCity()#</city>
+					      <state>#card.getRegion()#</state>
+					      <zip>#card.getPostalCode()#</zip>
+					      <country>#card.getCountry()#</country>
+					      <phoneNumber>#card.getphoneNumber()#</phoneNumber>
+					      
+					    </billTo>
+					    <payment>
+					      <creditCard>
+					        <cardNumber>#card.getAccount()#</cardNumber>
+					        <expirationDate>#DateFormat(card.getExpirationDate(), "YYYY-MM")#</expirationDate>
+					      </creditCard>
+					    </payment>
+					  </paymentProfile>
+
+					<cfif variables.testmode>
+						<validationMode>testMode</validationMode>
+					</cfif>
+
+				</cfif>
+
+
+				<cfif ListFindNoCase("createCustomerProfileRequest,updateCustomerProfileRequest", requestType)>
 					<profile>
 					<cfif !isEmpty(customer.getMerchantCustomerID())>
 						<merchantCustomerId>#customer.getMerchantCustomerID()#</merchantCustomerId>
@@ -245,7 +289,14 @@
 						<email>#customer.getemail()#</email>
 					</cfif>
 
-						<cfif !isNull(paymentProfile)>
+					<cfif !isEmpty(customer.getCustomerProfileId())>
+						<customerProfileId>#customer.getCustomerProfileId()#</customerProfileId>
+					</cfif>
+					 
+						<cfset paymentProfiles = customer.getPaymentProfiles()>
+						<cfif !isNull(paymentProfiles) && ArrayLen(paymentProfiles)>
+
+							<cfloop array="#paymentProfiles#" item="paymentProfile">
 							<paymentProfiles>
 								<customerType>#paymentProfile.getCustomerType()#</customerType>
 								<cfif !isNull(paymentProfile.getPaymentMethods())>
@@ -258,10 +309,11 @@
 									</payment>
 								</cfif>
 							</paymentProfiles>
+							</cfloop>
 						</cfif>
 						
 					</profile>
-					<cfif variables.testmode>
+					<cfif variables.testmode && !isNull(paymentProfiles) && ArrayLen(paymentProfiles)>
 						<validationMode>testMode</validationMode>
 					</cfif>
 				</cfif>
