@@ -364,11 +364,16 @@ component
 		return storeCustomer(argumentCollection=arguments);
 	}
 
+	//shortcut to deleteCustomer
+	function unstore(){
+		return deleteCustomer(argumentCollection=arguments);
+	}
+
 	/*
 		Creates a new customer record
 	*/
 
-	public customerResponse function storeCustomer(required customer) {
+	function storeCustomer(required customer) {
 
 		if(!customer.hasValidID()){
 			throw("No valid id defined in customer");	
@@ -390,10 +395,16 @@ component
 
 		//if there isnt an http error, go and process the response:
 		if (NOT resp.hasError()) {
+
+
+
 			var xmlResponse = XMLParse(resp.getResult());
 
 			var messages = XMLSearch(xmlResponse, "//:messages")[1]; //Should work, always you get a message
 			
+
+			
+
 			//There should generally always be a messsage
 			resp.setResultCode(messages.resultCode.xmlText);
 			resp.setMessageCode(messages.message.code.xmlText);
@@ -443,7 +454,8 @@ component
 		//Create a fake customer just for the request:
 
 		var customer = createCustomer();
-			customer.setMerchantCustomerID(customerId);
+			customer.setCustomerProfileId(customerId);
+
 
 		var RequestXMLProcessor = new AuthorizenetXMlRequest(getTestMode());
 		var payload = RequestXMLProcessor.createCustomerRequest(
@@ -470,9 +482,14 @@ component
 			resp.setMessageText(messages.message.text.xmlText);
 			resp.setMessage(resp.getMessageCode() & ": " & resp.getMessageText());
 
-		
+			
 			if(resp.getResultCode() EQ "OK"){
 				//Parse the thing
+
+				resp.setCustomer(new Customer().populate(xmlResponse));
+
+
+
 				resp.setStatus(getService().getStatusSuccessful());
 			}
 			else {
@@ -482,36 +499,115 @@ component
 
 		}
 		
-		throw("Method not implmemented");
+		return resp;
 	}
 
 	function listCustomerIds() {
-		throw("MethodNotImplemented");
+
+		var RequestXMLProcessor = new AuthorizenetXMlRequest(getTestMode());
+		var payload = RequestXMLProcessor.createCustomerRequest(
+						requestType="getCustomerProfileIdsRequest",
+						merchantAuthentication=getMerchantAuthentication(),
+						customer=nullValue(),
+						options={});
+
+		var result  = super.process(payload = payload);
+			result["service"] = super.getService();
+			result["testmode"] = super.getTestMode();
+
+		
+		//Does this actually need a customer response?
+
+		var resp = new customerResponse(argumentCollection=result);
+
+
+		var ret = resp.getIds();
+		return ret;
 	}
 
-	function updateCustomer() {
-		throw("MethodNotImplemented");
+	function updateCustomer(required customer) {
+
+		var RequestXMLProcessor = new AuthorizenetXMlRequest(getTestMode());
+		var payload = RequestXMLProcessor.createCustomerRequest(
+						requestType="updateCustomerProfileRequest",
+						merchantAuthentication=getMerchantAuthentication(),
+						customer=customer,
+						options={});
+
+		var result  = super.process(payload = payload);
+			result["service"] = super.getService();
+			result["testmode"] = super.getTestMode();
+
+		
+		//Does this actually need a customer response?
+
+		var resp = new customerResponse(argumentCollection=result);
+		return resp;
 	}
 
 
+	function deleteCustomer(required customer){
+		var RequestXMLProcessor = new AuthorizenetXMlRequest(getTestMode());
+		var payload = RequestXMLProcessor.createCustomerRequest(
+						requestType="deleteCustomerProfileRequest",
+						merchantAuthentication=getMerchantAuthentication(),
+						customer=customer,
+						options={});
+
+
+		var result  = super.process(payload = payload);
+			result["service"] = super.getService();
+			result["testmode"] = super.getTestMode();
+
+		var resp = new customerResponse(argumentCollection=result);
+
+		
+		return resp;
+	}
+
+	function addPaymentProfile(required customer, required paymentProfile){
+		var RequestXMLProcessor = new AuthorizenetXMlRequest(getTestMode());
+		var payload = RequestXMLProcessor.createCustomerRequest(
+						requestType="createCustomerPaymentProfileRequest",
+						merchantAuthentication=getMerchantAuthentication(),
+						customer=customer,
+						paymentProfile=paymentProfile,
+						options={});
+
+		var result  = super.process(payload = payload);
+			result["service"] = super.getService();
+			result["testmode"] = super.getTestMode();
+
+		var resp = new customerResponse(argumentCollection=result);
+
+		dump(toString(payload));
+		dump(resp);
+		abort;
+	}
+
+
+
+	private void function processCustomerResponseMessages(respObject, xmlResponse){
+
+	}
 	private customerResponse function createCustomerResponse(XML xmlResponse){
 
 		var resp = new customerResponse();
 		//var messages = XMLSearch(xmlResponse, "//*messages");
-
-		
-
 		return resp;
 	}
 
 	public customer function createCustomer(){
 		return new customer();
 	}
+
 	public PaymentProfile function createPaymentProfile(){
-		return new PaymentProfile();
+		return new PaymentProfile(argumentCollection=arguments);
 	}
 
-
+	public address function createAddress(){
+		return new address(argumentCollection=arguments);
+	}
 
 
 	private void function processTransactionResponse(XML xmlResponse, Any resultObj){

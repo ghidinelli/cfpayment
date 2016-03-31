@@ -19,8 +19,10 @@
 component accessors="true"
 {
 
-	property name="customerType" getter="true" setter="true";
-	property name="paymentMethods" getter="true" setter="true" hint="Card that we can use with this profile";
+	property name="customerType" 				type="string"	getter="true" setter="true";
+	property name="billTo" 						type="struct"	getter="true" setter="true";
+	property name="customerPaymentProfileId" 	type="string"	getter="true" setter="true";
+	property name="paymentMethods"				type="struct" 	getter="true" setter="true" hint="Card that we can use with this profile";
 
 	variables.custTypes = "individual,business";
 
@@ -31,5 +33,38 @@ component accessors="true"
 		}
 		variables.customerType = type;
 		return this;
+	}
+
+
+
+	public paymentProfile function populate(XML responseXML){
+			setCustomerType(getXMLElementText(responseXML, "customerType"));
+			setCustomerPaymentProfileId(getXMLElementText(responseXML, "customerPaymentProfileId"));
+		
+
+			
+			var creditCard = XMLSearch(responseXML, "//:creditCard");
+			if(ArrayLen(creditCard)){
+				//This should be a card object no?
+				var paymentMethod = {
+					"creditCard":{
+						"cardNumber": creditCard[1].cardNumber.xmltext,
+						"expirationDate": creditCard[1].expirationDate.xmltext
+					}
+				};	
+				setPaymentMethods(paymentMethod);
+			}
+			
+		
+
+
+			
+		return this;
+	}
+
+
+	private function getXMLElementText(XML responseXML, String elementName, default=""){
+		var searchItem = XMLSearch(responseXML, "//:#elementName#");
+		return ArrayLen(searchItem)?searchItem[1].xmlText : default;
 	}
 }
