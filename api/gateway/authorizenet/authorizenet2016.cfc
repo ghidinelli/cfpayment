@@ -42,7 +42,7 @@ component
 		}
 
 		//need a refID presume?
-		var RequestXMLProcessor = new AuthorizenetXMlRequest();
+		var RequestXMLProcessor = new AuthorizenetXMlRequest(getTestMode());
 		var payload = RequestXMLProcessor.createTransactionRequest(
 						transactionType="authCaptureTransaction",
 						merchantAuthentication=getMerchantAuthentication(),
@@ -120,7 +120,7 @@ component
 			throw("The account type #lcase(listLast(getMetaData(arguments.account).fullname, "."))# is not supported by this gateway.", "", "cfpayment.InvalidAccount");
 		}
 
-		var RequestXMLProcessor = new AuthorizenetXMlRequest();
+		var RequestXMLProcessor = new AuthorizenetXMlRequest(getTestMode());
 		var payload = RequestXMLProcessor.createTransactionRequest(
 						transactionType="authOnlyTransaction",
 						merchantAuthentication=getMerchantAuthentication(),
@@ -182,7 +182,7 @@ component
 	function capture(Any required money, String required authorization, Struct options={}){
 		options.refTransID = authorization;
 
-		var RequestXMLProcessor = new AuthorizenetXMlRequest();
+		var RequestXMLProcessor = new AuthorizenetXMlRequest(getTestMode());
 		var payload = RequestXMLProcessor.createTransactionRequest(
 						transactionType="priorAuthCaptureTransaction",
 						merchantAuthentication=getMerchantAuthentication(),
@@ -241,7 +241,7 @@ component
 
 	function credit(Any required transactionID, Any required money, Any requred account, Struct options={}) {
 
-		var RequestXMLProcessor = new AuthorizenetXMlRequest();
+		var RequestXMLProcessor = new AuthorizenetXMlRequest(getTestMode());
 		var payload = RequestXMLProcessor.createTransactionRequest(
 						transactionType="refundTransaction",
 						merchantAuthentication=getMerchantAuthentication(),
@@ -302,7 +302,7 @@ component
 
 		options.refTransID = transactionID;
         
-        var RequestXMLProcessor = new AuthorizenetXMlRequest();
+        var RequestXMLProcessor = new AuthorizenetXMlRequest(getTestMode());
 		var payload = RequestXMLProcessor.createTransactionRequest(
 						transactionType="voidTransaction",
 						merchantAuthentication=getMerchantAuthentication(),
@@ -359,8 +359,156 @@ component
 		return resp;
 	}
 
-	function store() {
+	//shortcut to storeCustomer
+	function store(){
+		return storeCustomer(argumentCollection=arguments);
+	}
+
+	/*
+		Creates a new customer record
+	*/
+
+	public customerResponse function storeCustomer(required customer) {
+
+		if(!customer.hasValidID()){
+			throw("No valid id defined in customer");	
+		}
+
+		var RequestXMLProcessor = new AuthorizenetXMlRequest(getTestMode());
+		var payload = RequestXMLProcessor.createCustomerRequest(
+						requestType="createCustomerProfileRequest",
+						merchantAuthentication=getMerchantAuthentication(),
+						customer=customer,
+						options={});
+		var result  = super.process(payload = payload);
+			result["service"] = super.getService();
+			result["testmode"] = super.getTestMode();
+
+		
+		var resp = new customerResponse(argumentCollection=result);
+
+
+		//if there isnt an http error, go and process the response:
+		if (NOT resp.hasError()) {
+			var xmlResponse = XMLParse(resp.getResult());
+
+			var messages = XMLSearch(xmlResponse, "//:messages")[1]; //Should work, always you get a message
+			
+			//There should generally always be a messsage
+			resp.setResultCode(messages.resultCode.xmlText);
+			resp.setMessageCode(messages.message.code.xmlText);
+			resp.setMessageText(messages.message.text.xmlText);
+			resp.setMessage(resp.getMessageCode() & ": " & resp.getMessageText());
+
+		
+			if(resp.getResultCode() EQ "OK"){
+				var customerID = XMLSearch(xmlResponse, "//:customerProfileId"); //Might not work if it fails right?
+
+				resp.setCustomerProfileId(customerID[1].xmlText);
+
+				var customerPaymentProfileIdList  = XMLSearch(xmlResponse, "//:customerPaymentProfileIdList/:numericString");
+
+				//Loop through the xmlChildren
+				for(var ppid in customerPaymentProfileIdList){
+					resp.addCustomerPaymentProfileId(ppid.xmlText);
+				}
+
+				var customerShippingAddressIdList  = XMLSearch(xmlResponse, "//:customerShippingAddressIdList/:numericString");
+
+				//Loop through the xmlChildren
+				for(var shipid in customerShippingAddressIdList){
+					resp.addCustomerShippingAddressId(shipid.xmlText);
+				}
+
+
+				var validationDirectResponseList  = XMLSearch(xmlResponse, "//:validationDirectResponseList/:string");
+				for(var directResponse in validationDirectResponseList){
+					resp.addvalidationDirectResponse(directResponse.xmlText);
+				}
+				resp.setStatus(getService().getStatusSuccessful());
+			}
+			else {
+				resp.setStatus(getService().getStatusFailure());
+			}
+
+
+		}
+
+		return resp;
+	}
+
+	function getCustomer(required customerId) {
+
+
+		//Create a fake customer just for the request:
+
+		var customer = createCustomer();
+			customer.setMerchantCustomerID(customerId);
+
+		var RequestXMLProcessor = new AuthorizenetXMlRequest(getTestMode());
+		var payload = RequestXMLProcessor.createCustomerRequest(
+						requestType="getCustomerProfileRequest",
+						merchantAuthentication=getMerchantAuthentication(),
+						customer=customer,
+						options={});
+
+		var result  = super.process(payload = payload);
+			result["service"] = super.getService();
+			result["testmode"] = super.getTestMode();
+
+		
+		var resp = new customerResponse(argumentCollection=result);
+
+		if (NOT resp.hasError()) {
+			var xmlResponse = XMLParse(resp.getResult());
+
+			var messages = XMLSearch(xmlResponse, "//:messages")[1]; //Should work, always you get a message
+			
+			//There should generally always be a messsage
+			resp.setResultCode(messages.resultCode.xmlText);
+			resp.setMessageCode(messages.message.code.xmlText);
+			resp.setMessageText(messages.message.text.xmlText);
+			resp.setMessage(resp.getMessageCode() & ": " & resp.getMessageText());
+
+		
+			if(resp.getResultCode() EQ "OK"){
+				//Parse the thing
+				resp.setStatus(getService().getStatusSuccessful());
+			}
+			else {
+				resp.setStatus(getService().getStatusFailure());
+			}
+
+
+		}
+		
+		throw("Method not implmemented");
+	}
+
+	function listCustomerIds() {
 		throw("MethodNotImplemented");
+	}
+
+	function updateCustomer() {
+		throw("MethodNotImplemented");
+	}
+
+
+	private customerResponse function createCustomerResponse(XML xmlResponse){
+
+		var resp = new customerResponse();
+		//var messages = XMLSearch(xmlResponse, "//*messages");
+
+		
+
+		return resp;
+	}
+
+	public customer function createCustomer(){
+		return new customer();
+	}
+	public PaymentProfile function createPaymentProfile(){
+		return new PaymentProfile();
 	}
 
 
