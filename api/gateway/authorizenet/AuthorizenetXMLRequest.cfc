@@ -22,7 +22,7 @@
 <cfcomponent>
 	<cfset variables.validTransactions = "authCaptureTransaction,authOnlyTransaction,priorAuthCaptureTransaction,refundTransaction,voidTransaction">
 
-	<cfset variables.validCustomerRequestTypes = "createCustomerProfileRequest,getCustomerProfileRequest,getCustomerProfileIdsRequest,updateCustomerProfileRequest,deleteCustomerProfileRequest,createCustomerPaymentProfileRequest">
+	<cfset variables.validCustomerRequestTypes = "createCustomerProfileRequest,getCustomerProfileRequest,getCustomerProfileIdsRequest,updateCustomerProfileRequest,deleteCustomerProfileRequest,createCustomerPaymentProfileRequest,getCustomerPaymentProfileRequest,getCustomerPaymentProfileListRequest">
 
 
 	<cfset variables.testmode = true>
@@ -211,6 +211,7 @@
 		<cfargument name="customer" required="false">
 		<cfargument name="paymentProfile" required="false">
 		<cfargument name="options" default="#StructNew()#">
+		<cfargument name="search" default="#StructNew()#">
 
 		<cfif !isValidCustomerRequestType(requestType)>
 			<cfthrow type="cfpayment.UnknownCustomerRequestType" message="Request type, #requestType# is not a valid request type">
@@ -233,13 +234,38 @@
 					<transactionKey>#merchantAuthentication.transactionKey#</transactionKey>
 				</merchantAuthentication>
 
-				<cfif ListFindNoCase("getCustomerProfileRequest,deleteCustomerProfileRequest,createCustomerPaymentProfileRequest", requestType)>
+				<cfif ListFindNoCase("getCustomerProfileRequest,deleteCustomerProfileRequest,createCustomerPaymentProfileRequest,getCustomerPaymentProfileRequest", requestType)>
 				<!--- They require it so throw a message --->
 					<cfif isEmpty(customer.getCustomerProfileId())>
 						<cfthrow type="cfpayment.missingAttributeException" message="The customerProfileId is required for this transaction">
 					</cfif>
 					<customerProfileId>#customer.getCustomerProfileId()#</customerProfileId>
 				</cfif> 
+
+				<cfif requestType EQ "getCustomerPaymentProfileRequest">
+					<cfif isEmpty(paymentProfile.getCustomerPaymentProfileID())>
+						<cfthrow type="cfpayment.missingAttributeException" message="The customerPaymentProfileId is required for this transaction">
+					</cfif>
+					<customerPaymentProfileId>#paymentProfile.getCustomerPaymentProfileID()#</customerPaymentProfileId>
+				</cfif>
+				
+				<!--- This is for searches of payment profiles --->
+				<cfif requestType EQ "getCustomerPaymentProfileListRequest">
+					<cfif structIsEmpty(search)>
+						<cfthrow type="cfpayment.missingAttributeException" message="Thhere are no properties in the search query">
+					</cfif>
+						<searchType>cardsExpiringInMonth</searchType>
+					  	<month>#search.month#</month>
+					  <sorting>
+					  	<orderBy>#search.sorting.orderBy#</orderBy>
+					    <orderDescending>#search.sorting.orderDescending#</orderDescending>
+					  </sorting>
+					  <paging>
+					    <limit>#search.paging.limit#</limit>
+					    <offset>#search.paging.offset#</offset>
+					  </paging>
+				</cfif>
+
 				
 
 				<cfif requestType EQ "createCustomerPaymentProfileRequest">

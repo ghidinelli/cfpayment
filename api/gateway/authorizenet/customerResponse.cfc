@@ -24,16 +24,19 @@ component
 	property name="resultCode" 										getter="true" setter="true";
 	property name="messageCode" 									getter="true" setter="true";
 	property name="messageText" 									getter="true" setter="true";
+	property name="responseType"					type="string"	getter="true" setter="true";
 	property name="customerProfileId"								getter="true" setter="true";
 	property name="customerPaymentProfileId"						getter="true" setter="true";
 	property name="customer"						type="customer"	getter="true" setter="true";
 	property name="customerPaymentProfileIdList" 	type="array" 	getter="true" setter="true";
 	property name="customerShippingAddressIdList" 	type="array" 	getter="true" setter="true";
 	property name="validationDirectResponseList" 	type="array"	getter="true" setter="true";
+	property name="directResponse" 					type="string"	getter="true" setter="true";
 	property name="ids"								type="array"	getter="true" setter="true";
-	property name="responseType"					type="string"	getter="true" setter="true";
+	property name="paymentProfiles"					type="array"	getter="true" setter="true";
+	property name="totalNumInResultSet"				type="numeric"	getter="true" setter="true";
 
-
+	
 	function init(){
 		super.init(argumentCollection=arguments);
 
@@ -45,6 +48,7 @@ component
 				setParsedResult(xmlResponse);
 			var messages = XMLSearch(xmlResponse, "//:messages")[1]; //Should work, always you get a message
 			
+			//If this errors is because the service didn't actually respond which means hasError() should be true;
 			setResultCode(messages.resultCode.xmlText);
 			setMessageCode(messages.message.code.xmlText);
 			setMessageText(messages.message.text.xmlText);
@@ -52,10 +56,24 @@ component
 	
 			//there might be other meta processing. 
 
+			
+
 			//Both HTTP call and actual call were ok
 			if(getResultCode() EQ "OK"){
 				setStatus(getService().getStatusSuccessful());
 				setResponseType(xmlResponse.XmlRoot.xmlName);
+
+				//If anything is in the response set it 
+				setCustomerProfileId(getXMLElementText(xmlResponse, "customerProfileId"));
+				setCustomerPaymentProfileId(getXMLElementText(xmlResponse, "customerPaymentProfileId"));
+				addValidationDirectResponse(getXMLElementText(xmlResponse, "validationDirectResponse"));
+				setDirectResponse(getXMLElementText(xmlResponse, "directResponse"));
+
+
+				
+
+
+
 				//Handle specific data types
 				if(getResponseType() EQ "getCustomerProfileIdsResponse"){
 					var ids = XMlSearch(xmlResponse, "//:ids");
@@ -69,10 +87,30 @@ component
 					}
 				}
 
-				if(getResponseType() EQ "createCustomerPaymentProfileResponse"){
+				if(getResponseType() EQ "getCustomerPaymentProfileListResponse"){
+					setTotalNumInResultSet(getXMLElementText(xmlResponse, "totalNumInResultSet", nullValue()));
 
-					dump(xmlResponse)
-					abort;
+					var paymentProfiles = XMlSearch(xmlResponse, "//:paymentProfile");
+
+					var profiles = [];
+
+					for(var profile in paymentProfiles){
+						var paymentProfile = new paymentProfile();
+							paymentProfile.setCustomerPaymentProfileId(getXMLElementText(profile, "customerPaymentProfileId"));
+							paymentProfile.setCustomerProfileId(getXMLElementText(profile, "customerProfileId"));
+
+							var paymentMethod = {
+								"creditCard":{
+									"cardNumber": getXMLElementText(profile, "cardNumber"),
+									"expirationDate": getXMLElementText(profile, "expirationDate")
+								}
+							};	
+							paymentProfile.setPaymentMethods(paymentMethod);
+
+							profiles.append(paymentProfile);
+					}
+
+					setPaymentProfiles(profiles);
 				}
 
 			}
@@ -108,5 +146,12 @@ component
 			
 			directResponseList.append(directResponse);
 			setValidationDirectResponseList(directResponseList);
+	}
+
+	private function getXMLElementText(XML responseXML, String elementName, default=""){
+		var searchItem = XMLSearch(responseXML, "//:#elementName#");
+
+		
+		return ArrayLen(searchItem) ? searchItem[1].xmlText : default;
 	}
 }
