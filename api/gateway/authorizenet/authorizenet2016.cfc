@@ -413,6 +413,7 @@ component
 
 		
 			if(resp.getResultCode() EQ "OK"){
+				//Move this to the constructor of the response
 				var customerID = XMLSearch(xmlResponse, "//:customerProfileId"); //Might not work if it fails right?
 
 				resp.setCustomerProfileId(customerID[1].xmlText);
@@ -580,12 +581,65 @@ component
 
 		var resp = new customerResponse(argumentCollection=result);
 
-		dump(toString(payload));
-		dump(resp);
-		abort;
+		
+		return resp;
 	}
 
+	function getPaymentProfile(required customerId, required paymentProfileId){
+		var RequestXMLProcessor = new AuthorizenetXMlRequest(getTestMode());
 
+		//Creeate a mock customer and a mock pauyment profile
+		var customer = createCustomer();
+			customer.setCustomerProfileId(customerID);
+		var profile = createPaymentProfile();
+			profile.setCustomerPaymentProfileId(paymentProfileId);
+
+		var payload = RequestXMLProcessor.createCustomerRequest(
+						requestType="getCustomerPaymentProfileRequest",
+						merchantAuthentication=getMerchantAuthentication(),
+						customer=customer,
+						paymentProfile=profile,
+						options={});
+
+
+		var result  = super.process(payload = payload);
+			result["service"] = super.getService();
+			result["testmode"] = super.getTestMode();
+
+		var resp = new customerResponse(argumentCollection=result);
+
+
+		
+		return resp;
+	}
+
+	function getPaymentProfileList(Date required expiryMonth, string orderBy="id",boolean orderDescending=false,numeric limit=1000,numeric offset=1){
+		var RequestXMLProcessor = new AuthorizenetXMlRequest(getTestMode());
+		var search = {
+			"month":DateFormat(expiryMonth, "YYYY-MM"),
+			"sorting": {
+				"orderBy": orderBy,
+				"orderDescending" : orderDescending
+			},
+			"paging": {
+				"limit": limit,
+				"offset": offset
+			}
+		};
+		var payload = RequestXMLProcessor.createCustomerRequest(
+						requestType="getCustomerPaymentProfileListRequest",
+						merchantAuthentication=getMerchantAuthentication(),
+						search=search
+					);
+
+
+		var result  = super.process(payload = payload);
+			result["service"] = super.getService();
+			result["testmode"] = super.getTestMode();
+		var resp = new customerResponse(argumentCollection=result);
+
+		return resp;
+	}
 
 	private void function processCustomerResponseMessages(respObject, xmlResponse){
 

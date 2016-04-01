@@ -21,6 +21,7 @@ component accessors="true"
 
 	property name="customerType" 				type="string"	getter="true" setter="true";
 	property name="billTo" 						type="struct"	getter="true" setter="true";
+	property name="customerProfileId" 			type="string"	getter="true" setter="true";
 	property name="customerPaymentProfileId" 	type="string"	getter="true" setter="true";
 	property name="paymentMethods"				type="struct" 	getter="true" setter="true" hint="Card that we can use with this profile";
 
