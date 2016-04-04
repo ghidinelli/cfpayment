@@ -72,7 +72,19 @@ component
 
 				
 
+				
+				if(getResponseType() EQ "getCustomerPaymentProfileResponse"){
+					var paymentProfiles = XMlSearch(xmlResponse, "//:paymentProfile");
+					var paymentProfile = new paymentProfile();
 
+					if(ArrayLen(paymentProfiles)){
+						paymentProfile.populate(paymentProfiles[1]);
+					}
+					
+
+					setPaymentProfiles([paymentProfile]);
+					
+				}
 
 				//Handle specific data types
 				if(getResponseType() EQ "getCustomerProfileIdsResponse"){
@@ -95,23 +107,15 @@ component
 					var profiles = [];
 
 					for(var profile in paymentProfiles){
-						var paymentProfile = new paymentProfile();
-							paymentProfile.setCustomerPaymentProfileId(getXMLElementText(profile, "customerPaymentProfileId"));
-							paymentProfile.setCustomerProfileId(getXMLElementText(profile, "customerProfileId"));
-
-							var paymentMethod = {
-								"creditCard":{
-									"cardNumber": getXMLElementText(profile, "cardNumber"),
-									"expirationDate": getXMLElementText(profile, "expirationDate")
-								}
-							};	
-							paymentProfile.setPaymentMethods(paymentMethod);
+						var paymentProfile = generatePaymentProfile(profile)
 
 							profiles.append(paymentProfile);
 					}
 
 					setPaymentProfiles(profiles);
 				}
+
+
 
 			}
 			else{
@@ -146,6 +150,27 @@ component
 			
 			directResponseList.append(directResponse);
 			setValidationDirectResponseList(directResponseList);
+	}
+
+	//PRIVATE HELPERS
+	private function generatePaymentProfile(XML profile){
+
+		var paymentProfile = new paymentProfile();
+			paymentProfile.setCustomerPaymentProfileId(getXMLElementText(profile, "customerPaymentProfileId"));
+			paymentProfile.setCustomerProfileId(getXMLElementText(profile, "customerProfileId"));
+
+			var paymentMethod = {
+				"creditCard":{
+					"cardNumber": getXMLElementText(profile, "cardNumber"),
+					"expirationDate": getXMLElementText(profile, "expirationDate")
+				}
+			};	
+
+			//if we have a billTo, we should add it too.
+
+
+			paymentProfile.setPaymentMethods(paymentMethod);
+		return paymentProfile;
 	}
 
 	private function getXMLElementText(XML responseXML, String elementName, default=""){
