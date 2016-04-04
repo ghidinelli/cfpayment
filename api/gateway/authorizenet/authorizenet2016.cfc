@@ -241,6 +241,8 @@ component
 
 	function credit(Any required transactionID, Any required money, Any requred account, Struct options={}) {
 
+	
+
 		var RequestXMLProcessor = new AuthorizenetXMlRequest(getTestMode());
 		var payload = RequestXMLProcessor.createTransactionRequest(
 						transactionType="refundTransaction",
@@ -388,7 +390,6 @@ component
 		var result  = super.process(payload = payload);
 			result["service"] = super.getService();
 			result["testmode"] = super.getTestMode();
-
 		
 		var resp = new customerResponse(argumentCollection=result);
 
@@ -640,6 +641,36 @@ component
 
 		return resp;
 	}
+
+
+	function validatePaymentProfile(required customerId, required paymentProfileId){
+
+		var customer = createCustomer();
+			customer.setCustomerProfileId(customerID);
+		var profile = createPaymentProfile();
+			profile.setCustomerPaymentProfileId(paymentProfileId);
+
+		var RequestXMLProcessor = new AuthorizenetXMlRequest(getTestMode());
+		var payload = RequestXMLProcessor.createCustomerRequest(
+					requestType="validateCustomerPaymentProfileRequest",
+					merchantAuthentication=getMerchantAuthentication(),
+					customer=customer,
+					paymentProfile=profile,
+					options={});
+
+		var result  = super.process(payload = payload);
+			result["service"] = super.getService();
+			result["testmode"] = super.getTestMode();
+
+		var resp = new customerResponse(argumentCollection=result);
+
+		return resp;
+
+	}
+
+	/**
+		PRIVATE FUNCTIONS
+	**/
 
 	private void function processCustomerResponseMessages(respObject, xmlResponse){
 

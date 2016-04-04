@@ -39,10 +39,32 @@ component accessors="true"
 
 
 	public paymentProfile function populate(XML responseXML){
-			setCustomerType(getXMLElementText(responseXML, "customerType"));
+
+
+			getXMLElementText(responseXML, "customerType", "", setCustomerType);
 			setCustomerPaymentProfileId(getXMLElementText(responseXML, "customerPaymentProfileId"));
 		
+			var billToXML = XMLSearch(responseXML, "//:billTo");
+			
 
+			if(ArrayLen(billToXML)){
+				 var billTo = {
+					"firstName": getXMLElementText( billToXML[1], "firstName"),
+					"lastName": getXMLElementText( billToXML[1], "lastName"),
+					"company": getXMLElementText( billToXML[1], "company"),
+					"address": getXMLElementText( billToXML[1], "address"),
+					"city": getXMLElementText( billToXML[1], "city"),
+					"state": getXMLElementText( billToXML[1], "state"),
+					"zip": getXMLElementText( billToXML[1], "zip"),
+					"country": getXMLElementText( billToXML[1], "country"),
+					"phoneNumber": getXMLElementText( billToXML[1], "phoneNumber"),
+					"faxNumber": getXMLElementText( billToXML[1], "faxNumber"),
+				};
+
+				setBillTo(new address(argumentCollection=billTo));
+			}
+				
+			
 			
 			var creditCard = XMLSearch(responseXML, "//:creditCard");
 			if(ArrayLen(creditCard)){
@@ -64,8 +86,22 @@ component accessors="true"
 	}
 
 
-	private function getXMLElementText(XML responseXML, String elementName, default=""){
+	
+
+	private function getXMLElementText(XML responseXML, String elementName, default="",Function callback ){
 		var searchItem = XMLSearch(responseXML, "//:#elementName#");
+
+		//Deal with callbacks.
+		if(	structKeyExists(arguments, "callback") 
+			&& !isNull(arguments.callback) 
+			&& isValid("Function", callback)
+			&& ArrayLen(searchItem)
+			){
+
+			callback(searchItem[1].xmlText);
+			
+		}
+		
 		return ArrayLen(searchItem)?searchItem[1].xmlText : default;
 	}
 }
