@@ -113,8 +113,6 @@
 			p = arguments.payload; // shortcut (by reference)
 
 
-			dump(p);
-			abort;
 
 
 	
@@ -150,8 +148,7 @@
 				structInsert(p, "x_test_request", "FALSE", "yes"); 
 			}
 
-			dump(p);
-			abort;
+			
 			// send it over the wire using the base gateway's transport function.
 			response = createResponse(argumentCollection = super.process(payload = p));
 
