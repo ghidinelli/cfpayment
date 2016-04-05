@@ -23,11 +23,16 @@ component accessors="true" {
 	property name="merchantCustomerId" 	getter="true" setter="true";
 	property name="description" 		getter="true" setter="true";
 	property name="email" 				getter="true" setter="true";
+	property name="service" 				getter="true" setter="true";
 
 	
 	property name="paymentProfiles"		type="array" getter="true" setter="true";
 
 
+	function init(service){
+		setService(service);
+		return this;
+	}
 	/*
 		The id can either be merchantCustomerId, description or email, if they are all null then it is not valid
 	*/
@@ -66,7 +71,7 @@ component accessors="true" {
 
 		var paymentProfiles = XMLSearch(responseXML, "//:paymentProfiles");
 		for(var paymentProfile in paymentProfiles){
-			var pp = new paymentProfile().populate(paymentProfile);
+			var pp = new paymentProfile(service=getService()).populate(paymentProfile);
 			addPaymentProfile(pp);
 			
 		}

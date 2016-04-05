@@ -21,11 +21,13 @@ component accessors="true"
 
 	property name="customerType" 				type="string"	getter="true" setter="true";
 	property name="billTo" 						type="struct"	getter="true" setter="true";
+	property name="service" 					getter="true" setter="true";
 	property name="customerProfileId" 			type="string"	getter="true" setter="true";
 	property name="customerPaymentProfileId" 	type="string"	getter="true" setter="true";
 	property name="paymentMethods"				type="struct" 	getter="true" setter="true" hint="Card that we can use with this profile";
 
 	variables.custTypes = "individual,business";
+
 
 	public function setCustomerType(String type){
 
@@ -69,6 +71,15 @@ component accessors="true"
 			var creditCard = XMLSearch(responseXML, "//:creditCard");
 			if(ArrayLen(creditCard)){
 				//This should be a card object no?
+				//No. The api doesn't return actual cards it seems. So this clashes with this api
+				
+				// var card  = getService().createCreditCard();
+				// 	card.setAccount(creditCard[1].cardNumber.xmltext);
+				// 	card.setMonth(Left(creditCard[1].expirationDate.xmltext, 2));
+				// 	card.setYear(Right(creditCard[1].expirationDate.xmltext, 2));
+				
+				
+			
 				var paymentMethod = {
 					"creditCard":{
 						"cardNumber": creditCard[1].cardNumber.xmltext,

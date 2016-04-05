@@ -54,7 +54,7 @@ component
 			setMessageText(messages.message.text.xmlText);
 			setMessage(getMessageCode() & ": " & getMessageText());
 	
-			//there might be other meta processing. 
+		
 
 			
 
@@ -75,7 +75,7 @@ component
 				
 				if(getResponseType() EQ "getCustomerPaymentProfileResponse"){
 					var paymentProfiles = XMlSearch(xmlResponse, "//:paymentProfile");
-					var paymentProfile = new paymentProfile();
+					var paymentProfile = new paymentProfile(service=getService());
 
 					if(ArrayLen(paymentProfiles)){
 						paymentProfile.populate(paymentProfiles[1]);
@@ -159,6 +159,8 @@ component
 			paymentProfile.setCustomerPaymentProfileId(getXMLElementText(profile, "customerPaymentProfileId"));
 			paymentProfile.setCustomerProfileId(getXMLElementText(profile, "customerProfileId"));
 
+
+			//This should be a card, not just 
 			var paymentMethod = {
 				"creditCard":{
 					"cardNumber": getXMLElementText(profile, "cardNumber"),
