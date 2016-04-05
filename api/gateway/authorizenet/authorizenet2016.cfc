@@ -35,11 +35,23 @@ component
 	variables.cfpayment.GATEWAY_LIVE_URL = "https://api.authorize.net/xml/v1/request.api";
 
 
-	function purchase(Any required money, Any requred account, Struct options={} ){
+	function purchase(Any required money, Any account=nullValue(), Any customer=nullValue(), Any paymentProfile=nullValue(), Struct options={}){
 
-		if(lcase(listLast(getMetaData(arguments.account).fullname, ".")) NEQ "creditcard"){
+
+		//we either need an account (ergo a creditcard) OR a (customer and payment profile) 
+
+		if(!isNull(account)){
+			if(lcase(listLast(getMetaData(arguments.account).fullname, ".")) NEQ "creditcard"){
 			throw("The account type #lcase(listLast(getMetaData(arguments.account).fullname, "."))# is not supported by this gateway.", "", "cfpayment.InvalidAccount");
+			}	
 		}
+
+		if(isNull(account) && isNull(customer) && isNull(paymentProfile)){
+			throw("Either a creditcard/account is needed or a customer and payment profile. None of these have been passed in");
+		}
+
+
+		
 
 		//need a refID presume?
 		var RequestXMLProcessor = new AuthorizenetXMlRequest(getTestMode());
@@ -48,69 +60,23 @@ component
 						merchantAuthentication=getMerchantAuthentication(),
 						money=arguments.money,
 						account=account, 
-						options=options);
+						customer=customer,
+						paymentProfile=paymentProfile,
+						options=options
+						);
 	
+		
 		var results = {};
 
 		//Now go and process it
 		var result  = super.process(payload = payload);
+			result["service"] = super.getService();
+			result["testmode"] = super.getTestMode();
 
-		result.parsedResults = XMLParse(result.result);
-		var resp = createResponse(argumentCollection=result);
-		
-		
-			// do some meta-checks for gateway-level errors (as opposed to auth/decline errors)
-			if (NOT resp.hasError()) {
-					
-				// we need to have a result; otherwise that's an error in itself
-				if (len(resp.getResult())) {
-					var xmlResponse = XMLParse(resp.getResult());
-
-					//Successful response, deal with the actual codes. 
-					var hasTransactionResponse = structKeyExists(xmlResponse, "createTransactionResponse") && structKeyExists(xmlResponse.createTransactionResponse, "transactionResponse");
-
-					var hasErrorRsponse = structKeyExists(xmlResponse, "ErrorResponse");
+		var resp = new transactionResponse(argumentCollection=result);
 
 
-					
-					
-					if(hasTransactionResponse){
-						processTransactionResponse(xmlResponse, resp);
-					}
 
-					else if(hasErrorRsponse) {
-
-						processErrorResponse(xmlResponse, resp);
-
-					}
-
-					
-
-				}
-				else {
-					resp.setStatus(getService().getStatusUnknown()); // Authorize.net didn't return a response
-				}
-			}
-
-
-		
-
-			if (resp.getStatus() EQ getService().getStatusSuccessful()) {
-				result["result"] = "CAPTURED";
-			}
-			else if (resp.getStatus() EQ getService().getStatusDeclined()) {
-				result["result"] = "NOT CAPTURED";
-				
-			}
-			else {
-				result["result"] = "ERROR";
-				
-			}
-
-
-		// store parsed result
-		resp.setParsedResult(result);
-		
 		return resp;
 	
 	}
@@ -488,7 +454,7 @@ component
 			if(resp.getResultCode() EQ "OK"){
 				//Parse the thing
 
-				resp.setCustomer(new Customer().populate(xmlResponse));
+				resp.setCustomer(createCustomer().populate(xmlResponse));
 
 
 
@@ -668,6 +634,59 @@ component
 
 	}
 
+	function updatePaymentProfile(required customerId, required paymentProfile){
+
+		var customer = createCustomer();
+			customer.setCustomerProfileId(customerID);
+	
+
+		var RequestXMLProcessor = new AuthorizenetXMlRequest(getTestMode());
+		var payload = RequestXMLProcessor.createCustomerRequest(
+					requestType="updateCustomerPaymentProfileRequest",
+					merchantAuthentication=getMerchantAuthentication(),
+					customer=customer,
+					paymentProfile=paymentProfile,
+					options={});
+
+
+		
+		var result  = super.process(payload = payload);
+			result["service"] = super.getService();
+			result["testmode"] = super.getTestMode();
+
+		var resp = new customerResponse(argumentCollection=result);
+
+		return resp;
+
+	}
+
+	function deletePaymentProfile(required customerId, required paymentProfileId){
+
+		var customer = createCustomer();
+			customer.setCustomerProfileId(customerID);
+		var profile = createPaymentProfile();
+			profile.setCustomerPaymentProfileId(paymentProfileId);
+
+		var RequestXMLProcessor = new AuthorizenetXMlRequest(getTestMode());
+		var payload = RequestXMLProcessor.createCustomerRequest(
+					requestType="deleteCustomerPaymentProfileRequest",
+					merchantAuthentication=getMerchantAuthentication(),
+					customer=customer,
+					paymentProfile=profile,
+					options={});
+
+
+
+		var result  = super.process(payload = payload);
+			result["service"] = super.getService();
+			result["testmode"] = super.getTestMode();
+
+		var resp = new customerResponse(argumentCollection=result);
+
+		return resp;
+
+	}
+
 	/**
 		PRIVATE FUNCTIONS
 	**/
@@ -683,10 +702,12 @@ component
 	}
 
 	public customer function createCustomer(){
-		return new customer();
+		arguments.service = getService();
+		return new customer(argumentCollection=arguments);
 	}
 
 	public PaymentProfile function createPaymentProfile(){
+		arguments.service = getService();
 		return new PaymentProfile(argumentCollection=arguments);
 	}
 
