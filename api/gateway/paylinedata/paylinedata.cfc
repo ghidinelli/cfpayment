@@ -183,6 +183,30 @@ component
 		return resp;
 	}
 
+	function update(Any required transactionID, Struct options={}){
+
+		//create the struct to send:
+		var PaylineRequest = new PaylineRequest(getTestMode());
+
+
+		var payload = PaylineRequest.createPayload(
+				requestType="update",
+				merchantAuthentication=getMerchantAuthentication(),
+				transactionid=transactionID,
+				options=options
+			);
+
+
+		//Raw result	
+		var result  = super.process(payload = payload);
+		 	result["service"] = super.getService();
+		 	result["testmode"] = super.getTestMode();
+
+
+
+		 var resp = new transactionResponse(argumentCollection=result);
+		return resp;
+	}
 
 	/*
 		Override basic doHTTPCall meethod

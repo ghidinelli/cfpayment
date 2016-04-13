@@ -22,9 +22,13 @@ component
 	
 {
 
-	variables.validTransactions = "sale,auth,capture,refund,void,validate";
+	variables.validTransactions = "sale,auth,capture,refund,void,validate,update";
 
-	public Array function createPayload(String required requestType, Any required merchantAuthentication, Any required money, Any  account, Struct options={}){
+	variables.validFields = {
+		"update": "tracking_number,shipping,shipping_postal,ship_from_postal,shipping_country,shipping_carrier,shipping_date,order_description,order_date,customer_receipt,ponumber,summary_commodity_code,duty_amount,discount_amount,tax,national_tax_amount,alternate_tax_amount,alternate_tax_id,vat_tax_amount,vat_tax_rate,vat_invoice_reference_number,customer_vat_registration,merchant_vat_registration"
+	}
+
+	public Array function createPayload(String required requestType, Any required merchantAuthentication, Any required money, Any  account, Any transactionId, Struct options={}){
 
 		if(!isValidTransactionType(requestType)){
 		 	throw(type="cfpayment.UnknownTransactionType", message="transactionType, #requestType# is not known");
@@ -40,6 +44,9 @@ component
 			addKey(ret, "username", merchantAuthentication.username);
 			addKey(ret, "password", merchantAuthentication.password);
 			
+			if(!isNull(transactionid)){
+				addKey(ret, "transactionId", transactionId);
+			}
 			if(!isNull(money)){
 				addKey(ret, "amount",money.getAmount());
 				addKey(ret, "currency",money.getCurrency());
@@ -76,6 +83,14 @@ component
 
 	private function addKey(arrayItem, name, value){
 		arrayItem.append({"name":name, "value":value});
+	}
+
+	private boolean function isValidField(string requestType, string field){
+			
+
+			//These are also valid
+			//merchant_defined_field_#
+
 	}
 	
 }
