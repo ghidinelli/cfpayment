@@ -111,49 +111,72 @@ component
 
 	function credit(Any required transactionID, Any required money, Struct options={}) {
 
-			options['transactionid'] = transactionID;
+		var PaylineRequest = new PaylineRequest(getTestMode());
+		var payload = PaylineRequest.createPayload(
+				requestType="credit",
+				merchantAuthentication=getMerchantAuthentication(),
+				money=money,
+				transactionId = transactionID,
+				options=options
+			);
 
-			var PaylineRequest = new PaylineRequest(getTestMode());
-			var payload = PaylineRequest.createPayload(
-					requestType="refund",
-					merchantAuthentication=getMerchantAuthentication(),
-					money=money,
-					options=options
-				);
-
-
-			//Raw result	
-			var result  = super.process(payload = payload);
-			 	result["service"] = super.getService();
-			 	result["testmode"] = super.getTestMode();
+		//Raw result	
+		var result  = super.process(payload = payload);
+		 	result["service"] = super.getService();
+		 	result["testmode"] = super.getTestMode();
 
 
 
-			 var resp = new transactionResponse(argumentCollection=result);
-			return resp;
+		 var resp = new transactionResponse(argumentCollection=result);
+		return resp;
 
-		}
-		function void(Any required transactionID, Struct options={}) {
+	}
 
-			options['transactionid'] = transactionID;
-			
-			var PaylineRequest = new PaylineRequest(getTestMode());
-			var payload = PaylineRequest.createPayload(
-					requestType="void",
-					merchantAuthentication=getMerchantAuthentication(),
-					options=options
-				);
+	function refund(Any required transactionID, Any required money, Struct options={}) {
+
+		var PaylineRequest = new PaylineRequest(getTestMode());
+		var payload = PaylineRequest.createPayload(
+				requestType="refund",
+				merchantAuthentication=getMerchantAuthentication(),
+				money=money,
+				transactionId = transactionID,
+				options=options
+			);
+
+		//Raw result	
+		var result  = super.process(payload = payload);
+		 	result["service"] = super.getService();
+		 	result["testmode"] = super.getTestMode();
 
 
-			//Raw result	
-			var result  = super.process(payload = payload);
-			 	result["service"] = super.getService();
-			 	result["testmode"] = super.getTestMode();
+
+		 var resp = new transactionResponse(argumentCollection=result);
+		return resp;
+
+	}
+
+
+	function void(Any required transactionID, Struct options={}) {
+
+		options['transactionid'] = transactionID;
+		
+		var PaylineRequest = new PaylineRequest(getTestMode());
+		var payload = PaylineRequest.createPayload(
+				requestType="void",
+				merchantAuthentication=getMerchantAuthentication(),
+				options=options
+			);
+
+
+		//Raw result	
+		var result  = super.process(payload = payload);
+		 	result["service"] = super.getService();
+		 	result["testmode"] = super.getTestMode();
 
 
 
-			 var resp = new transactionResponse(argumentCollection=result);
-			return resp;
+		 var resp = new transactionResponse(argumentCollection=result);
+		return resp;
 
 		}
 
