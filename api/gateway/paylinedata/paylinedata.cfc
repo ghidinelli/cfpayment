@@ -31,6 +31,8 @@ component
 	variables.cfpayment.GATEWAY_TEST_URL = "https://secure.paylinedatagateway.com/api/transact.php";
 	variables.cfpayment.GATEWAY_LIVE_URL = "https://secure.paylinedatagateway.com/api/transact.php";
 
+	variables.cfpayment.QUERY_URL = "https://secure.paylinedatagateway.com/api/query.php"
+
 
 
 	function purchase(Any required money, Any requred account, Struct options={}){
@@ -231,6 +233,90 @@ component
 		return resp;
 	}
 
+	function store(required customer){
+		
+		var PaylineRequest = new PaylineRequest(getTestMode());
+
+
+		var payload = PaylineRequest.createPayload(
+				requestType="add_customer",
+				merchantAuthentication=getMerchantAuthentication(),
+				customer=arguments.customer
+				
+			);
+
+		//Raw result	
+		var result  = super.process(payload = payload);
+		 	result["service"] = super.getService();
+		 	result["testmode"] = super.getTestMode();
+
+
+
+		 var resp = new transactionResponse(argumentCollection=result);
+		return resp;
+
+	}
+
+
+
+	function getCustomer(required String customer_vault_id ){
+
+		var payload = [];
+		var auth = getMerchantAuthentication();
+		//We are not doing a full query implementation, so let's just see what it returns.
+		ArrayAppend(payload, {
+				"name": "customer_vault_id",
+				"value": customer_vault_id
+			});
+		ArrayAppend(payload, {
+				"name": "report_type",
+				"value": "customer_vault"
+			});
+
+		ArrayAppend(payload, {
+				"name": "report_type",
+				"value": "customer_vault"
+			});
+		ArrayAppend(payload, {
+				"name": "username",
+				"value": auth.username
+			});
+		ArrayAppend(payload, {
+				"name": "password",
+				"value": auth.password
+			});
+
+		
+
+
+		//Raw result	
+		var result  = super.process(payload = payload, url=variables.cfpayment.QUERY_URL);
+		 	result["service"] = super.getService();
+		 	result["testmode"] = super.getTestMode();
+
+
+		 	dump(result);
+		 abort;
+
+
+		 var resp = new transactionResponse(argumentCollection=result);
+		return resp;
+
+
+
+
+	}
+
+
+	//FACTORY METHODS
+
+	public customer function createCustomer(){
+		return new customer(argumentCollection=arguments);
+	}
+
+	public address function createAddress(){
+		return new address(argumentCollection=arguments);
+	}
 	/*
 		Override basic doHTTPCall meethod
 	*/

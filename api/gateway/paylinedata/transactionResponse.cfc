@@ -22,10 +22,11 @@ component
 	{
 
 
-		property name="orderID" 		getter="true" setter="true";
-		property name="responseType"	type="string"	getter="true" setter="true";
-		property name="responseCode"	type="numeric"	getter="true" setter="true";
-		property name="response"		type="numeric"	getter="true" setter="true";
+		property name="orderID" 			getter="true" setter="true";
+		property name="responseType"		type="string"	getter="true" setter="true";
+		property name="responseCode"		type="numeric"	getter="true" setter="true";
+		property name="response"			type="numeric"	getter="true" setter="true";
+		property name="customerVaultId"	type="string"	getter="true" setter="true";
 
 
 
@@ -81,6 +82,14 @@ component
 				setResponseCode(parsedResult.response_code)
 				setResponse(parsedResult.response);
 				setMessage(parsedResult.responsetext);
+
+				if(structKeyExists(parsedResult, "customer_vault_id")){
+					setCustomerVaultId(parsedResult.customer_vault_id);
+				}
+				
+
+
+
 
 				if(getResponseCode() EQ 100){
 					setStatus(getService().getStatusSuccessful());
