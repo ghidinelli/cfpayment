@@ -57,7 +57,7 @@ component
 
 
 
-		 var resp = new transactionResponse(argumentCollection=result);
+		 var resp = new PaylineResponse(argumentCollection=result);
 		return resp;
 	}
 
@@ -83,7 +83,7 @@ component
 
 
 
-		 var resp = new transactionResponse(argumentCollection=result);
+		 var resp = new PaylineResponse(argumentCollection=result);
 		return resp;
 	}
 
@@ -107,7 +107,7 @@ component
 
 
 
-		 var resp = new transactionResponse(argumentCollection=result);
+		 var resp = new PaylineResponse(argumentCollection=result);
 		return resp;
 	}
 
@@ -129,7 +129,7 @@ component
 
 
 
-		 var resp = new transactionResponse(argumentCollection=result);
+		 var resp = new PaylineResponse(argumentCollection=result);
 		return resp;
 
 	}
@@ -152,7 +152,7 @@ component
 
 
 
-		 var resp = new transactionResponse(argumentCollection=result);
+		 var resp = new PaylineResponse(argumentCollection=result);
 		return resp;
 
 	}
@@ -177,7 +177,7 @@ component
 
 
 
-		 var resp = new transactionResponse(argumentCollection=result);
+		 var resp = new PaylineResponse(argumentCollection=result);
 		return resp;
 
 		}
@@ -204,7 +204,7 @@ component
 
 
 
-		 var resp = new transactionResponse(argumentCollection=result);
+		 var resp = new PaylineResponse(argumentCollection=result);
 		return resp;
 	}
 
@@ -229,7 +229,7 @@ component
 
 
 
-		 var resp = new transactionResponse(argumentCollection=result);
+		 var resp = new PaylineResponse(argumentCollection=result);
 		return resp;
 	}
 
@@ -252,7 +252,7 @@ component
 
 
 
-		 var resp = new transactionResponse(argumentCollection=result);
+		 var resp = new PaylineResponse(argumentCollection=result);
 		return resp;
 
 	}
@@ -294,16 +294,34 @@ component
 		 	result["service"] = super.getService();
 		 	result["testmode"] = super.getTestMode();
 
-
-		 	dump(result);
-		 abort;
-
-
-		 var resp = new transactionResponse(argumentCollection=result);
+		 var resp = new PaylineResponse(argumentCollection=result);
 		return resp;
 
 
 
+
+	}
+	function updateCustomer(required customer){
+		
+		var PaylineRequest = new PaylineRequest(getTestMode());
+
+
+		var payload = PaylineRequest.createPayload(
+				requestType="update_customer",
+				merchantAuthentication=getMerchantAuthentication(),
+				customer=arguments.customer
+				
+			);
+
+		//Raw result	
+		var result  = super.process(payload = payload);
+		 	result["service"] = super.getService();
+		 	result["testmode"] = super.getTestMode();
+
+
+
+		 var resp = new PaylineResponse(argumentCollection=result);
+		return resp;
 
 	}
 

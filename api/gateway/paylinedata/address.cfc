@@ -30,6 +30,8 @@ component
 	property name="phoneNumber" 	type="string"	getter="true"	setter="true";
 	property name="email" 			type="string"	getter="true"	setter="true";
 	property name="faxNumber" 		type="string"	getter="true"	setter="true";
+	property name="cellPhoneNumber" type="string"	getter="true"	setter="true";
+	property name="website" 		type="string"	getter="true"	setter="true";
 
 
 	public Struct function getMemento(){
@@ -45,7 +47,4 @@ component
 		}
 		return ret;
 	}
-
-
-
 }

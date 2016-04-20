@@ -22,7 +22,7 @@ component
 	
 {
 
-	variables.validTransactions = "sale,auth,capture,refund,void,validate,update,credit,add_customer";
+	variables.validTransactions = "sale,auth,capture,refund,void,validate,update,credit,add_customer,update_customer";
 
 	variables.validFields = {
 		"update": "tracking_number,shipping,shipping_postal,ship_from_postal,shipping_country,shipping_carrier,shipping_date,order_description,order_date,customer_receipt,ponumber,summary_commodity_code,duty_amount,discount_amount,tax,national_tax_amount,alternate_tax_amount,alternate_tax_id,vat_tax_amount,vat_tax_rate,vat_invoice_reference_number,customer_vat_registration,merchant_vat_registration"
@@ -43,14 +43,13 @@ component
 		
 		var ret = [];
 
-			if(requestType EQ "add_customer"){
+			if(ListFindNocase("update_customer,add_customer", requestType)){
 				addKey(ret, "customer_vault", requestType);
 			}
 			else{
 				addKey(ret, "type", requestType);
 			}
-
-			
+	
 			addKey(ret, "username", merchantAuthentication.username);
 			addKey(ret, "password", merchantAuthentication.password);
 			
@@ -83,13 +82,12 @@ component
 				var customer = customer.getMemento();
 
 
-
 				for(var k in customer){
 
 					if(k EQ "address" && !isNull(customer[k])){
 						var address = customer[k];
-
-						addKey(ret, "firs_tname", address.getFirstName());
+						//Should be elevated out to the customer themselves no?
+						addKey(ret, "first_name", address.getFirstName());
 						addKey(ret, "last_name", address.getLastName());
 						addKey(ret, "company", address.getcompany());
 						addKey(ret, "address1", address.getaddress());
@@ -118,10 +116,13 @@ component
 						addKey(ret, "shipping_email", address.getEmail());
 					}
 
+
+			
 					//Dont add fields we don't have
 					else if(!isNull(customer[k])){
 							addKey(ret, k, customer[k]);	
 					}
+
 
 					
 					

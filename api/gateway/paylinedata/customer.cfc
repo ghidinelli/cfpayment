@@ -21,14 +21,24 @@ component accessors="true"
 
 
 
-	property name="customer_vault_id" 					getter="true" setter="true";
-	property name="billing_id" 							getter="true" setter="true";
+	property name="customerVaultId" 					getter="true" setter="true";
+
+	property name="billingId" 							getter="true" setter="true";
+	property name="taxId" 								getter="true" setter="true";
+	property name="shippingCarrier" 					getter="true" setter="true";
+	property name="trackingNumber" 						getter="true" setter="true";
+	property name="shippingDate" 						getter="true" setter="true";
+	property name="shipping" 							getter="true" setter="true";
+	property name="cchash" 							getter="true" setter="true";
+	property name="ccbin" 								getter="true" setter="true";
+	property name="processorId" 						getter="true" setter="true";
+
 	property name="card" 								getter="true" setter="true";
 	property name="payment" 							getter="true" setter="true" default="creditcard";
 	property name="orderid"								getter="true" setter="true";
-	property name="order_description"					getter="true" setter="true";
+	property name="orderDescription"					getter="true" setter="true";
 	//Should be an array
-	property name="merchant_defined_fields" 			type="array"	getter="true" setter="true";
+	property name="merchantDefinedFields" 			type="array"	getter="true" setter="true";
 
 // ponumber****
 // tax****
@@ -57,22 +67,48 @@ component accessors="true"
 		return this;
 	}
 
+
+	public customer function populate(XML responseXML){
+
+		abort;
+
+		// setMerchantCustomerId(getXMLElementText(responseXML, "merchantCustomerId"));
+		// setDescription(getXMLElementText(responseXML, "description"));
+		// setEmail(getXMLElementText(responseXML, "email"));
+		
+
+		// //TODO: find out if this is actually correct and we get an array of paymentProfiles back, documentation is lacking at this point:
+		// //http://developer.authorize.net/api/reference/#customer-profiles-create-customer-profile
+
+		// var paymentProfiles = XMLSearch(responseXML, "//:paymentProfiles");
+		// for(var paymentProfile in paymentProfiles){
+		// 	var pp = new paymentProfile(service=getService()).populate(paymentProfile);
+		// 	addPaymentProfile(pp);
+			
+		// }
+
+		
+		return this;
+	}
+
+
+
 	public Struct function getMemento(){
 
 		var ret = {};
 		var proparr = getMetadata(this).properties;
+
+		//mapped properties
 
 		for(var prop in proparr){
 			if(prop.name != "card"){
 				ret[prop.name] = prop.getter? this["get#prop.name#"]() : variables[prop.name];	
 			}
 			else if(!isNull(getCard())) {
-
 				ret["ccnumber"] = getCard().getAccount();
 				ret["ccexp"] = DateFormat(getCard().getExpirationDate(), "MMYY");
 
 			}
-			
 		}
 		return ret;
 	}
