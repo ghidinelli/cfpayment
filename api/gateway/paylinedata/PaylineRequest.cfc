@@ -81,51 +81,10 @@ component
 			if(!isNull(customer)){
 				var customer = customer.getMemento();
 
-
 				for(var k in customer){
-
-					if(k EQ "address" && !isNull(customer[k])){
-						var address = customer[k];
-						//Should be elevated out to the customer themselves no?
-						addKey(ret, "first_name", address.getFirstName());
-						addKey(ret, "last_name", address.getLastName());
-						addKey(ret, "company", address.getcompany());
-						addKey(ret, "address1", address.getaddress());
-						addKey(ret, "address2", address.getAddress2());
-						addKey(ret, "city", address.getCity());
-						addKey(ret, "state", address.getState());
-						addKey(ret, "zip", address.getZip());
-						addKey(ret, "country", address.getcountry());
-						addKey(ret, "phone", address.getphoneNumber());
-						addKey(ret, "fax", address.getphoneNumber());
-						addKey(ret, "email", address.getEmail());
+					if(!isNull(customer[k])){
+						addKey(ret, k, customer[k]);	
 					}
-					else if(k EQ "shippingaddress" && !isNull(customer[k])){
-						var address = customer[k];
-						addKey(ret, "shipping_firstname", address.getFirstName());
-						addKey(ret, "shipping_lastname", address.getLastName());
-						addKey(ret, "shipping_company", address.getcompany());
-						addKey(ret, "shipping_address1", address.getaddress());
-						addKey(ret, "shipping_address2", address.getAddress2());
-						addKey(ret, "shipping_city", address.getCity());
-						addKey(ret, "shipping_state", address.getState());
-						addKey(ret, "shipping_zip", address.getZip());
-						addKey(ret, "shipping_country", address.getcountry());
-						addKey(ret, "shipping_phone", address.getphoneNumber());
-						addKey(ret, "shipping_fax", address.getphoneNumber());
-						addKey(ret, "shipping_email", address.getEmail());
-					}
-
-
-			
-					//Dont add fields we don't have
-					else if(!isNull(customer[k])){
-							addKey(ret, k, customer[k]);	
-					}
-
-
-					
-					
 				}
 			}
 			

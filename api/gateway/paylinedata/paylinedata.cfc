@@ -257,7 +257,40 @@ component
 
 	}
 
+	function unstore(required String customer_vault_id ){
+		var payload = [];
+		var auth = getMerchantAuthentication();
 
+		ArrayAppend(payload, {
+				"name": "customer_vault_id",
+				"value": customer_vault_id
+			});
+		ArrayAppend(payload, {
+				"name": "customer_vault",
+				"value": "delete_customer"
+			});
+
+	
+		ArrayAppend(payload, {
+				"name": "username",
+				"value": auth.username
+			});
+		ArrayAppend(payload, {
+				"name": "password",
+				"value": auth.password
+			});
+
+		//Raw result	
+		var result  = super.process(payload = payload);
+		 	result["service"] = super.getService();
+		 	result["testmode"] = super.getTestMode();
+
+
+
+		 var resp = new PaylineResponse(argumentCollection=result);
+		return resp;
+
+	}
 
 	function getCustomer(required String customer_vault_id ){
 
