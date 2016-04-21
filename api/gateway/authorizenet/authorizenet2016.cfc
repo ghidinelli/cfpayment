@@ -35,8 +35,7 @@ component
 	variables.cfpayment.GATEWAY_LIVE_URL = "https://api.authorize.net/xml/v1/request.api";
 
 
-	function purchase(Any required money, Any account=nullValue(), Any customer=nullValue(), Any paymentProfile=nullValue(), Struct options={}){
-
+	function purchase(required Any money, Any account=nullValue(), Any customer=nullValue(), Any paymentProfile=nullValue(), Struct options={}){
 
 		//we either need an account (ergo a creditcard) OR a (customer and payment profile) 
 
@@ -49,20 +48,26 @@ component
 		if(isNull(account) && isNull(customer) && isNull(paymentProfile)){
 			throw("Either a creditcard/account is needed or a customer and payment profile. None of these have been passed in");
 		}
-
-
-		
-
 		//need a refID presume?
 		var RequestXMLProcessor = new AuthorizenetXMlRequest(getTestMode());
+
+		var argumentColls = {
+			"transactionType" : "authCaptureTransaction",
+			"merchantAuthentication" : getMerchantAuthentication(),
+			"money" : arguments.money,
+			"options" : options
+		};
+
+		if(!IsNull(account)){
+			argumentColls["account"] = account;
+		}
+
+		if(!IsNull(customer)){
+			argumentColls["customer"] = customer;	
+		}
+
 		var payload = RequestXMLProcessor.createTransactionRequest(
-						transactionType="authCaptureTransaction",
-						merchantAuthentication=getMerchantAuthentication(),
-						money=arguments.money,
-						account=account, 
-						customer=customer,
-						paymentProfile=paymentProfile,
-						options=options
+					argumentCollection=argumentColls
 						);
 	
 		
@@ -81,7 +86,7 @@ component
 	
 	}
 
-	function authorize(Any required money, Any requred account, Struct options={}){
+	function authorize(required Any money, Any requred account, Struct options={}){
 		if(lcase(listLast(getMetaData(arguments.account).fullname, ".")) NEQ "creditcard"){
 			throw("The account type #lcase(listLast(getMetaData(arguments.account).fullname, "."))# is not supported by this gateway.", "", "cfpayment.InvalidAccount");
 		}
@@ -145,7 +150,7 @@ component
 
 	}
 
-	function capture(Any required money, String required authorization, Struct options={}){
+	function capture(required Any money, String required authorization, Struct options={}){
 		options.refTransID = authorization;
 
 		var RequestXMLProcessor = new AuthorizenetXMlRequest(getTestMode());
