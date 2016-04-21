@@ -28,7 +28,7 @@ component
 		"update": "tracking_number,shipping,shipping_postal,ship_from_postal,shipping_country,shipping_carrier,shipping_date,order_description,order_date,customer_receipt,ponumber,summary_commodity_code,duty_amount,discount_amount,tax,national_tax_amount,alternate_tax_amount,alternate_tax_id,vat_tax_amount,vat_tax_rate,vat_invoice_reference_number,customer_vat_registration,merchant_vat_registration"
 	}
 
-	public Array function createPayload(String required requestType, Any required merchantAuthentication, Any required money, Any  account, Any transactionId, Any customer, Struct options={}){
+	public Array function createPayload(String required requestType, Any required merchantAuthentication, Any required money, Any  account, String customer_vault_id, Any transactionId, Any customer, Struct options={}){
 
 		if(!isValidTransactionType(requestType)){
 		 	throw(type="cfpayment.UnknownTransactionType", message="transactionType, #requestType# is not known");
@@ -59,6 +59,10 @@ component
 			if(!isNull(money)){
 				addKey(ret, "amount",money.getAmount());
 				addKey(ret, "currency",money.getCurrency());
+			}
+
+			if(!isNull(customer_vault_id)){
+				addKey(ret, "customer_vault_id",customer_vault_id);
 			}
 			
 			if(!isNull(account)){
