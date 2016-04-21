@@ -35,21 +35,30 @@ component
 
 
 
-	function purchase(Any required money, Any requred account, Struct options={}){
+	function purchase(required Any  money, Any account, String customer_vault_id, Struct options={}){
 
-		//create the struct to send:
+		var requestPayload = {
+			requestType="sale",
+			merchantAuthentication=getMerchantAuthentication(),
+			money=money,
+			options=options
+		}
+
+		if(!IsNull(account)){
+			requestPayload['account'] =account;
+		}
+
+		if(!IsNull(customer_vault_id)){
+			requestPayload['customer_vault_id'] =customer_vault_id; 
+		}
+
 		var PaylineRequest = new PaylineRequest(getTestMode());
-
-
 		var payload = PaylineRequest.createPayload(
-				requestType="sale",
-				merchantAuthentication=getMerchantAuthentication(),
-				money=money,
-				account=account,
-				options=options
+				argumentCollection=requestPayload
 			);
 
 
+	
 		//Raw result	
 		var result  = super.process(payload = payload);
 		 	result["service"] = super.getService();
