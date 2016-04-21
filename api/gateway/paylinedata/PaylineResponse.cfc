@@ -76,10 +76,11 @@ component
 				var parsedResult = getResult();
 
 				if(isXML(getResult())){
-					//We have to process this differently
-					
+					//We have to process this differently				
 					parseXMLResponse(getResult());
 					setParsedResult(parsedResult);
+
+
 					
 				}
 				else {
@@ -158,62 +159,36 @@ component
 			setResponse(1);
 			setMessage("Returned customer from customer_vault");
 
-			var custData = {
-				'customerVaultId': custXML.customer_vault_id.XMLText,
-				"taxId": custXML.customertaxid.XMLText,
-				"shippingCarrier": custXML.shipping_carrier.XMLText,
-				"trackingNumber": custXML.tracking_number.XMLText,
-				"shippingDate": custXML.shipping_date.XMLText,
-				"shipping": custXML.shipping.XMLText,
-				"ccHash": custXML.cc_hash.XMLText,
-				"ccbin": custXML.cc_bin.XMLText,
-				"processorId": custXML.processor_id.XMLText,
+
+		
+
+			var inputStruct  = {};
+			for(var field in custXML.XMLChildren){
+				
+					inputStruct[field.xmlName] = field.XMLText;
+				
+				
 			}
-
-			setCustomerVaultId( custXML.customer_vault_id.XMLText);
-
 			
-			custData.address = new address({
-				"firstName":custXML.first_name.XMLText,
-				"lastName":custXML.last_name.XMLText,
-				"company":custXML.company.XMLText,
-				"address":custXML.address_1.XMLText,
-				"address2":custXML.address_2.XMLText,
-				"city":custXML.city.XMLText,
-				"state":custXML.state.XMLText,
-				"zip":custXML.postal_code.XMLText,
-				"country":custXML.country.XMLText,
-				"phoneNumber":custXML.phone.XMLText,
-				"email":custXML.email.XMLText,
-				"faxNumber":custXML.fax.XMLText,
-				"cellPhoneNumber":custXML.cell_phone.XMLText,
-				"website":custXML.website.XMLText,
-			});
-			custData.shippingAddress = new address({
-				"firstName":custXML.shipping_first_name.XMLText,
-				"lastName":custXML.shipping_last_name.XMLText,
-				"address":custXML.shipping_address_1.XMLText,
-				"address2":custXML.shipping_address_2.XMLText,
-				"city":custXML.shipping_city.XMLText,
-				"state":custXML.shipping_state.XMLText,
-				"zip":custXML.shipping_postal_code.XMLText,
-				"country":custXML.shipping_country.XMLText,
-				"email":custXML.shipping_email.XMLText,
-			});
-
+			
 
 			var card = getService().createCreditCard();
 				card.setAccount(custXML.cc_number.XMLText);
 				card.setMonth(Left(custXML.cc_exp.XMLText, 2));
 				card.setYear(Right(custXML.cc_exp.XMLText, 2));
+				card.setIssueNumber(custXML.cc_issue_number.XMLText);
 
-			custData.card = card;
+				card.setStartMonth(Left(custXML.cc_start_date.XMLText, 2));
+				card.setStartYear(Right(custXML.cc_start_date.XMLText, 2));
+				
+
+			inputStruct.card = card;
 
 		
-			var customer = new customer(custData);
+			var customer = new customer().populate(inputStruct);
 
 			setCustomer(customer);
-			return;
+			return this;
 		}
 
 		//get the root
