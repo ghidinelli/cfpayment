@@ -25,9 +25,13 @@ component
 
 	variables.cfpayment.GATEWAY_LIVE_URL = "https://ps1.merchantware.net/Merchantware/ws/RetailTransaction/v4/Credit.asmx";
 
+	variables.MerchantWareService = ""; //Needs to be configured at startup
+
 	
 	function init(){
 		super.init(argumentCollection=arguments);
+
+		//Create the webservice 
 
 		//we require 
 		if(!structKeyExists(config, "merchantName")){
@@ -43,122 +47,369 @@ component
 		variables.cfpayment.merchantName = config.merchantName;
 		variables.cfpayment.merchantSiteId = config.merchantSiteId;
 		variables.cfpayment.merchantKey = config.merchantKey;
+		variables.MerchantWareService = createObject("webservice", "#variables.cfpayment.GATEWAY_LIVE_URL#?wsdl");
 
 		return this;
 
 	}
 
-	function purchase(Any required money, Any requred account, Struct options={}){
+	function purchase(Any required money, Any account, Struct options={}){
 
 		//Need to append /SaleKeyed to url
 		var requestType = "SaleKeyed";
-
-		var MerchantWareRequest = new MerchantWareRequest();
-		var payload = MerchantWareRequest.createPayload(
-				requestType=requestType,
-				merchantAuthentication=getMerchantAuthentication(),
-				money=money,
-				account=account,
-				options=options
-			);
+		var creds = getMerchantAuthentication();
 
 
-		var urlDest = variables.cfpayment.GATEWAY_LIVE_URL & "/" & requestType;
-		var result  = super.process(payload = payload, url=urlDest);
-		 	result["service"] = super.getService();
-		 	result["testmode"] = super.getTestMode();
-		 
+		var args = {
+			merchantName:creds.merchantName,
+			merchantSiteId:creds.merchantSiteId,
+			merchantKey:creds.merchantKey,
+			invoiceNumber:"",
+			amount:money.getCents(),
+			cardNumber:account.getAccount(),
+			expirationDate=DateFormat(account.getExpirationDate(), "MMYY"),
+			cardholder=account.getName(),
+			avsStreetAddress=account.getAddress(),
+			avsStreetZipCode=account.getPostalCode(),
+			cardSecurityCode=account.getVerificationValue(),
+			forceDuplicate=getTestMode(),
+			registerNumber="",
+			merchantTransactionId="",
+		}
+
+		if(StructKeyExists(options,"invoiceNumber")){
+			args["invoiceNumber"]=options.invoiceNumber;
+		}
+		if(StructKeyExists(options,"registerNumber")){
+			args["registerNumber"]=options.registerNumber;
+		}
+		if(StructKeyExists(options,"merchantTransactionId")){
+			args["merchantTransactionId"]=options.merchantTransactionId;
+		}
+		
+
+		var resp = variables.MerchantWareService.SaleKeyed(argumentCollection=args );
 
 
-		dump(result);
-		dump([arguments, payload]);
+			//Raw result	
+		var result = {
+			"parsedResult": resp,
+			"service" : super.getService(),
+			"testmode" : super.getTestMode(),
+			"requestType": "SaleKeyed"
+		};
 
-		abort;		//Raw result	
-		 var resp = new transactionResponse(argumentCollection=result);
-		return resp;
+		var formattedresponse = new MerchantWareResponse(argumentCollection=result);
+
+		return formattedresponse;
+	}
+
+	function purchaseVault(required money, Any vaultToken, Struct options={}){
+
+		var requestType = "SaleVault";
+		var creds = getMerchantAuthentication();
 
 
-	
-		throw("Method Not Implemented");
+		var args = {
+			merchantName:creds.merchantName,
+			merchantSiteId:creds.merchantSiteId,
+			merchantKey:creds.merchantKey,
+			invoiceNumber:"",
+			amount:money.getCents(),
+			vaultToken: vaultToken,
+			forceDuplicate=getTestMode(),
+			registerNumber="",
+			merchantTransactionId="",
+		}
+
+		if(StructKeyExists(options,"invoiceNumber")){
+			args["invoiceNumber"]=options.invoiceNumber;
+		}
+		if(StructKeyExists(options,"registerNumber")){
+			args["registerNumber"]=options.registerNumber;
+		}
+		if(StructKeyExists(options,"merchantTransactionId")){
+			args["merchantTransactionId"]=options.merchantTransactionId;
+		}
+		
+
+		var resp = variables.MerchantWareService.SaleVault(argumentCollection=args );
+
+
+			//Raw result	
+		var result = {
+			"parsedResult": resp,
+			"service" : super.getService(),
+			"testmode" : super.getTestMode(),
+			"requestType": "SaleVault"
+		};
+
+		var formattedresponse = new MerchantWareResponse(argumentCollection=result);
+
+		return formattedresponse;
 	}
 
 	function authorize(Any required money, Any requred account, Struct options={}){
 
-		throw("Method Not Implemented");
+		var requestType = "PreAuthorizationKeyed";
+		var creds = getMerchantAuthentication();
+
+		var args = {
+			merchantName:creds.merchantName,
+			merchantSiteId:creds.merchantSiteId,
+			merchantKey:creds.merchantKey,
+			invoiceNumber:"",
+			amount:money.getCents(),
+			cardNumber:account.getAccount(),
+			expirationDate=DateFormat(account.getExpirationDate(), "MMYY"),
+			cardholder=account.getName(),
+			avsStreetAddress=account.getAddress(),
+			avsStreetZipCode=account.getPostalCode(),
+			cardSecurityCode=account.getVerificationValue(),
+			registerNumber="",
+			merchantTransactionId="",
+		}
+
+		if(StructKeyExists(options,"invoiceNumber")){
+			args["invoiceNumber"]=options.invoiceNumber;
+		}
+		if(StructKeyExists(options,"registerNumber")){
+			args["registerNumber"]=options.registerNumber;
+		}
+		if(StructKeyExists(options,"merchantTransactionId")){
+			args["merchantTransactionId"]=options.merchantTransactionId;
+		}
+		
+		var resp = variables.MerchantWareService.PreAuthorizationKeyed(argumentCollection=args );
+		//Raw result	
+		
+		var result = {
+			"parsedResult": resp,
+			"service" : super.getService(),
+			"testmode" : super.getTestMode(),
+			"requestType": "PreAuthorizationKeyed"
+		};
+		var formattedresponse = new MerchantWareResponse(argumentCollection=result);
+
+		return formattedresponse;
 	}
 
 	function capture(Any required money, String required authorization, Struct options={}){
 
-		throw("Method Not Implemented");
+		var requestType = "PostAuthorization";
+		var creds = getMerchantAuthentication();
+
+		var args = {
+			merchantName:creds.merchantName,
+			merchantSiteId:creds.merchantSiteId,
+			merchantKey:creds.merchantKey,
+			invoiceNumber:"",
+			amount:money.getCents(),
+			token:authorization,
+			registerNumber="",
+			merchantTransactionId="",
+		}
+
+		if(StructKeyExists(options,"invoiceNumber")){
+			args["invoiceNumber"]=options.invoiceNumber;
+		}
+		if(StructKeyExists(options,"registerNumber")){
+			args["registerNumber"]=options.registerNumber;
+		}
+		if(StructKeyExists(options,"merchantTransactionId")){
+			args["merchantTransactionId"]=options.merchantTransactionId;
+		}
+		
+		var resp = variables.MerchantWareService.PostAuthorization(argumentCollection=args );
+		//Raw result	
+		
+		var result = {
+			"parsedResult": resp,
+			"service" : super.getService(),
+			"testmode" : super.getTestMode(),
+			"requestType": "PostAuthorization"
+		};
+		var formattedresponse = new MerchantWareResponse(argumentCollection=result);
+
+		return formattedresponse;
 	}
+
+	public Any function refund(required Any transactionID, required Any money, Struct options={}){
+
+		var requestType = "Refund";
+		var creds = getMerchantAuthentication();
+
+		var args = {
+			merchantName:creds.merchantName,
+			merchantSiteId:creds.merchantSiteId,
+			merchantKey:creds.merchantKey,
+			invoiceNumber:"",
+			overrideAmount:money.getCents(),
+			token:transactionID,
+			registerNumber="",
+			merchantTransactionId="",
+		}
+
+		if(StructKeyExists(options,"invoiceNumber")){
+			args["invoiceNumber"]=options.invoiceNumber;
+		}
+		if(StructKeyExists(options,"registerNumber")){
+			args["registerNumber"]=options.registerNumber;
+		}
+		if(StructKeyExists(options,"merchantTransactionId")){
+			args["merchantTransactionId"]=options.merchantTransactionId;
+		}
+		
+		var resp = variables.MerchantWareService.Refund(argumentCollection=args );
+		//Raw result	
+		
+		var result = {
+			"parsedResult": resp,
+			"service" : super.getService(),
+			"testmode" : super.getTestMode(),
+			"requestType": "Refund"
+		};
+		var formattedresponse = new MerchantWareResponse(argumentCollection=result);
+
+		return formattedresponse;
+	}
+
 
 	function credit(Any required transactionID, Any required money, Struct options={}) {
 
 		throw("Method Not Implemented");
 
 	}
-	function void(Any required transactionID, Struct options={}) {
 
-		throw("Method Not Implemented");
+
+
+	function void(required Any transactionID, Struct options={}) {
+
+		var requestType = "Void";
+		var creds = getMerchantAuthentication();
+
+		var args = {
+			merchantName:creds.merchantName,
+			merchantSiteId:creds.merchantSiteId,
+			merchantKey:creds.merchantKey,
+			
+			token:transactionID,
+			registerNumber="",
+			merchantTransactionId="",
+		}
+
+
+		if(StructKeyExists(options,"registerNumber")){
+			args["registerNumber"]=options.registerNumber;
+		}
+		if(StructKeyExists(options,"merchantTransactionId")){
+			args["merchantTransactionId"]=options.merchantTransactionId;
+		}
+		
+		var resp = variables.MerchantWareService.Void(argumentCollection=args );
+		//Raw result	
+		
+		var result = {
+			"parsedResult": resp,
+			"service" : super.getService(),
+			"testmode" : super.getTestMode(),
+			"requestType": "Void"
+		};
+		var formattedresponse = new MerchantWareResponse(argumentCollection=result);
+
+		return formattedresponse;
 
 	}
-private Struct function doHttpCall(	
-			String required url,
-			String method="GET", 
-			numeric required timeout, 
-			struct headers={}, 
-			Array payload=[], 
-			boolean encoded=true, 
-			Struct files={}){
+
+	function store(String merchantDefinedToken="", required account) {
+
+		var requestType = "VaultBoardCreditKeyed";
+		var creds = getMerchantAuthentication();
+
+		var args = {
+			merchantName:creds.merchantName,
+			merchantSiteId:creds.merchantSiteId,
+			merchantKey:creds.merchantKey,
+			merchantDefinedToken=merchantDefinedToken,
+			cardNumber:account.getAccount(),
+			expirationDate=DateFormat(account.getExpirationDate(), "MMYY"),
+			cardholder=account.getName(),
+			avsStreetAddress=account.getAddress(),
+			avsStreetZipCode=account.getPostalCode(),
+		}
 
 
-
-			var CFHTTP = "";
-			var key = "";
-			var keylist = "";
-			var skey = "";
-			var paramType = "body";
-
-			
-
-			var ValidMethodTypes = "URL,GET,POST,PUT,DELETE";
-			if(!listFindNoCase(ValidMethodTypes, arguments.method)){
-				throw(message="Invalid Method",type="cfpayment.InvalidParameter.Method");
-			}
-
-			if(arguments.method EQ "URL"){
-				paramType = "url";
-			}
-
-			
-
+		var resp = variables.MerchantWareService.VaultBoardCreditKeyed(argumentCollection=args );
+		//Raw result	
 		
+		var result = {
+			"parsedResult": resp,
+			"service" : super.getService(),
+			"testmode" : super.getTestMode(),
+			"requestType": "Void"
+		};
+		var formattedresponse = new MerchantWareResponse(argumentCollection=result);
 
+		return formattedresponse;
 
-			var HTTP = new HTTP(url=arguments.url, method=arguments.method, timeout=arguments.timeout, throwonerror="no");
-
-			for(var h in headers){
-				HTTP.addParam(name=h, value=headers[h], type="header");
-			}
-
-			//The actual array of form attributes
-			for(var p in payload){
-
-				
-				HTTP.addParam(name=p.name, value=Trim(p.value), type="formField");	
-			}
-			
-
-			for(var f in files){
-				HTTP.addParam(name=f, file=files[f], type="file");
-			}
-
-		
-			var res = HTTP.send();
-			
-		return res.getPrefix();
 	}
 
+	function unstore(String vaultToken="") {
+
+		var requestType = "VaultDeleteToken";
+		var creds = getMerchantAuthentication();
+
+		var args = {
+			merchantName:creds.merchantName,
+			merchantSiteId:creds.merchantSiteId,
+			merchantKey:creds.merchantKey,
+			vaultToken=vaultToken,
+		}
+
+
+		var resp = variables.MerchantWareService.VaultDeleteToken(argumentCollection=args );
+		//Raw result	
+
+		var result = {
+			"parsedResult": resp,
+			"service" : super.getService(),
+			"testmode" : super.getTestMode(),
+			"requestType": "VaultDeleteToken"
+		};
+		var formattedresponse = new MerchantWareResponse(argumentCollection=result);
+
+		return formattedresponse;
+
+	}
+
+
+	function getCustomer(String merchantDefinedToken="") {
+
+		var requestType = "VaultFindPaymentInfo";
+		var creds = getMerchantAuthentication();
+
+		var args = {
+			merchantName:creds.merchantName,
+			merchantSiteId:creds.merchantSiteId,
+			merchantKey:creds.merchantKey,
+			vaultToken=merchantDefinedToken,
+		}
+
+
+		var resp = variables.MerchantWareService.VaultFindPaymentInfo(argumentCollection=args );
+		//Raw result	
+		
+		var result = {
+			"parsedResult": resp,
+			"service" : super.getService(),
+			"testmode" : super.getTestMode(),
+			"requestType":requestType
+		};
+		var formattedresponse = new MerchantWareResponse(argumentCollection=result);
+
+		return formattedresponse;
+
+	}
 
 	function getMerchantAuthentication(){
 		
