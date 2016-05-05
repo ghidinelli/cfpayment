@@ -679,10 +679,12 @@
 		<!--- Mask the request data --->
 		<cfif getMasking()>
 			<cfset rd = response.getRequestData()>
-			<cfloop collection="#rd.PAYLOAD#" item="n">
-				<cfset rd.PAYLOAD[n] = mask(n, rd.PAYLOAD[n])>
-			</cfloop>
-			<cfset response.setRequestData(rd)>
+			<cfif isStruct(rd) AND structKeyExists(rd, "payload")>
+				<cfloop collection="#rd.PAYLOAD#" item="n">
+					<cfset rd.PAYLOAD[n] = mask(n, rd.PAYLOAD[n])>
+				</cfloop>
+				<cfset response.setRequestData(rd)>
+			</cfif>
 		</cfif>
 
 		<cfreturn response>
