@@ -1,20 +1,20 @@
 /*
 	Copyright 2016 Mark Drew (http://markdrew.io)
-		
-	This is an implementation of Cayan MerchantWare API. 
+
+	This is an implementation of Cayan MerchantWare API.
 	See:
 https://ps1.merchantware.net/Merchantware/ws/RetailTransaction/v4/Credit.asmx
 
-	Licensed under the Apache License, Version 2.0 (the "License"); you 
-	may not use this file except in compliance with the License. You may 
+	Licensed under the Apache License, Version 2.0 (the "License"); you
+	may not use this file except in compliance with the License. You may
 	obtain a copy of the License at:
-	 
+
 		http://www.apache.org/licenses/LICENSE-2.0
-		 
-	Unless required by applicable law or agreed to in writing, software 
-	distributed under the License is distributed on an "AS IS" BASIS, 
-	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
-	See the License for the specific language governing permissions and 
+
+	Unless required by applicable law or agreed to in writing, software
+	distributed under the License is distributed on an "AS IS" BASIS,
+	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	See the License for the specific language governing permissions and
 	limitations under the License.
 */
 component
@@ -27,13 +27,13 @@ component
 
 	variables.MerchantWareService = ""; //Needs to be configured at startup
 
-	
+
 	function init(){
 		super.init(argumentCollection=arguments);
 
-		//Create the webservice 
+		//Create the webservice
 
-		//we require 
+		//we require
 		if(!structKeyExists(config, "merchantName")){
 			throw("merchantName is required")
 		}
@@ -43,7 +43,7 @@ component
 		if(!structKeyExists(config, "merchantKey")){
 			throw("merchantKey is required")
 		}
-		
+
 		variables.cfpayment.merchantName = config.merchantName;
 		variables.cfpayment.merchantSiteId = config.merchantSiteId;
 		variables.cfpayment.merchantKey = config.merchantKey;
@@ -52,6 +52,54 @@ component
 		return this;
 
 	}
+
+	public boolean function hasValidCredentials(){
+
+		//Do the minimum that is required.
+		//Should do a purchase with a test card
+		var expDate = dateAdd("m", randRange(1, 20), Now());
+		var money = getService().createMoney(5000);
+		var account = getService().createCreditCard();
+			account.setAccount("4111111111111111");
+			account.setMonth(Month(expDate));
+			account.setYear(Year(expDate));
+			account.setVerificationValue(900);
+
+		var options = {
+			"refId": getTickCount() //Authorize.net requires a unique order id for each transaction.
+		};
+
+
+		var requestType = "SaleKeyed";
+		var creds = getMerchantAuthentication();
+		var args = {
+			merchantName:creds.merchantName,
+			merchantSiteId:creds.merchantSiteId,
+			merchantKey:creds.merchantKey,
+			invoiceNumber:"",
+			amount:money.getCents(),
+			cardNumber:account.getAccount(),
+			expirationDate=DateFormat(account.getExpirationDate(), "MMYY"),
+			cardholder=account.getName(),
+			avsStreetAddress=account.getAddress(),
+			avsStreetZipCode=account.getPostalCode(),
+			cardSecurityCode=account.getVerificationValue(),
+			forceDuplicate=false,
+			registerNumber="",
+			merchantTransactionId="",
+		}
+
+		var resp = variables.MerchantWareService.SaleKeyed(argumentCollection=args );
+
+		if(resp.ErrorMessage EQ "Invalid Credentials."){
+			return false;
+		}
+		//There could be other errors but we are ignoring it
+		return true;
+	}
+
+
+
 
 	function purchase(Any required money, Any account, Struct options={}){
 
@@ -86,12 +134,13 @@ component
 		if(StructKeyExists(options,"merchantTransactionId")){
 			args["merchantTransactionId"]=options.merchantTransactionId;
 		}
-		
+
+
+
 
 		var resp = variables.MerchantWareService.SaleKeyed(argumentCollection=args );
 
-
-			//Raw result	
+			//Raw result
 		var result = {
 			"parsedResult": resp,
 			"service" : super.getService(),
@@ -131,12 +180,12 @@ component
 		if(StructKeyExists(options,"merchantTransactionId")){
 			args["merchantTransactionId"]=options.merchantTransactionId;
 		}
-		
+
 
 		var resp = variables.MerchantWareService.SaleVault(argumentCollection=args );
 
 
-			//Raw result	
+			//Raw result
 		var result = {
 			"parsedResult": resp,
 			"service" : super.getService(),
@@ -179,10 +228,10 @@ component
 		if(StructKeyExists(options,"merchantTransactionId")){
 			args["merchantTransactionId"]=options.merchantTransactionId;
 		}
-		
+
 		var resp = variables.MerchantWareService.PreAuthorizationKeyed(argumentCollection=args );
-		//Raw result	
-		
+		//Raw result
+
 		var result = {
 			"parsedResult": resp,
 			"service" : super.getService(),
@@ -219,10 +268,10 @@ component
 		if(StructKeyExists(options,"merchantTransactionId")){
 			args["merchantTransactionId"]=options.merchantTransactionId;
 		}
-		
+
 		var resp = variables.MerchantWareService.PostAuthorization(argumentCollection=args );
-		//Raw result	
-		
+		//Raw result
+
 		var result = {
 			"parsedResult": resp,
 			"service" : super.getService(),
@@ -259,10 +308,10 @@ component
 		if(StructKeyExists(options,"merchantTransactionId")){
 			args["merchantTransactionId"]=options.merchantTransactionId;
 		}
-		
+
 		var resp = variables.MerchantWareService.Refund(argumentCollection=args );
-		//Raw result	
-		
+		//Raw result
+
 		var result = {
 			"parsedResult": resp,
 			"service" : super.getService(),
@@ -292,7 +341,7 @@ component
 			merchantName:creds.merchantName,
 			merchantSiteId:creds.merchantSiteId,
 			merchantKey:creds.merchantKey,
-			
+
 			token:transactionID,
 			registerNumber="",
 			merchantTransactionId="",
@@ -305,10 +354,10 @@ component
 		if(StructKeyExists(options,"merchantTransactionId")){
 			args["merchantTransactionId"]=options.merchantTransactionId;
 		}
-		
+
 		var resp = variables.MerchantWareService.Void(argumentCollection=args );
-		//Raw result	
-		
+		//Raw result
+
 		var result = {
 			"parsedResult": resp,
 			"service" : super.getService(),
@@ -340,8 +389,8 @@ component
 
 
 		var resp = variables.MerchantWareService.VaultBoardCreditKeyed(argumentCollection=args );
-		//Raw result	
-		
+		//Raw result
+
 		var result = {
 			"parsedResult": resp,
 			"service" : super.getService(),
@@ -368,7 +417,7 @@ component
 
 
 		var resp = variables.MerchantWareService.VaultDeleteToken(argumentCollection=args );
-		//Raw result	
+		//Raw result
 
 		var result = {
 			"parsedResult": resp,
@@ -397,8 +446,8 @@ component
 
 
 		var resp = variables.MerchantWareService.VaultFindPaymentInfo(argumentCollection=args );
-		//Raw result	
-		
+		//Raw result
+
 		var result = {
 			"parsedResult": resp,
 			"service" : super.getService(),
@@ -412,13 +461,13 @@ component
 	}
 
 	function getMerchantAuthentication(){
-		
+
 		return {
 			"merchantName" : variables.cfpayment.merchantName,
       		"merchantSiteId" : variables.cfpayment.merchantSiteID,
       		"merchantKey" : variables.cfpayment.merchantKey
-			
-			 
+
+
 		}
 	}
 }
