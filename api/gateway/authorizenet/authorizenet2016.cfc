@@ -1,21 +1,21 @@
 /*
 	Copyright 2016 Mark Drew (http://markdrew.io)
-
-	This is a updated implementation of the authorize.net API.
+		
+	This is a updated implementation of the authorize.net API. 
 	See:
 	http://developer.authorize.net/api/reference/index.html
-
-
-	Licensed under the Apache License, Version 2.0 (the "License"); you
-	may not use this file except in compliance with the License. You may
+	
+	
+	Licensed under the Apache License, Version 2.0 (the "License"); you 
+	may not use this file except in compliance with the License. You may 
 	obtain a copy of the License at:
-
+	 
 		http://www.apache.org/licenses/LICENSE-2.0
-
-	Unless required by applicable law or agreed to in writing, software
-	distributed under the License is distributed on an "AS IS" BASIS,
-	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-	See the License for the specific language governing permissions and
+		 
+	Unless required by applicable law or agreed to in writing, software 
+	distributed under the License is distributed on an "AS IS" BASIS, 
+	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
+	See the License for the specific language governing permissions and 
 	limitations under the License.
 */
 component
@@ -24,80 +24,25 @@ component
 	hint="Authorize.net Gateway see http://developer.authorize.net/api/reference/"
 
 	{
-
+	
 
 	variables.cfpayment.GATEWAY_NAME = "Authorize.net";
 	variables.cfpayment.GATEWAY_VERSION = "4.0";
-
+	
 	// The test URL requires a separate developer transKey and login
 	// Request a developer account here: http://developer.authorize.net/testaccount/
 	variables.cfpayment.GATEWAY_TEST_URL = "https://apitest.authorize.net/xml/v1/request.api";
 	variables.cfpayment.GATEWAY_LIVE_URL = "https://api.authorize.net/xml/v1/request.api";
 
-	/**
-		Check that the credentials are correct
-	*/
-	public boolean function hasValidCredentials(){
-		//Should do a purchase with a test card
-		var expDate = dateAdd("m", randRange(1, 20), Now());
-		var money = getService().createMoney(5000);
-		var account = getService().createCreditCard();
-			account.setAccount("4111111111111111");
-			account.setMonth(Month(expDate));
-			account.setYear(Year(expDate));
-			account.setVerificationValue(900);
-
-		var options = {
-			"refId": getTickCount() //Authorize.net requires a unique order id for each transaction.
-		};
-
-		var ret = purchase(money=money,account=account,options=options);
-
-		//Make sure it's just the credentials
-
-
-		if(ret.getMessageText() EQ "User authentication failed due to invalid authentication values."){
-			return false;
-		}
-
-		if(ret.getMessageCode() EQ "E00007"){
-			return false;
-		}
-
-		//There could be other errors but we are ignoring it
-
-		return true;
-
-
-
-	}
-
-
-
-
-
-	// private any function createValidCard(svc, card="4111111111111111", CVV=900, expDate=dateAdd("m", randRange(1, 20), Now()), ZipCode=46201){
-	//
-	// 	var account = svc.createCreditCard();
-	// 		account.setAccount(card);
-	// 		account.setMonth(Month(expDate));
-	// 		account.setYear(Year(expDate));
-	// 		account.setVerificationValue(CVV);
-	// 		account.setFirstName("John");
-	// 		account.setLastName("Doe");
-	// 		account.setAddress(getTickCount() & " Boulevard Road"); //Hopefully avoids duplicate transaction errors
-	// 		account.setPostalCode(ZipCode);
-	// 	return account;
-	// }
 
 	function purchase(required Any money, Any account=nullValue(), Any customer=nullValue(), Any paymentProfile=nullValue(), Struct options={}){
 
-		//we either need an account (ergo a creditcard) OR a (customer and payment profile)
+		//we either need an account (ergo a creditcard) OR a (customer and payment profile) 
 
 		if(!isNull(account)){
 			if(lcase(listLast(getMetaData(arguments.account).fullname, ".")) NEQ "creditcard"){
 			throw("The account type #lcase(listLast(getMetaData(arguments.account).fullname, "."))# is not supported by this gateway.", "", "cfpayment.InvalidAccount");
-			}
+			}	
 		}
 
 		if(isNull(account) && isNull(customer) && isNull(paymentProfile)){
@@ -118,14 +63,14 @@ component
 		}
 
 		if(!IsNull(customer)){
-			argumentColls["customer"] = customer;
+			argumentColls["customer"] = customer;	
 		}
 
 		var payload = RequestXMLProcessor.createTransactionRequest(
 					argumentCollection=argumentColls
 						);
-
-
+	
+		
 		var results = {};
 
 		//Now go and process it
@@ -138,7 +83,7 @@ component
 
 
 		return resp;
-
+	
 	}
 
 	function authorize(required Any money, Any requred account, Struct options={}){
@@ -151,22 +96,22 @@ component
 						transactionType="authOnlyTransaction",
 						merchantAuthentication=getMerchantAuthentication(),
 						money=arguments.money,
-						account=account,
+						account=account, 
 						options=options);
 
 			//Now go and process it
 		var result  = super.process(payload = payload);
 		var resp = createResponse(argumentCollection=result);
-
+		
 		// do some meta-checks for gateway-level errors (as opposed to auth/decline errors)
 			if (NOT resp.hasError()) {
-
+					
 				// we need to have a result; otherwise that's an error in itself
 				if (len(resp.getResult())) {
 					var xmlResponse = XMLParse(resp.getResult());
 					resp.setParsedResult(xmlResponse);
 
-					//Successful response, deal with the actual codes.
+					//Successful response, deal with the actual codes. 
 					var hasTransactionResponse = structKeyExists(xmlResponse, "createTransactionResponse") && structKeyExists(xmlResponse.createTransactionResponse, "transactionResponse");
 
 					var hasErrorRsponse = structKeyExists(xmlResponse, "ErrorResponse");
@@ -187,18 +132,18 @@ component
 			}
 
 
-
+		
 
 			if (resp.getStatus() EQ getService().getStatusSuccessful()) {
 				result["result"] = "CAPTURED";
 			}
 			else if (resp.getStatus() EQ getService().getStatusDeclined()) {
 				result["result"] = "NOT CAPTURED";
-
+				
 			}
 			else {
 				result["result"] = "ERROR";
-
+				
 			}
 
 		return resp;
@@ -213,20 +158,20 @@ component
 						transactionType="priorAuthCaptureTransaction",
 						merchantAuthentication=getMerchantAuthentication(),
 						money=money,
-						account=nullValue(),
+						account=nullValue(), 
 						options=options);
 		var result  = super.process(payload = payload);
 		var resp = createResponse(argumentCollection=result);
 
 		// do some meta-checks for gateway-level errors (as opposed to auth/decline errors)
 			if (NOT resp.hasError()) {
-
+					
 				// we need to have a result; otherwise that's an error in itself
 				if (len(resp.getResult())) {
 					var xmlResponse = XMLParse(resp.getResult());
 					resp.setParsedResult(xmlResponse);
 
-					//Successful response, deal with the actual codes.
+					//Successful response, deal with the actual codes. 
 					var hasTransactionResponse = structKeyExists(xmlResponse, "createTransactionResponse") && structKeyExists(xmlResponse.createTransactionResponse, "transactionResponse");
 
 					var hasErrorRsponse = structKeyExists(xmlResponse, "ErrorResponse");
@@ -247,18 +192,18 @@ component
 			}
 
 
-
+		
 
 			if (resp.getStatus() EQ getService().getStatusSuccessful()) {
 				result["result"] = "CAPTURED";
 			}
 			else if (resp.getStatus() EQ getService().getStatusDeclined()) {
 				result["result"] = "NOT CAPTURED";
-
+				
 			}
 			else {
 				result["result"] = "ERROR";
-
+				
 			}
 
 		return resp;
@@ -267,27 +212,27 @@ component
 
 	function credit(Any required transactionID, Any required money, Any requred account, Struct options={}) {
 
-
+	
 
 		var RequestXMLProcessor = new AuthorizenetXMlRequest(getTestMode());
 		var payload = RequestXMLProcessor.createTransactionRequest(
 						transactionType="refundTransaction",
 						merchantAuthentication=getMerchantAuthentication(),
 						money=money,
-						account=account,
+						account=account, 
 						options=options);
 		var result  = super.process(payload = payload);
 		var resp = createResponse(argumentCollection=result);
 
 		// do some meta-checks for gateway-level errors (as opposed to auth/decline errors)
 			if (NOT resp.hasError()) {
-
+					
 				// we need to have a result; otherwise that's an error in itself
 				if (len(resp.getResult())) {
 					var xmlResponse = XMLParse(resp.getResult());
 					resp.setParsedResult(xmlResponse);
 
-					//Successful response, deal with the actual codes.
+					//Successful response, deal with the actual codes. 
 					var hasTransactionResponse = structKeyExists(xmlResponse, "createTransactionResponse") && structKeyExists(xmlResponse.createTransactionResponse, "transactionResponse");
 
 					var hasErrorRsponse = structKeyExists(xmlResponse, "ErrorResponse");
@@ -308,34 +253,34 @@ component
 			}
 
 
-
+		
 
 			if (resp.getStatus() EQ getService().getStatusSuccessful()) {
 				result["result"] = "REFUNDED";
 			}
 			else if (resp.getStatus() EQ getService().getStatusDeclined()) {
 				result["result"] = "NOT REFUNDED";
-
+				
 			}
 			else {
 				result["result"] = "ERROR";
-
+				
 			}
 
 		return resp;
-
+		
 	}
 
 	function void(Any required transactionID, Struct options={}) {
 
 		options.refTransID = transactionID;
-
+        
         var RequestXMLProcessor = new AuthorizenetXMlRequest(getTestMode());
 		var payload = RequestXMLProcessor.createTransactionRequest(
 						transactionType="voidTransaction",
 						merchantAuthentication=getMerchantAuthentication(),
 						money=nullValue(),
-						account=nullValue(),
+						account=nullValue(), 
 						options=options);
 
 		var result  = super.process(payload = payload);
@@ -343,13 +288,13 @@ component
 
 		// do some meta-checks for gateway-level errors (as opposed to auth/decline errors)
 			if (NOT resp.hasError()) {
-
+					
 				// we need to have a result; otherwise that's an error in itself
 				if (len(resp.getResult())) {
 					var xmlResponse = XMLParse(resp.getResult());
 					resp.setParsedResult(xmlResponse);
 
-					//Successful response, deal with the actual codes.
+					//Successful response, deal with the actual codes. 
 					var hasTransactionResponse = structKeyExists(xmlResponse, "createTransactionResponse") && structKeyExists(xmlResponse.createTransactionResponse, "transactionResponse");
 
 					var hasErrorRsponse = structKeyExists(xmlResponse, "ErrorResponse");
@@ -370,18 +315,18 @@ component
 			}
 
 
-
+		
 
 			if (resp.getStatus() EQ getService().getStatusSuccessful()) {
 				result["result"] = "VOIDED";
 			}
 			else if (resp.getStatus() EQ getService().getStatusDeclined()) {
 				result["result"] = "NOT VOIDED";
-
+				
 			}
 			else {
 				result["result"] = "ERROR";
-
+				
 			}
 
 		return resp;
@@ -404,7 +349,7 @@ component
 	function storeCustomer(required customer) {
 
 		if(!customer.hasValidID()){
-			throw("No valid id defined in customer");
+			throw("No valid id defined in customer");	
 		}
 
 		var RequestXMLProcessor = new AuthorizenetXMlRequest(getTestMode());
@@ -416,7 +361,7 @@ component
 		var result  = super.process(payload = payload);
 			result["service"] = super.getService();
 			result["testmode"] = super.getTestMode();
-
+		
 		var resp = new customerResponse(argumentCollection=result);
 
 
@@ -428,9 +373,9 @@ component
 			var xmlResponse = XMLParse(resp.getResult());
 
 			var messages = XMLSearch(xmlResponse, "//:messages")[1]; //Should work, always you get a message
+			
 
-
-
+			
 
 			//There should generally always be a messsage
 			resp.setResultCode(messages.resultCode.xmlText);
@@ -438,7 +383,7 @@ component
 			resp.setMessageText(messages.message.text.xmlText);
 			resp.setMessage(resp.getMessageCode() & ": " & resp.getMessageText());
 
-
+		
 			if(resp.getResultCode() EQ "OK"){
 				//Move this to the constructor of the response
 				var customerID = XMLSearch(xmlResponse, "//:customerProfileId"); //Might not work if it fails right?
@@ -496,21 +441,21 @@ component
 			result["service"] = super.getService();
 			result["testmode"] = super.getTestMode();
 
-
+		
 		var resp = new customerResponse(argumentCollection=result);
 
 		if (NOT resp.hasError()) {
 			var xmlResponse = XMLParse(resp.getResult());
 
 			var messages = XMLSearch(xmlResponse, "//:messages")[1]; //Should work, always you get a message
-
+			
 			//There should generally always be a messsage
 			resp.setResultCode(messages.resultCode.xmlText);
 			resp.setMessageCode(messages.message.code.xmlText);
 			resp.setMessageText(messages.message.text.xmlText);
 			resp.setMessage(resp.getMessageCode() & ": " & resp.getMessageText());
 
-
+			
 			if(resp.getResultCode() EQ "OK"){
 				//Parse the thing
 
@@ -526,7 +471,7 @@ component
 
 
 		}
-
+		
 		return resp;
 	}
 
@@ -543,7 +488,7 @@ component
 			result["service"] = super.getService();
 			result["testmode"] = super.getTestMode();
 
-
+		
 		//Does this actually need a customer response?
 
 		var resp = new customerResponse(argumentCollection=result);
@@ -566,7 +511,7 @@ component
 			result["service"] = super.getService();
 			result["testmode"] = super.getTestMode();
 
-
+		
 		//Does this actually need a customer response?
 
 		var resp = new customerResponse(argumentCollection=result);
@@ -589,7 +534,7 @@ component
 
 		var resp = new customerResponse(argumentCollection=result);
 
-
+		
 		return resp;
 	}
 
@@ -608,7 +553,7 @@ component
 
 		var resp = new customerResponse(argumentCollection=result);
 
-
+		
 		return resp;
 	}
 
@@ -636,7 +581,7 @@ component
 		var resp = new customerResponse(argumentCollection=result);
 
 
-
+		
 		return resp;
 	}
 
@@ -698,7 +643,7 @@ component
 
 		var customer = createCustomer();
 			customer.setCustomerProfileId(customerID);
-
+	
 
 		var RequestXMLProcessor = new AuthorizenetXMlRequest(getTestMode());
 		var payload = RequestXMLProcessor.createCustomerRequest(
@@ -709,7 +654,7 @@ component
 					options={});
 
 
-
+		
 		var result  = super.process(payload = payload);
 			result["service"] = super.getService();
 			result["testmode"] = super.getTestMode();
@@ -786,17 +731,17 @@ component
 		if (structKeyExists(transResponse, "transId")){
 			resultObj.setTransactionID(transResponse.transId.XMLText);
 		}
-
+		
 		if (structKeyExists(transResponse, "authCode")){
 			resultObj.setAuthorization(transResponse.authCode.XmlText);
 		}
 		// handle common "success" fields
 		if (structKeyExists(transResponse, "avsResultCode")){
-			resultObj.setAVSCode(transResponse.avsResultCode.XmlText);
+			resultObj.setAVSCode(transResponse.avsResultCode.XmlText);					
 		}
 
 		if (structKeyExists(transResponse, "cvvResultCode")){
-			resultObj.setCVVCode(transResponse.cvvResultCode.XmlText);
+			resultObj.setCVVCode(transResponse.cvvResultCode.XmlText);					
 		}
 		if (isDefined("transResponse.errors.error.errorText")){
 			resultObj.setMessage(resultObj.getMessage() & ": " & transResponse.errors.error.errorText.XMLText);
@@ -827,10 +772,10 @@ component
 
 		resultObj.setStatus(getService().getStatusFailure());
 
-
+		
 		resultObj.setMessage("There has been an error");
 
-
+				
 
 
 		if(isDefined("xmlResponse.ErrorResponse.messages.message")){
@@ -848,16 +793,16 @@ component
 	/*
 		@hint: wrapper around the http call
 	*/
-	private Struct function doHttpCall(
+	private Struct function doHttpCall(	
 			String required url,
-			String method="GET",
-			numeric required timeout,
-			struct headers={},
-			XML payload={},
-			boolean encoded=true,
+			String method="GET", 
+			numeric required timeout, 
+			struct headers={}, 
+			XML payload={}, 
+			boolean encoded=true, 
 			Struct files={}){
 
-
+		
 
 			var CFHTTP = "";
 			var key = "";
@@ -890,7 +835,7 @@ component
 			}
 
 			var res = HTTP.send();
-
+			
 		return res.getPrefix();
 	}
 
@@ -901,7 +846,7 @@ component
 
 
 
-
+		
 		return super.createResponse(argumentCollection=arguments);
 	}
 
@@ -909,8 +854,8 @@ component
 		return {
 			"name":variables.cfpayment.username,
 			"transactionKey": variables.cfpayment.merchantAccount
-
+			 
 		}
 	}
-
+	
 }

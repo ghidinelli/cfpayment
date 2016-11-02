@@ -1,20 +1,20 @@
 /*
 	Copyright 2016 Mark Drew (http://markdrew.io)
-
-	This is an implementation of paylinedata API.
+		
+	This is an implementation of paylinedata API. 
 	See:
 	https://secure.paylinedatagateway.com/gw/merchants/resources/integration/integration_portal.php#transaction_types
 
-	Licensed under the Apache License, Version 2.0 (the "License"); you
-	may not use this file except in compliance with the License. You may
+	Licensed under the Apache License, Version 2.0 (the "License"); you 
+	may not use this file except in compliance with the License. You may 
 	obtain a copy of the License at:
-
+	 
 		http://www.apache.org/licenses/LICENSE-2.0
-
-	Unless required by applicable law or agreed to in writing, software
-	distributed under the License is distributed on an "AS IS" BASIS,
-	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-	See the License for the specific language governing permissions and
+		 
+	Unless required by applicable law or agreed to in writing, software 
+	distributed under the License is distributed on an "AS IS" BASIS, 
+	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
+	See the License for the specific language governing permissions and 
 	limitations under the License.
 */
 component
@@ -25,46 +25,15 @@ component
 
 	variables.cfpayment.GATEWAY_NAME = "PaylineData";
 	variables.cfpayment.GATEWAY_VERSION = "1.0";
+	
 
-
-	//Same endpoint, but different credentials
+	//Same endpoint, but different credentials	
 	variables.cfpayment.GATEWAY_TEST_URL = "https://secure.paylinedatagateway.com/api/transact.php";
 	variables.cfpayment.GATEWAY_LIVE_URL = "https://secure.paylinedatagateway.com/api/transact.php";
 
 	variables.cfpayment.QUERY_URL = "https://secure.paylinedatagateway.com/api/query.php"
 
-	/**
-		Check that the credentials are correct
-	*/
-	public boolean function hasValidCredentials(){
-		var requestPayload = {
-			requestType="sale",
-			merchantAuthentication=getMerchantAuthentication(),
-		}
 
-		var PaylineRequest = new PaylineRequest(getTestMode());
-		var payload = PaylineRequest.createPayload(
-				argumentCollection=requestPayload
-			);
-
-		//Raw result
-		var result  = super.process(payload = payload);
-		 	result["service"] = super.getService();
-		 	result["testmode"] = super.getTestMode();
-		var resp = new PaylineResponse(argumentCollection=result);
-
-//If we actually got some kind of result
-		if(result.statuscode NEQ "200"){
-			return false;
-		}
-		var mem = resp.getMemento();
-		if(resp.getMessage() EQ "Authentication Failed"){
-			return false;
-		}
-		//Most other answers could be a "pass?"
-
-		return true;
-	}
 
 	function purchase(required Any  money, Any account, String customer_vault_id, Struct options={}){
 
@@ -80,7 +49,7 @@ component
 		}
 
 		if(!IsNull(customer_vault_id)){
-			requestPayload['customer_vault_id'] =customer_vault_id;
+			requestPayload['customer_vault_id'] =customer_vault_id; 
 		}
 
 		var PaylineRequest = new PaylineRequest(getTestMode());
@@ -89,8 +58,8 @@ component
 			);
 
 
-
-		//Raw result
+	
+		//Raw result	
 		var result  = super.process(payload = payload);
 		 	result["service"] = super.getService();
 		 	result["testmode"] = super.getTestMode();
@@ -116,7 +85,7 @@ component
 			);
 
 
-		//Raw result
+		//Raw result	
 		var result  = super.process(payload = payload);
 		 	result["service"] = super.getService();
 		 	result["testmode"] = super.getTestMode();
@@ -140,7 +109,7 @@ component
 			);
 
 
-		//Raw result
+		//Raw result	
 		var result  = super.process(payload = payload);
 		 	result["service"] = super.getService();
 		 	result["testmode"] = super.getTestMode();
@@ -162,7 +131,7 @@ component
 				options=options
 			);
 
-		//Raw result
+		//Raw result	
 		var result  = super.process(payload = payload);
 		 	result["service"] = super.getService();
 		 	result["testmode"] = super.getTestMode();
@@ -185,7 +154,7 @@ component
 				options=options
 			);
 
-		//Raw result
+		//Raw result	
 		var result  = super.process(payload = payload);
 		 	result["service"] = super.getService();
 		 	result["testmode"] = super.getTestMode();
@@ -201,7 +170,7 @@ component
 	function void(Any required transactionID, Struct options={}) {
 
 		options['transactionid'] = transactionID;
-
+		
 		var PaylineRequest = new PaylineRequest(getTestMode());
 		var payload = PaylineRequest.createPayload(
 				requestType="void",
@@ -210,7 +179,7 @@ component
 			);
 
 
-		//Raw result
+		//Raw result	
 		var result  = super.process(payload = payload);
 		 	result["service"] = super.getService();
 		 	result["testmode"] = super.getTestMode();
@@ -237,7 +206,7 @@ component
 			);
 
 
-		//Raw result
+		//Raw result	
 		var result  = super.process(payload = payload);
 		 	result["service"] = super.getService();
 		 	result["testmode"] = super.getTestMode();
@@ -262,7 +231,7 @@ component
 			);
 
 
-		//Raw result
+		//Raw result	
 		var result  = super.process(payload = payload);
 		 	result["service"] = super.getService();
 		 	result["testmode"] = super.getTestMode();
@@ -274,7 +243,7 @@ component
 	}
 
 	function store(required customer){
-
+		
 		var PaylineRequest = new PaylineRequest(getTestMode());
 
 
@@ -282,10 +251,10 @@ component
 				requestType="add_customer",
 				merchantAuthentication=getMerchantAuthentication(),
 				customer=arguments.customer
-
+				
 			);
 
-		//Raw result
+		//Raw result	
 		var result  = super.process(payload = payload);
 		 	result["service"] = super.getService();
 		 	result["testmode"] = super.getTestMode();
@@ -310,7 +279,7 @@ component
 				"value": "delete_customer"
 			});
 
-
+	
 		ArrayAppend(payload, {
 				"name": "username",
 				"value": auth.username
@@ -320,7 +289,7 @@ component
 				"value": auth.password
 			});
 
-		//Raw result
+		//Raw result	
 		var result  = super.process(payload = payload);
 		 	result["service"] = super.getService();
 		 	result["testmode"] = super.getTestMode();
@@ -359,10 +328,10 @@ component
 				"value": auth.password
 			});
 
+		
 
 
-
-		//Raw result
+		//Raw result	
 		var result  = super.process(payload = payload, url=variables.cfpayment.QUERY_URL);
 		 	result["service"] = super.getService();
 		 	result["testmode"] = super.getTestMode();
@@ -375,7 +344,7 @@ component
 
 	}
 	function updateCustomer(required customer){
-
+		
 		var PaylineRequest = new PaylineRequest(getTestMode());
 
 
@@ -383,10 +352,10 @@ component
 				requestType="update_customer",
 				merchantAuthentication=getMerchantAuthentication(),
 				customer=arguments.customer
-
+				
 			);
 
-		//Raw result
+		//Raw result	
 		var result  = super.process(payload = payload);
 		 	result["service"] = super.getService();
 		 	result["testmode"] = super.getTestMode();
@@ -411,13 +380,13 @@ component
 	/*
 		Override basic doHTTPCall meethod
 	*/
-	private Struct function doHttpCall(
+	private Struct function doHttpCall(	
 			String required url,
-			String method="GET",
-			numeric required timeout,
-			struct headers={},
-			Array payload=[],
-			boolean encoded=true,
+			String method="GET", 
+			numeric required timeout, 
+			struct headers={}, 
+			Array payload=[], 
+			boolean encoded=true, 
 			Struct files={}){
 
 
@@ -428,7 +397,7 @@ component
 			var skey = "";
 			var paramType = "body";
 
-
+			
 
 			var ValidMethodTypes = "URL,GET,POST,PUT,DELETE";
 			if(!listFindNoCase(ValidMethodTypes, arguments.method)){
@@ -439,9 +408,9 @@ component
 				paramType = "url";
 			}
 
+			
 
-
-
+		
 
 
 			var HTTP = new HTTP(url=arguments.url, method=arguments.method, timeout=arguments.timeout, throwonerror="no");
@@ -453,18 +422,18 @@ component
 			//The actual array of form attributes
 			for(var p in payload){
 
-
-				HTTP.addParam(name=p.name, value=p.value, type="formField");
+				
+				HTTP.addParam(name=p.name, value=p.value, type="formField");	
 			}
-
+			
 
 			for(var f in files){
 				HTTP.addParam(name=f, file=files[f], type="file");
 			}
 
-
+		
 			var res = HTTP.send();
-
+			
 		return res.getPrefix();
 	}
 
@@ -473,7 +442,7 @@ component
 		return {
 			"username":variables.cfpayment.username,
 			"password": variables.cfpayment.password
-
+			 
 		}
 	}
 }
