@@ -79,13 +79,13 @@ component
 			invoiceNumber:"",
 			amount:money.getCents(),
 			cardNumber:account.getAccount(),
-			expirationDate=DateFormat(account.getExpirationDate(), "MMYY"),
-			cardholder=account.getName(),
-			avsStreetAddress=account.getAddress(),
-			avsStreetZipCode=account.getPostalCode(),
-			cardSecurityCode=account.getVerificationValue(),
-			forceDuplicate=false,
-			registerNumber="",
+			expirationDate:DateFormat(account.getExpirationDate(), "MMYY"),
+			cardholder:account.getName(),
+			avsStreetAddress:account.getAddress(),
+			avsStreetZipCode:account.getPostalCode(),
+			cardSecurityCode:account.getVerificationValue(),
+			forceDuplicate:false,
+			registerNumber:"",
 			merchantTransactionId="",
 		}
 
@@ -139,6 +139,54 @@ component
 
 
 		var resp = variables.MerchantWareService.SaleKeyed(argumentCollection=args );
+
+			//Raw result
+		var result = {
+			"parsedResult": resp,
+			"service" : super.getService(),
+			"testmode" : super.getTestMode(),
+			"requestType": "SaleKeyed"
+		};
+
+		var formattedresponse = new MerchantWareResponse(argumentCollection=result);
+
+		return formattedresponse;
+	}
+
+		function purchaseSwiped(Any required money, String trackdata, Struct options={}){
+
+		//Need to append /SaleKeyed to url
+		var requestType = "Sale";
+		var creds = getMerchantAuthentication();
+
+
+		var args = {
+			merchantName:creds.merchantName,
+			merchantSiteId:creds.merchantSiteId,
+			merchantKey:creds.merchantKey,
+			invoiceNumber:"",
+			amount:money.getCents(),
+			trackData:trackData,
+			forceDuplicate:getTestMode(),
+			registerNumber:"",
+			merchantTransactionId:"",
+			entryMode:"MAGNETICSTRIPE"
+		}
+
+		if(StructKeyExists(options,"invoiceNumber")){
+			args["invoiceNumber"]=options.invoiceNumber;
+		}
+		if(StructKeyExists(options,"registerNumber")){
+			args["registerNumber"]=options.registerNumber;
+		}
+		if(StructKeyExists(options,"merchantTransactionId")){
+			args["merchantTransactionId"]=options.merchantTransactionId;
+		}
+
+
+
+
+		var resp = variables.MerchantWareService.Sale(argumentCollection=args );
 
 			//Raw result
 		var result = {

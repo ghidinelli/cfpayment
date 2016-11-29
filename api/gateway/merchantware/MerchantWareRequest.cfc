@@ -20,7 +20,7 @@ https://ps1.merchantware.net/Merchantware/ws/RetailTransaction/v4/Credit.asmx
 */
 component {
 
-	variables.validTransactions = "SaleKeyed";
+	variables.validTransactions = "SaleKeyed,Sale";
 
 	public Array function createPayload(String required requestType, Any required merchantAuthentication, Any required money, Any  account, Any transactionId, Any customer, Struct options={}){
 
