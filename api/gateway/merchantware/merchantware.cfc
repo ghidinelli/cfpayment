@@ -101,7 +101,7 @@ component
 
 
 
-	function purchase(Any required money, Any account, Struct options={}){
+	function purchase(required Any  money, Any account, Struct options={}){
 
 		//Need to append /SaleKeyed to url
 		var requestType = "SaleKeyed";
@@ -153,7 +153,11 @@ component
 		return formattedresponse;
 	}
 
-		function purchaseSwiped(Any required money, String trackdata, Struct options={}){
+
+	function canSwipe(){
+		return true;
+	}
+	function purchaseSwiped(required Any money, required String trackdata, Struct options={}){
 
 		//Need to append /SaleKeyed to url
 		var requestType = "Sale";

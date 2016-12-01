@@ -141,6 +141,10 @@ component
 
 	}
 
+	function function canSwipe(){
+		return false;
+	}
+	
 	function authorize(required Any money, Any requred account, Struct options={}){
 		if(lcase(listLast(getMetaData(arguments.account).fullname, ".")) NEQ "creditcard"){
 			throw("The account type #lcase(listLast(getMetaData(arguments.account).fullname, "."))# is not supported by this gateway.", "", "cfpayment.InvalidAccount");
