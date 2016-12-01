@@ -101,6 +101,10 @@ component
 		return resp;
 	}
 
+	function canSwipe(){
+		return false;
+	}
+	
 	function authorize(Any required money, Any requred account, Struct options={}){
 
 		//create the struct to send:

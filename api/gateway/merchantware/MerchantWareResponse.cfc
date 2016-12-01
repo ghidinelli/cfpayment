@@ -116,5 +116,26 @@ component accessors=true extends="cfpayment.api.model.response"
 			return this;
 		}
 
+		function asString(){
 
+			var resp = getcreditresponse4();
+			var ret = "";
+				ret &= "Token: #resp.getToken()# #Chr(10) & Chr(13)#";
+				ret &= "ErrorMessage: #resp.getErrorMessage()# #Chr(10) & Chr(13)#";
+				ret &= "AvsResponse: #resp.getAvsResponse()# #Chr(10) & Chr(13)#";
+				ret &= "CvResponse: #resp.getCvResponse()# #Chr(10) & Chr(13)#";
+				ret &= "EntryMode: #resp.getEntryMode()# #Chr(10) & Chr(13)#";
+				ret &= "Amount: #resp.getAmount()# #Chr(10) & Chr(13)#";
+				//ret &= "string: #resp.getstring()# #Chr(10) & Chr(13)#";
+				ret &= "TransactionDate: #resp.getTransactionDate()# #Chr(10) & Chr(13)#";
+				ret &= "AuthorizationCode: #resp.getAuthorizationCode()# #Chr(10) & Chr(13)#";
+				ret &= "TransactionType: #resp.getTransactionType()# #Chr(10) & Chr(13)#";
+				ret &= "ExtraData: #resp.getExtraData()# #Chr(10) & Chr(13)#";
+				ret &= "InvoiceNumber: #resp.getInvoiceNumber()# #Chr(10) & Chr(13)#";
+				ret &= "Cardholder: #resp.getCardholder()# #Chr(10) & Chr(13)#";
+				ret &= "CardNumber: #resp.getCardNumber()# #Chr(10) & Chr(13)#";
+				ret &= "CardType: #resp.getCardType()# #Chr(10) & Chr(13)#";
+				
+			return ret;
+		}
 }
