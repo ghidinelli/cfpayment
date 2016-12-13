@@ -106,7 +106,7 @@ component
 		//Need to append /SaleKeyed to url
 		var requestType = "SaleKeyed";
 		var creds = getMerchantAuthentication();
-
+		
 
 		var args = {
 			merchantName:creds.merchantName,
@@ -121,8 +121,8 @@ component
 			avsStreetZipCode=account.getPostalCode(),
 			cardSecurityCode=account.getVerificationValue(),
 			forceDuplicate=getTestMode(),
-			registerNumber="",
-			merchantTransactionId="",
+			registerNumber=options.registerNumber?:"",
+			merchantTransactionId=options.merchantTransactionId?:""
 		}
 
 		if(StructKeyExists(options,"invoiceNumber")){
@@ -448,6 +448,34 @@ component
 			"service" : super.getService(),
 			"testmode" : super.getTestMode(),
 			"requestType": "Void"
+		};
+		var formattedresponse = new MerchantWareResponse(argumentCollection=result);
+
+		return formattedresponse;
+
+	}
+	function storeByTransaction(String merchantDefinedToken="", required String referenceNumber) {
+
+		var requestType = "VaultBoardCreditByReference";
+		var creds = getMerchantAuthentication();
+
+		var args = {
+			merchantName:creds.merchantName,
+			merchantSiteId:creds.merchantSiteId,
+			merchantKey:creds.merchantKey,
+			merchantDefinedToken=merchantDefinedToken,
+			referenceNumber:referenceNumber
+		}
+
+
+		var resp = variables.MerchantWareService.VaultBoardCreditByReference(argumentCollection=args );
+		//Raw result
+
+		var result = {
+			"parsedResult": resp,
+			"service" : super.getService(),
+			"testmode" : super.getTestMode(),
+			"requestType": "VaultBoardCreditByReference"
 		};
 		var formattedresponse = new MerchantWareResponse(argumentCollection=result);
 
