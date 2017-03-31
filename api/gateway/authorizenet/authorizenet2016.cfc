@@ -110,7 +110,8 @@ component
 			"transactionType" : "authCaptureTransaction",
 			"merchantAuthentication" : getMerchantAuthentication(),
 			"money" : arguments.money,
-			"options" : options
+			"options" : arguments.options,
+			"paymentProfile": arguments.paymentProfile
 		};
 
 		if(!IsNull(account)){

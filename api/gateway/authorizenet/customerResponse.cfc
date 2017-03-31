@@ -108,7 +108,7 @@ component
 
 					for(var profile in paymentProfiles){
 						var paymentProfile = generatePaymentProfile(profile)
-
+							paymentProfile.setCustomerProfileId(getCustomerProfileID());
 							profiles.append(paymentProfile);
 					}
 

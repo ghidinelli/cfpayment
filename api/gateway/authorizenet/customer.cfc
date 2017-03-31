@@ -64,6 +64,7 @@ component accessors="true" {
 		setMerchantCustomerId(getXMLElementText(responseXML, "merchantCustomerId"));
 		setDescription(getXMLElementText(responseXML, "description"));
 		setEmail(getXMLElementText(responseXML, "email"));
+		setCustomerProfileId(getXMLElementText(responseXML, "customerProfileId"));
 		
 
 		//TODO: find out if this is actually correct and we get an array of paymentProfiles back, documentation is lacking at this point:
