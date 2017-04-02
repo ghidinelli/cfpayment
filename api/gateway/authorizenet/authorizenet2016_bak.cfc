@@ -1,15 +1,15 @@
 <!---
 
-	Copyright 2006-2009 Jonah Blossom (http://www.creori.com/)
-	
-	Based on Authorizenet.cfm custom tag by Jonah Blossom, Authorize.net 
+	Copyright 2006-2015 Jonah Blossom (http://www.creori.com/), Brian Ghidinelli (http://www.ghidinelli.com), Mark Drew (http://markdrew.io)
+		
+	Based on Authorizenet.cfc gateway tag by Jonah Blossom, Authorize.net 
 	AIM ColdFusion Examples, and braintree.cfc by Brian Ghidinelli
-	
 	Additional development by Brian Ghidinelli (http://www.ghidinelli.com)
+		
+	This is a updated implemeentation of the authorize.net API. 
+	See:
+	http://developer.authorize.net/api/reference/index.html
 	
-	
-	Authorize.net Advanced Integration Method (AIM) Implementation Guide:
-	http://developer.authorize.net/guides/AIM/
 	
 	Licensed under the Apache License, Version 2.0 (the "License"); you 
 	may not use this file except in compliance with the License. You may 
@@ -49,63 +49,9 @@
 		<cfargument name="options" type="struct" required="false" default="#structNew()#" />
 
 		
-		<!---
-			Minimum Requirements for Authorize.net AIM: 
-
-			
-			Minimum required for new API
-			{
-			  "createTransactionRequest": {
-			    "merchantAuthentication": {
-			      "name": "4U4Vg7WFjg99",
-			      "transactionKey": "6Dn698bW2K8b6mah"
-			    },
-			    "refId": "123456",
-			    "transactionRequest": {
-			      "transactionType": "authCaptureTransaction",
-			      "amount": "5",
-			      "payment": {
-			        "creditCard": {
-			          "cardNumber": "5424000000000015",
-			          "expirationDate": "1220",
-			          "cardCode": "999"
-			        }
-			      }
-			    }
-			  }
-			}
-
-
-			
-			The following is the minimum set of NAME/VALUE pairs that must be submitted to the payment gateway for each credit card transaction.
-			
-			x_login  -  Merchant''s Login ID
-			x_tran_key  -  Merchant''s Transaction Key
 	
-			x_delim_data  -  TRUE
-			x_delim_char  -  Any valid character
-			x_version  -  3.1
-			x_relay_response  -  FALSE
-	
-			x_method  -  Payment method (CC)
-			x_type  -  Type of transaction (AUTH_CAPTURE, AUTH_ONLY, CAPTURE_ONLY, CREDIT, VOID, PRIOR_AUTH_CAPTURE)
-			x_amount  -  Amount of purchase inclusive of tax
-			x_card_num  -  Customer's credit card number
-			x_exp_date  -  Customer's credit card expiration date
-			x_card_code  -  Any valid CVV2, CVC2, or CID value
-			x_first_name  -  Customer's first name
-			x_last_name  -  Customer's last name
-			x_address  -  Customer's street address
-			x_city  -  City for the customer's address
-			x_state  -  State for the customer's address
-			x_zip  -  ZIP code for the customer's address
-			x_country  -  Country for the customer's address
-			x_phone  -  Customer's phone number
-			x_email  -  Customer's e-mail address
-			x_customer_ip  -  Customer's IP address
-		--->
 		<cfscript>
-			var response = "";
+			var response = {};
 			var results = structNew();
 			var pairs = "";
 			var ii = 1;
@@ -113,76 +59,97 @@
 			p = arguments.payload; // shortcut (by reference)
 
 
+			
 
 
 	
 			//fold in any optional data
-			structAppend(p, arguments.options, true);
-		
+			structAppend(p.transactionRequest, arguments.options, true);
+
 			// Translate to Authorize.net specific name.
 			if (structKeyExists(arguments.options, "orderID"))
-				structInsert(p, "x_invoice_num", arguments.options.orderID, "yes");
+				p.transactionRequest["order"] = {
+							"invoiceNumber" :  arguments.options.orderID
+				};
+
+			
 		
 			// Configure the gateway environment variables.
-			structInsert(p, "x_version", variables.cfpayment.GATEWAY_VERSION, "yes");
-			structInsert(p, "x_tran_key", getMerchantAccount(), "yes");
-			structInsert(p, "x_login", getUsername(), "yes");
-			structInsert(p, "x_delim_data", "TRUE", "yes");
-
-
-			
-			// This overrides the delimeter set in the merchant interface.
-			// We need to know what it is to successfully parse the response.
-			structInsert(p, "x_delim_char", getResponseDelimeter(), "yes");
-
-			// All AIM transactions are direct response, a value of FALSE is required.
-			structInsert(p, "x_relay_response", "FALSE", "yes"); 
-
-			// Authorize.net has two distinct (but overlapping)  test modes.
-			// The first is a developer account. Contact for them credentials and use them to connect to the host specified in GATEWAY_TEST_URL
-			// The second is test mode where you can use "test" account numbers, etc. Both developer and production accounts can be set to test mode.
-			// However, if set to TRUE here, you can't do any follow-on trans like CAPTURE or VOID because x_trans_id is always 0
-			// But, if set to FALSE, you can't test AVS failures.
-			if (NOT structKeyExists(p, "x_test_request"))
-			{
-				structInsert(p, "x_test_request", "FALSE", "yes"); 
+			//TBD:structInsert(p, "x_version", variables.cfpayment.GATEWAY_VERSION, "yes");
+			p["merchantAuthentication"] = {
+					"name": getUsername(),
+            		"transactionKey": getMerchantAccount()
 			}
-
 			
+
+			// if (NOT structKeyExists(p, "x_test_request"))
+			// {
+			// 	structInsert(p, "x_test_request", "FALSE", "yes"); 
+			// }
+
 			// send it over the wire using the base gateway's transport function.
-			response = createResponse(argumentCollection = super.process(payload = p));
+			var payload = {
+					"createTransactionRequest" : p
+			};
+			var format = "application/xml";
+			response = createResponse(argumentCollection = super.process(payload = payload, headers={"Content-Type": format}));
 
-			
+
+
 			// do some meta-checks for gateway-level errors (as opposed to auth/decline errors)
 			if (NOT response.hasError()) {
-		
 				// we need to have a result; otherwise that's an error in itself
 				if (len(response.getResult())) {
 				
-					results = parseResponse(response.getResult());
+
+					results = parseResponse(response.getResult(), format);
+
 					
+					//TODO: check results.createTransactionResponse.transactionResponse is a valid response
+					var res = results.createTransactionResponse.transactionResponse;
+
+
+
 					// handle common response fields
-					if (structKeyExists(results, "x_resp_code"))
-						response.setMessage(results.x_resp_code);
+					if (structKeyExists(res, "responseCode")){
+							response.setMessage(res.responseCode);
+					}
+					
 
-					if (structKeyExists(results, "x_reason_text"))
-						response.setMessage(response.getMessage() & ": " & results.x_reason_text);
-
-					if (structKeyExists(results, "x_trans_ID"))
-						response.setTransactionID(results.x_trans_ID);
-
-					if (structKeyExists(results, "x_approval_code"))
-						response.setAuthorization(results.x_approval_code);
+					
 
 					// handle common "success" fields
-					if (structKeyExists(results, "x_AVS_code"))
-						response.setAVSCode(results.x_AVS_code);					
+					if (structKeyExists(res, "avsResultCode")){
+						response.setAVSCode(res.avsResultCode);					
+					}
 
-					if (structKeyExists(results, "x_card_code_resp"))
-						response.setCVVCode(results.x_card_code_resp);					
+
+				
+				
+					if(structKeyExists(res, "errors")){
+						response.setMessage(response.getMessage() & ": " & res.errors.error.errorText);
+					}
+				
+					if(structKeyExists(res, "transId")){
+						response.setTransactionID(res.transId);
+					}
+				
+
+
+					if (structKeyExists(res, "authCode")){
+						response.setAuthorization(res.authCode);
+					}
+
+					
+
+					if (structKeyExists(res, "cvvResultCode")){
+						response.setCVVCode(res.cvvResultCode);					
+					}
 	
+
+				
 					// see if the response was successful
-					switch (results.x_resp_code) {
+					switch (res.responseCode) {
 						case "1": {
 							response.setStatus(getService().getStatusSuccessful());
 							break;
@@ -205,14 +172,16 @@
 				}
 			}
 
+		
+			//Not sure what this is doing 
 			if (response.getStatus() EQ getService().getStatusSuccessful()) {
-				if (results.x_type EQ "auth_only")
+				if (p.transactionRequest.transactionType EQ "authCaptureTransaction")
 					structInsert(results, "result", "APPROVED", "yes");
 				else
 					structInsert(results, "result", "CAPTURED", "yes");
 			}
 			else if (response.getStatus() EQ getService().getStatusDeclined()) {
-				if (results.x_type EQ "auth_only")
+				if (p.transactionRequest.transactionType EQ "authCaptureTransaction")
 					structInsert(results, "result", "NOT APPROVED", "yes");
 				else
 					structInsert(results, "result", "NOT CAPTURED", "yes");
@@ -239,16 +208,16 @@
 		<cfargument name="account" type="any" required="true" />
 		<cfargument name="options" type="struct" required="false" default="#structNew()#" />
 		
-		
-		
-
 		<cfscript>
-			var post = structNew();
-		
-			// set general values
-			structInsert(post, "x_amount", arguments.money.getAmount(), "yes");
-			structInsert(post, "x_type", "AUTH_CAPTURE", "yes");
-
+			//Initial creation of the structure
+			var post = {
+				"transactionRequest": {
+					"amount":arguments.money.getAmount(),
+					"transactionType": "authCaptureTransaction",
+				}
+			};
+			
+			
 			switch (lcase(listLast(getMetaData(arguments.account).fullname, "."))) {
 				case "creditcard": {
 					// copy in name and customer details
@@ -261,9 +230,6 @@
 					break;
 				}
 			}
-	
-
-
 			return process(payload = post, options = arguments.options);
 		</cfscript>
 	</cffunction>
@@ -366,6 +332,65 @@
 		</cfscript>
 	</cffunction>
 
+
+	<cffunction name="store" output="false" access="public" returntype="any" hint="Put payment information into the vault">
+		<cfargument name="account" type="any" required="true" />
+		<cfargument name="options" type="struct" required="false" default="#structNew()#" />
+
+		<cfscript>
+			var post = structNew();
+			var res = "";
+
+			var identifierExists = structKeyExists(options, "merchantCustomerId") ||
+				structKeyExists(options, "description") ||
+				structKeyExists(options, "email") ? true : false;
+
+
+			if(	!identifierExists
+				
+				){
+				throw(type="cfpayment.missingParameter", message="Options for the customer ID should have either a merchantCustomerId, description or email as an identifier")
+			}
+		
+
+			switch(getService().getAccountType(arguments.account)){
+				case "creditcard":
+					post = addCreditCard(post = post, account = arguments.account, options = arguments.options);
+					break;
+				
+				case "eft": 
+					post = addEFT(post = post, account = arguments.account, options = arguments.options);
+					break;
+				
+				default:
+					throw(type="cfpayment.InvalidAccount", message="Account type of token is not supported by this method.")
+			}
+
+			post = addCustomer(post = post, account = arguments.account, options=options);
+			dump(post);
+			abort;
+		</cfscript>
+
+	
+		<!---
+			One of the following are required
+		<merchantCustomerId>Merchant_Customer_ID</merchantCustomerId>
+    	<description>Profile description here</description>
+     	<email>customer-profile-email@here.com</email> --->
+
+
+		<cfabort>
+		
+
+		
+		
+		<!--- process transaction --->
+		<cfreturn process(payload = post, options = arguments.options) />
+
+
+	</cffunction>
+
+
 	<!--- ------------------------------------------------------------------------------
 		  CUSTOM GETTERS/SETTERS
 		  ------------------------------------------------------------------------- --->
@@ -378,36 +403,327 @@
 	</cffunction>
 
 	<!--- ------------------------------------------------------------------------------
+		  OVERRIDEN METHOD
+		  ------------------------------------------------------------------------- --->
+
+	<cffunction name="doHttpCall" access="private" hint="wrapper around the http call - improves testing" returntype="struct" output="false">
+		<cfargument name="url" type="string" required="true" hint="URL to get/post" />
+		<cfargument name="method" type="string" required="false" hint="the http request method: GET, POST, PUT or DELETE" default="get" />
+		<cfargument name="timeout" type="numeric" required="true" />
+		<cfargument name="headers" type="struct" required="false" default="#structNew()#" />
+		<cfargument name="payload" type="any" required="false" default="#structNew()#" />
+		<cfargument name="encoded" type="boolean" required="false" default="true" />
+		<cfargument name="files" type="struct" required="false" default="#structNew()#" />
+
+		<cfscript>
+
+
+			var CFHTTP = "";
+			var key = "";
+			var keylist = "";
+			var skey = "";
+			var paramType = "body";
+
+			var ValidMethodTypes = "URL,GET,POST,PUT,DELETE";
+			if(!listFindNoCase(ValidMethodTypes, arguments.method)){
+				throw(message="Invalid Method",type="cfpayment.InvalidParameter.Method");
+			}
+
+			if(arguments.method EQ "URL"){
+				paramType = "url";
+			}
+
+			var PayloadToSend = "";
+
+			if(isStruct(arguments.payload)){
+				//We need headers to know how to encode this. 
+				if(!structKeyExists(arguments.headers, "Content-Type")){
+					throw(message="No Content-Type header. Don't know whether to encode the body as XML or JSON?", type="cfpayment.missingParameter.ContentType");
+				}
+				PayloadToSend = convertFor(arguments.headers["Content-Type"], arguments.payload);
+			
+			}
+			else if(isSimpleValue(arguments.payload) AND len(arguments.payload)){
+				PayloadToSend = arguments.payload;
+			}
+			else {
+				throw(message="The payload must be either XML/JSON/string or a struct", type="cfpayment.InvalidParameter.Payload");
+			}
+
+
+		</cfscript>
+
+
+
+
+		
+		<!--- send request --->
+		<cfhttp url="#arguments.url#" method="#arguments.method#" timeout="#arguments.timeout#" throwonerror="no">
+			<!--- pass along any extra headers, like Accept or Authorization or Content-Type --->
+			<cfloop collection="#arguments.headers#" item="key">
+				<cfhttpparam name="#key#" value="#arguments.headers[key]#" type="header" />
+			</cfloop>
+
+			
+			<cfhttpparam value="#PayloadToSend#" type="#paramType#"/>
+			<!--- Handle file uploads with files that already exist on local drive/network. Note, this must be after the cfhttparam type formfield lines --->
+			<cfloop collection="#arguments.files#" item="key">
+				<cfhttpparam name="#key#" file="#arguments.files[key]#" type="file" />
+			</cfloop>
+		</cfhttp>
+
+		<cfreturn CFHTTP />
+	</cffunction>
+
+
+	<!--- ------------------------------------------------------------------------------
 		  PRIVATE HELPER METHODS
 		  ------------------------------------------------------------------------- --->
+
+
+	<cffunction name="convertFor" access="private" hint="converts structures to XML or to JSON" returntype="string" output="false">
+		<cfargument name="ContentType" required="true" hint="expects either application/xml or application/json">
+		<cfargument name="payload" required="true" type="struct" hint="the payload to convert">
+
+		<cfif arguments.ContentType EQ "application/json">
+			<cfreturn serializeJSON(arguments.payload)>
+		</cfif>
+
+		<cfif arguments.ContentType EQ "application/xml">
+			<cfreturn convertToXML(arguments.payload)>
+		</cfif>
+
+		<cfthrow type="cfpayment.InvalidParameter.UnknownContentType" message="No way to convert #ContentType# to string">
+
+	</cffunction>
+
+	<cffunction name="convertToXML" output="false" access="private" hint="converts the payload to a payment XML">
+		<cfargument name="payload" type="struct">
+		
+		<cfset p = payload.createTransactionRequest>
+		<cfset var xmlPayload = "">
+		<cfxml variable="xmlPayload">
+			<cfoutput>
+			<createTransactionRequest xmlns="AnetApi/xml/v1/schema/AnetApiSchema.xsd">
+
+			<cfif structKeyExists(p,"merchantAuthentication")>
+				<merchantAuthentication>
+					#asTagWithValue(payload, "createTransactionRequest.merchantAuthentication.name")#
+					#asTagWithValue(payload, "createTransactionRequest.merchantAuthentication.transactionKey")#
+					
+				</merchantAuthentication>
+			</cfif>
+			
+			<cfif structKeyExists(p, "refId")>
+				<refId>#p.refId#</refId>
+			</cfif>
+
+			<cfif structKeyExists(p, "transactionRequest")>
+				<cfset var tr = p.transactionRequest> <!--- ShortCut --->
+				<transactionRequest>
+
+					<transactionType>#tr.transactionType#</transactionType>
+					<amount>#tr.amount#</amount>
+					<cfif structKeyExists(tr, "payment")>
+					<payment>
+						<cfif structKeyExists(tr.payment, "creditCard")>
+						<cfset var creditCard = tr.payment.creditCard>
+						<creditCard>
+							<cardNumber>#creditCard.cardNumber#</cardNumber>
+							<expirationDate>#creditCard.expirationDate#</expirationDate>
+							<cardCode>#creditCard.cardCode#</cardCode>
+						</creditCard>
+						</cfif>
+					</payment>
+					</cfif>
+
+
+					<cfif structKeyExists(tr, "order")>
+					<order>
+						<invoiceNumber>#tr.order.invoiceNumber#</invoiceNumber>
+						<description>#tr.order.description#</description>
+					</order>
+					</cfif>
+
+
+					
+					<cfif structKeyExists(tr, "lineItems")>
+					<lineItems>
+						<cfloop array="#tr.lineItems#" index="itn">
+							<lineItem>
+								<itemId>#tr.lineItems[itm].itemId#</itemId>
+								<name>#tr.lineItems[itm].name#</name>
+								<description>#tr.lineItems[itm].description#</description>
+								<quantity>#tr.lineItems[itm].quantity#</quantity>
+								<unitPrice>#tr.lineItems[itm].unitPrice#</unitPrice>
+							</lineItem>
+						</cfloop>
+						
+					</lineItems>
+					</cfif>
+
+					<cfif structKeyExists(tr, "tax")>
+					<tax>
+						<amount>#tr.tax.amount#</amount>
+						<name>#tr.tax.name#</name>
+						<description>#tr.tax.description#</description>
+					</tax>
+					</cfif>
+
+					<cfif structKeyExists(tr, "shipping")>
+					<shipping>
+						<amount>#tr.shipping.amount#</amount>
+						<name>#tr.shipping.name#</name>
+						<description>#tr.shipping.description#</description>
+					</shipping>
+					</cfif>
+				
+					<cfif structKeyExists(tr, "poNumber")>
+					<poNumber>#tr.poNumber#</poNumber>
+					</cfif>
+
+					<cfif structKeyExists(tr, "customer")>
+					<customer>
+						<id>#tr.customer#</id>
+					</customer>
+					</cfif>
+
+					<cfif structKeyExists(tr, "billTo")>
+					<cfset var billTo = tr.billTo>
+					<billTo>
+						<firstName>#billto.firstName#</firstName>
+						<lastName>#billto.lastName#</lastName>
+						<company>#billto.company#</company>
+						<address>#billto.address#</address>
+						<city>#billto.city#</city>
+						<state>#billto.state#</state>
+						<zip>#billto.zip#</zip>
+						<country>#billto.country#</country>
+					</billTo>
+					</cfif>
+
+					<cfif structKeyExists(tr, "shipTo")>
+					<cfset var shipTo = tr.shipTo>
+					<shipTo>
+						<firstName>#shipTo.firstName#</firstName>
+						<lastName>#shipTo.lastName#</lastName>
+						<company>#shipTo.company#</company>
+						<address>#shipTo.address#</address>
+						<city>#shipTo.city#</city>
+						<state>#shipTo.state#</state>
+						<zip>#shipTo.zip#</zip>
+						<country>#shipTo.country#</country>
+					</shipTo>
+					</cfif>
+
+					<cfif structKeyExists(tr, "customerIP")>
+					<customerIP>#tr.customerIP#</customerIP>
+					</cfif>
+					
+					<!--- Uncomment this section for Card Present Sandbox Accounts --->
+					<!--- <retail><marketType>2</marketType><deviceType>1</deviceType></retail> --->
+					<cfif structKeyExists(tr, "transactionSettings")>
+					<transactionSettings>
+						<setting>
+							<settingName>testRequest</settingName>
+							<settingValue>false</settingValue>
+						</setting>
+					</transactionSettings>
+					</cfif>
+				</transactionRequest>
+			</cfif>
+		
+			</createTransactionRequest>
+			</cfoutput>
+		</cfxml>
+		<cfreturn toSTring(xmlPayload)>
+	</cffunction>
+
+
+	<cffunction name="createCustomerProfileRequestXML" access="private" hint="converts the payload to a customer profile request formatted XML">
+
+	<cfxml variable="local.xml">
+<cfoutput>
+<?xml version="1.0" encoding="utf-8"?>
+<createCustomerProfileRequest xmlns="AnetApi/xml/v1/schema/AnetApiSchema.xsd">  
+   <merchantAuthentication>
+     <name>API_LOGIN_ID</name>
+     <transactionKey>API_TRANSACTION_KEY</transactionKey>
+    </merchantAuthentication>
+   <profile>
+     <merchantCustomerId>Merchant_Customer_ID</merchantCustomerId>
+     <description>Profile description here</description>
+     <email>customer-profile-email@here.com</email>
+     <paymentProfiles>
+       <customerType>individual</customerType>
+          <payment>
+             <creditCard>
+                <cardNumber>4111111111111111</cardNumber>
+                <expirationDate>2020-12</expirationDate>
+              </creditCard>
+           </payment>
+      </paymentProfiles>
+    </profile>
+	<validationMode>testMode</validationMode>
+  </createCustomerProfileRequest> 
+</cfoutput>		
+	</cfxml>
+			<!--- --->
+
+
+			<cfreturn toString(xml)>
+	</cffunction>
+
 	<cffunction name="addCustomer" output="false" access="private" returntype="any" hint="Add customer contact details to the request object">
 		<cfargument name="post" type="struct" required="true" />
 		<cfargument name="account" type="any" required="true" />
 		<cfargument name="options" type="struct" required="true" />		
 		<cfscript>
-			structInsert(arguments.post, "x_first_name", arguments.account.getFirstName()); // Customer's first name
-			structInsert(arguments.post, "x_last_name", arguments.account.getLastName()); // Customer's last name
-			structInsert(arguments.post, "x_address", arguments.account.getAddress()); // Customer's street address
-			structInsert(arguments.post, "x_city", arguments.account.getCity()); // City for the customer's address
-			structInsert(arguments.post, "x_state", arguments.account.getRegion()); // State for the customer's address
-			structInsert(arguments.post, "x_zip", arguments.account.getPostalCode()); // ZIP code for the customer's address
-			structInsert(arguments.post, "x_country", arguments.account.getCountry()); // Country for the customer's address
+		
+		
+		/* we set state as a string here for later so that when it is converted it is still treated as a string */
+		if(!structKeyExists(post, "transactionRequest")){
+			post["transactionRequest"] = {};
+		}
 
-			if (structKeyExists(arguments.options, "address") AND structKeyExists(arguments.options.address, "phone"))
-				structInsert(arguments.post, "x_phone", options.address.phone); // Customer's phone number
-			else
-				structInsert(arguments.post, "x_phone", ""); // No phone number
+		post.transactionRequest["billTo"] = {
+                "company": 			"",
+                "firstName": 		arguments.account.getFirstName(),
+                "lastName":  		arguments.account.getLastName(),
+                "address": 			arguments.account.getAddress(),
+                "city": 			arguments.account.getCity(),
+                "state": 			arguments.account.getRegion(),
+                "country": 			arguments.account.getCountry(),
+                "zip": 				"#arguments.account.getPostalCode()#", 
+                "phoneNumber" : 	""
+        };
 
-			if (structKeyExists(arguments.options, "email"))
-				structInsert(arguments.post, "x_email", arguments.options.email); // Customer's e-mail address
-			else
-				structInsert(arguments.post, "x_email", ""); // No email
+	    // post.transactionRequest["customer"] = {
+	    //     	"id" : 		"",
+	    //     	"email":	""
+	    // };
 
-			if (structKeyExists(arguments.options, "IPAddress"))
-				structInsert(arguments.post, "x_customer_ip", arguments.options.IPAddress); // Customer's IP address
-			else
-				structInsert(arguments.post, "x_customer_ip", ""); // No IP Address
+	   // post.transactionRequest["customerIP"] = "";
+
 			
+
+			if (structKeyExists(arguments.options, "address") AND structKeyExists(arguments.options.address, "phone")){
+				post.transactionRequest.billTo["phoneNumber"] = options.address.phone;
+			}
+			
+			// if (structKeyExists(arguments.options, "email")){
+			// 	post.transactionRequest.customer.email = arguments.options.email;
+			// }
+
+			// if (structKeyExists(arguments.options, "customerID")){
+			// 	post.transactionRequest.customer.id = arguments.options.customerID;
+			// }
+			
+			if (structKeyExists(arguments.options, "IPAddress")){
+				post.transactionRequest["customerIP"] = arguments.options.IPAddress;
+			}
+			
+		
 			return arguments.post;
 		</cfscript>
 	</cffunction>
@@ -417,10 +733,19 @@
 		<cfargument name="account" type="any" required="true" />
 		<cfargument name="options" type="struct" required="true" />
 		<cfscript>
-			structInsert(arguments.post, "x_method", "CC"); // Payment method (CC)
-			structInsert(arguments.post, "x_card_num", arguments.account.getAccount()); // credit card number
-			structInsert(arguments.post, "x_exp_date", numberFormat(arguments.account.getMonth(), "00") & right(arguments.account.getYear(), 2)); // credit card expiration date
-			structInsert(arguments.post, "x_card_code", arguments.account.getVerificationValue()); // Any valid CVV2, CVC2, or CID value
+
+			if(!structKeyExists(post, "transactionRequest")){
+				post["transactionRequest"] = {};
+			}
+
+			post["transactionRequest"]["payment"] = {};
+
+			post["transactionRequest"]["payment"]["creditCard"] =  {
+                    "cardCode": "#arguments.account.getVerificationValue()#",
+                    "cardNumber": "#arguments.account.getAccount()#",
+                    "expirationDate": "#numberFormat(arguments.account.getMonth(), "00") & right(arguments.account.getYear(), 2)#"
+                
+            };
 
 			return arguments.post;
 		</cfscript>
@@ -448,17 +773,36 @@
 	</cffunction>
 
 	<cfscript>
-		
+		// Helper method for repetitive actions
+		function asTagWithValue(Struct payload, String Path){
+			var tagname = ListLast(Path, ".");
+			return "<#tagname#>#evaluate("arguments.payload.#Path#")#</#tagname#>"
+		}
+
+		function XMLToStruct(XMLItem){
+			var r = "";
+			var ret = {};
+
+
+			loop collection="#xmlItem#" item="r"{
+
+				if(ArrayLen(xmlItem[r].XMLChildren)){
+					ret[r] = XMLToStruct(xmlItem[r]);
+				}
+				else{
+					ret[r] = xmlItem[r].xmlText;
+				}
+
+			}
+			return ret;
+		}
 		// Parse the delimited gateway response.
-		function parseResponse(gatewayResponse) {
-			var results = structNew();
-			
-			// Use Java's split because we have empty list elements which CF doesn't natively handle.
-			var response = JavaCast('string', arguments.gatewayResponse).split("\#getResponseDelimeter()#");
-			
-			// Alternatively, if you don't want to or can't use JavaCast() and split(), use this custom function:
-			//var response = listToArrayInclEmpty(arguments.gatewayResponse);
-			
+		function parseResponse(gatewayResponse, type) {
+				
+			var response = XMLToStruct(XMLParse(gatewayResponse));
+
+			return response;
+			// OLD CODE. Kept here for reference
 			results = insertResult(results, response, "1", "Response Code", "x_resp_code", "Error");
 			results = insertResult(results, response, "2", "Response Subcode", "x_resp_subcode", "-1");
 			results = insertResult(results, response, "3", "Response Reason Code:", "x_reason_code", "-1");
