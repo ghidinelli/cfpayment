@@ -279,7 +279,7 @@
 		<cfargument name="customer" type="any" required="true" />
 		<cfargument name="ConnectedAccount" type="any" required="true" />
 
-		<cfreturn process(gatewayUrl = getGatewayURL("/tokens"), payload = {}, options = {"ConnectedAccount": arguments.ConnectedAccount, "customer": arguments.customer}) />
+		<cfreturn process(gatewayUrl = getGatewayURL("/tokens"), payload = {}, options = '{"ConnectedAccount": arguments.ConnectedAccount, "customer": arguments.customer}') />
 	</cffunction>
 
 
@@ -361,7 +361,7 @@
 		<cfargument name="ConnectedAccount" type="any" required="false" />		
 		<cfargument name="bankAccountId" type="any" required="false" />		
 
-		<cfset local.post = {"default_for_currency": true} />
+		<cfset local.post = '{"default_for_currency": true}' />
 		<cfreturn process(gatewayUrl = getGatewayURL("/accounts/#arguments.ConnectedAccount.getID()#/bank_accounts/#arguments.bankAccountId#"), payload = local.post) />
 	</cffunction>
 
@@ -375,8 +375,8 @@
 			<cfthrow type="cfpayment.InvalidArguments" message="Purpose must be one of: identity_document, dispute_evidence" />
 		</cfif>
 
-		<cfset local.files = {"file": arguments.file} />
-		<cfset local.post = {"purpose": arguments.purpose} />
+		<cfset local.files = '{"file": arguments.file}' />
+		<cfset local.post = '{"purpose": arguments.purpose}' />
 		
 		<cfreturn process(gatewayUrl = "https://uploads.stripe.com/v1/files", payload = local.post, files = local.files, options = arguments.options) />
 	</cffunction>
