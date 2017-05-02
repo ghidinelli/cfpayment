@@ -174,7 +174,7 @@
 				<cfif structKeyExists(results, "L_LONGMESSAGE0")>
 					<cfset response.setMessage(results.L_LONGMESSAGE0) />
 				</cfif>
-			<cfelseif results.ACK eq "Success">
+			<cfelseif results.ACK eq "Success" OR results.ACK eq "SuccessWithWarning">
 				<cfset response.setStatus(getService().getStatusSuccessful()) />
 
 
