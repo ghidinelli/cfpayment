@@ -220,7 +220,7 @@
 
 	<cffunction name="unstore" output="false" access="public" returntype="any">
 		<cfargument name="tokenId" type="string" required="true" />
-		<cfreturn process(gatewayUrl = getGatewayURL("/customers/#arguments.tokenId#"), method = "DELETE") />
+		<cfreturn process(gatewayUrl = getGatewayURL("/customers/#arguments.tokenId#"), payload = {}, method = "DELETE") />
 	</cffunction>
 
 
