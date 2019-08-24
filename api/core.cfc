@@ -49,14 +49,14 @@
 			  telling it what gateway to use and so forth --->
 		<cftry>
 			<!--- instantiate gateway and initialize it with the passed configuration --->
-			<cfset variables.instance.gateway = createObject("component", "gateway.#lCase(variables.instance.config.path)#").init(config = variables.instance.config, service = this) />
+			<cfset variables.instance.gateway = createObject("component", variables.instance.config.path).init(config = variables.instance.config, service = this) />
 
 			<cfcatch type="template">
 				<!--- these are errors in the gateway itself, need to bubble them up for debugging --->
 				<cfrethrow />
 			</cfcatch>
 			<cfcatch type="application">
-				<cfthrow message="Invalid Gateway Specified" type="cfpayment.InvalidGateway" />
+				<cfthrow message="Invalid Gateway Specified: #variables.instance.config.path#" type="cfpayment.InvalidGateway" />
 			</cfcatch>
 			<cfcatch type="any">
 				<cfrethrow />
