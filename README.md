@@ -27,7 +27,7 @@ Charge an Account in 6 Lines of Code
 ====================================
 ```js
 // initialize gateway
-cfg = { path = "stripe.stripe", TestSecretKey = "tGN0bIwXnHdwOa85VABjPdSn8nWY7G7I" };
+cfg = { path = "gateway.stripe.stripe", TestSecretKey = "tGN0bIwXnHdwOa85VABjPdSn8nWY7G7I" };
 svc = createObject("component", "cfpayment.api.core").init(cfg);
 gw = svc.getGateway();
 
