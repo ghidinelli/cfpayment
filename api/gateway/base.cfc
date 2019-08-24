@@ -19,12 +19,12 @@
 
 	<!---
 	Building a new gateway is straightforward.  Extend this base.cfc and then map your gateway-specific parameters to normalized cfpayment parameters.
-	
+
 	For example, we call our internal tracking ID "orderId".  However, Braintree expects "order_id" and Skipjack expects "ordernumber".
-	
+
 	To write a new gateway, you would pass in orderId to a method like purchase() and map it to whatever name your gateway requires.  When you parse the response from your gateway,
 	you would map it back to orderId in the common response object.  Make sense?
-	
+
 	Check the docs for a complete list of normalized cfpayment parameter names.
 	--->
 
@@ -40,8 +40,8 @@
 	<cfset variables.cfpayment.Password = "" />
 	<cfset variables.cfpayment.Timeout = 300 />
 	<cfset variables.cfpayment.TestMode = true />
-	
-	
+
+
 	<!--- it's possible access to internal java objects is disabled, so we account for that --->
 	<cftry>
 		<!--- use this java object to get at the current RequestTimeout value for a given request --->
@@ -158,7 +158,7 @@
 		<cfset variables.cfpayment.GatewayID = arguments.GatewayID />
 	</cffunction>
 
-	<!--- the current request timeout allows us to intelligently modify the overall page timeout based 
+	<!--- the current request timeout allows us to intelligently modify the overall page timeout based
 		  upon whatever the current page context or configured timeout dictate.  It's possible to have
 		  acces to internal Java components disabled so we take that into account here. --->
 	<cffunction name="getCurrentRequestTimeout" output="false" access="private" returntype="numeric">
@@ -189,8 +189,8 @@
 									,RequestData = {}
 									,TestMode = getTestMode()
 									} />
-									
-									
+
+
 		<!--- TODO: NOTE: THIS INTERNAL DATA REFERENCE MAY GO AWAY, DO NOT RELY UPON IT!!!  DEVELOPMENT PURPOSES ONLY!!! --->
 		<!--- store payload for reference during development (can be simplevalue OR structure) --->
 		<cfif getTestMode()>
@@ -199,7 +199,7 @@
 												,HTTP_METHOD = arguments.method
 												,HEADERS = arguments.headers
 												} />
-		</cfif>									
+		</cfif>
 
 		<!--- enable a little extra time past the CFHTTP timeout so error handlers can run --->
 		<cfsetting requesttimeout="#max(getCurrentRequestTimeout(), getTimeout() + 10)#" />
@@ -318,10 +318,10 @@
 			<cfloop collection="#arguments.headers#" item="key">
 				<cfhttpparam name="#key#" value="#arguments.headers[key]#" type="header" />
 			</cfloop>
-			
+
 			<!--- accept nested structures including ordered structs (required for skipjack) --->
 			<cfif isStruct(arguments.payload)>
-			
+
 				<cfloop collection="#arguments.payload#" item="key">
 					<cfif isSimpleValue(arguments.payload[key])>
 						<!--- most common param is simple value --->
@@ -338,11 +338,15 @@
 								<cfhttpparam name="#skey#" value="#arguments.payload[key][skey]#" type="#paramType#" encoded="#arguments.encoded#" />
 							</cfif>
 						</cfloop>
+					<cfelseif isArray(arguments.payload[key])>
+						<cfloop array="#arguments.payload[key]#" index="skey">
+							<cfhttpparam name="#key#" value="#skey#" type="#paramType#" encoded="#arguments.encoded#" />
+						</cfloop>
 					<cfelse>
 						<cfthrow message="Invalid data type for #key#" detail="The payload must be either XML/JSON/string or a struct" type="cfpayment.InvalidParameter.Payload" />
 					</cfif>
 				</cfloop>
-				
+
 			<cfelseif isSimpleValue(arguments.payload) AND len(arguments.payload)>
 
 				<!--- some services may need a Content-Type header of application/xml, pass it in as part of the headers array instead --->
@@ -371,7 +375,7 @@
 			<cfreturn arguments.Options[arguments.Key] />
 		<cfelse>
 			<cfif arguments.ErrorIfNotFound>
-				<cfthrow message="Missing Option: #HTMLEditFormat(arguments.key)#" type="cfpayment.MissingParameter.Option" />
+				<cfthrow message="Missing Option: #encodeForHTML(arguments.key)#" type="cfpayment.MissingParameter.Option" />
 			<cfelse>
 				<cfreturn "" />
 			</cfif>
