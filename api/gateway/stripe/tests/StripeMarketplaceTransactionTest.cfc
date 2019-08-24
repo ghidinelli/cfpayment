@@ -1,10 +1,10 @@
 <cfcomponent name="StripeMarketplaceTransactionTest" extends="BaseStripeTest" output="false">
 
 <!---
-	
+
 	From https://stripe.com/docs/testing#cards :
 	In test mode, you can use these test cards to simulate a successful transaction:
-	
+
 	Number	Card type
 	4242424242424242	Visa
 	4012888888881881	Visa
@@ -19,7 +19,7 @@
 	3530111333300000	JCB
 	3566002020360505	JCB
 	In addition, these cards will produce specific responses that are useful for testing different scenarios:
-	
+
 	Number	Description
 	4000000000000010	address_line1_check and address_zip_check will both fail.
 	4000000000000028	address_line1_check will fail.
@@ -30,11 +30,11 @@
 	4000000000000069	Will be declined with an expired_card code.
 	4000000000000119	Will be declined with a processing_error code.
 	Additional test mode validation: By default, passing address or CVC data with the card number will cause the address and CVC checks to succeed. If not specified, the value of the checks will be null. Any expiration date in the future will be considered valid.
-	
+
 	How do I test specific error codes?
-	
+
 	Some suggestions:
-	
+
 	card_declined: Use this special card number - 4000000000000002.
 	incorrect_number: Use a number that fails the Luhn check, e.g. 4242424242424241.
 	invalid_expiry_month: Use an invalid month e.g. 13.
@@ -117,6 +117,10 @@
 		<cfset offlineInjector(arguments.gw, this, "mock_destination_charge_ok", "doHttpCall") />
 		<cfset local.charge = arguments.gw.purchase(money = money, account = token, options = {destination: ConnectedAccountToken }) />
 		<cfset standardResponseTests(response = local.charge, expectedObjectName = "charge", expectedIdPrefix="ch_") />
+		<cfset debug("<h2>Charge, has sourced_trnasfer?</h2>") />
+		<cfset debug(charge.getParsedResult()) />
+		<cfset debug(gw.status(charge.getParsedResult().id).getParsedResult()) />
+		<cfset debug(gw.getBalanceTransaction(charge.getParsedResult().balance_transaction).getParsedResult()) />
 		<cfset assertTrue(NOT structKeyExists(charge.getParsedResult(), "application_fee"), "There should not be an application fee") />
 
 		<!--- tokens only used once so create another token --->
@@ -277,6 +281,259 @@
 		<cfset assertTrue(NOT fee.getParsedResult().refunded, "Application fee is only marked as refunded if FULLY refunded") />
 		<cfset assertTrue(fee.getParsedResult().amount NEQ fee.getParsedResult().amount_refunded, "Application fee was fully refunded") />
 		<cfset assertTrue(fee.getParsedResult().amount_refunded EQ 25, "Application fee wasn't partially refunded") />
+
+	</cffunction>
+
+
+	<cffunction name="testDestinationMultipleRefundApplicationFeeReversed" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
+		<cfargument name="gw" type="any" required="true" />
+
+		<!--- Create Connected Account --->
+		<cfset offlineInjector(arguments.gw, this, "mock_create_account_ok", "doHttpCall") />
+		<cfset local.connectedAccount = arguments.gw.createConnectedAccount(managed = true, country = arguments.gw.country) />
+		<cfset standardResponseTests(response = local.connectedAccount, expectedObjectName = "account", expectedIdPrefix="acct_") />
+		<cfset local.connectedAccountToken = variables.svc.createToken().setID(local.connectedAccount.getTransactionId()) />
+
+		<!--- create a token on the platform account --->
+		<cfset offlineInjector(arguments.gw, this, "mock_token_ok", "doHttpCall") />
+		<cfset local.response = arguments.gw.validate(money = variables.svc.createMoney(5000, arguments.gw.currency), account = createCardHelper()) />
+		<cfset standardResponseTests(response = local.response, expectedObjectName = "token", expectedIdPrefix="tok_") />
+		<cfset local.token = variables.svc.createToken().setID(local.response.getTransactionId()) />
+
+		<!--- Destination Charge --->
+		<cfset local.money = variables.svc.createMoney(1000, arguments.gw.currency) />
+		<cfset local.application_fee = variables.svc.createMoney(100, arguments.gw.currency)>
+		<cfset offlineInjector(arguments.gw, this, "mock_direct_charge_with_application_fee_ok", "doHttpCall") />
+		<cfset local.charge = arguments.gw.purchase(money = money, account = token, options = {"destination": connectedAccountToken, "application_fee": application_fee}) />
+		<cfset standardResponseTests(response = local.charge, expectedObjectName = "charge", expectedIdPrefix="ch_") />
+		<cfset assertTrue(structKeyExists(charge.getParsedResult(), "application_fee"), "There should be an application fee") />
+
+		<!--- Refund Partial Charge To Destination Account --->
+		<cfset offlineInjector(arguments.gw, this, "mock_refund_partial_charge_to_connected_account_ok", "doHttpCall") />
+		<cfset local.refundMoney = variables.svc.createMoney(250, arguments.gw.currency) />
+		<cfset local.refund = arguments.gw.refund(money = refundMoney, transactionId = charge.getTransactionID(), refund_application_fee = true, reverse_transfer = true) />
+		<cfset standardResponseTests(response = local.refund, expectedObjectName = "refund", expectedIdPrefix="re_") />
+		<cfset assertTrue(refund.getParsedResult().amount EQ 250, "Refund should have been partial") />
+
+		<cfset debug(charge.getParsedResult()) />
+		<cfset debug(refund.getParsedResult()) />
+
+		<!--- get the py_, can also get the tr_ and trr_ here under sourced_transfers.data[1] --->
+		<cfset local.disbursement = arguments.gw.getBalanceTransaction(id = charge.getParsedResult().balance_transaction, options = {"expand[]": "sourced_transfers.data"}) />
+		<cfset debug(disbursement.getParsedResult()) />
+
+		<!--- can get the tr_ and trr_ here under reversals.data[1] --->
+		<cfset local.disbursement2 = arguments.gw.getTransfer(id = disbursement.getParsedResult().sourced_transfers.data[1].reversals.data[1].transfer) />
+		<cfset debug(disbursement2.getParsedResult()) />
+
+		<cfset local.disbursement3 = arguments.gw.getBalanceTransaction(id = disbursement2.getParsedResult().balance_transaction, options = {"expand[]": "source.data"}) />
+		<cfset debug(disbursement3.getParsedResult()) />
+
+		<!--- get the pyr_ from refunds.data[1].id --->
+		<cfset local.source = arguments.gw.status(transactionId = disbursement.getParsedResult().sourced_transfers.data[1].destination_payment, options = {"ConnectedAccount": ConnectedAccountToken}) />
+		<cfset debug(source.getParsedResult()) />
+
+		<cfset local.txn = arguments.gw.getBalanceTransaction(id = local.refund.getParsedResult().balance_transaction) />
+		<cfset debug(local.txn.getParsedResult()) />
+<cfexit />
+		<cfset debug(arguments.gw.status(txn.getParsedResult().source).getParsedResult()) />
+		<cfset debug(arguments.gw.listTransfers({"source_transaction": refund.getTransactionId()}).getParsedResult()) />
+		<cfset debug(arguments.gw.listTransfers({"source_transaction": txn.getParsedResult().source}).getParsedResult()) />
+		<cfset debug(arguments.gw.listTransfers({"source_transaction": refund.getTransactionId(), "ConnectedAccount": connectedAccountToken}).getParsedResult()) />
+		<cfset debug(arguments.gw.listTransfers({"source_transaction": txn.getParsedResult().source, "ConnectedAccount": connectedAccountToken}).getParsedResult()) />
+
+		<cfset debug(refund.getParsedResult()) />
+		<cfset local.py = arguments.gw.getBalanceTransaction(id = charge.getParsedResult().balance_transaction).getParsedResult() />
+		<cfset debug(local.py) />
+		<cfset debug(arguments.gw.status(transactionId = py.sourced_transfers.data[1].destination_payment, options = {"ConnectedAccount": connectedAccountToken}).getParsedResult()) />
+
+<cfexit />
+		<!--- verify fee was refunded --->
+		<cfset offlineInjector(arguments.gw, this, "mock_application_fee_reversal_partial", "doHttpCall") />
+		<cfset local.fee = arguments.gw.getApplicationFee(local.charge.getParsedResult().application_fee, {"expand[]": "balance_transaction"}) />
+		<cfset standardResponseTests(response = local.fee, expectedObjectName = "application_fee", expectedIdPrefix="fee_") />
+		<cfset assertTrue(NOT fee.getParsedResult().refunded, "Application fee is only marked as refunded if FULLY refunded") />
+		<cfset assertTrue(fee.getParsedResult().amount NEQ fee.getParsedResult().amount_refunded, "Application fee was fully refunded") />
+		<cfset assertTrue(fee.getParsedResult().amount_refunded EQ 25, "Application fee wasn't partially refunded") />
+
+
+		<!--- Refund Partial Charge To Destination Account --->
+		<cfset offlineInjector(arguments.gw, this, "mock_refund_partial_charge_to_connected_account_ok", "doHttpCall") />
+		<cfset local.refundMoney = variables.svc.createMoney(350, arguments.gw.currency) />
+		<cfset local.refund = arguments.gw.refund(money = refundMoney, transactionId = charge.getTransactionID(), refund_application_fee = true, reverse_transfer = true) />
+		<cfset standardResponseTests(response = local.refund, expectedObjectName = "refund", expectedIdPrefix="re_") />
+		<cfset assertTrue(refund.getParsedResult().amount EQ 350, "Refund should have been partial") />
+
+		<cfset local.txn = arguments.gw.getBalanceTransaction(id = local.refund.getParsedResult().balance_transaction) />
+		<cfdump var="#local.txn.getParsedResult()#" output="console" label="balance transaction" />
+
+		<!--- verify fee was refunded --->
+		<cfset offlineInjector(arguments.gw, this, "mock_application_fee_reversal_partial", "doHttpCall") />
+		<cfset local.fee = arguments.gw.getApplicationFee(local.charge.getParsedResult().application_fee) />
+		<cfset standardResponseTests(response = local.fee, expectedObjectName = "application_fee", expectedIdPrefix="fee_") />
+		<cfset assertTrue(NOT fee.getParsedResult().refunded, "Application fee is only marked as refunded if FULLY refunded") />
+		<cfset assertTrue(fee.getParsedResult().amount NEQ fee.getParsedResult().amount_refunded, "Application fee was fully refunded") />
+		<cfset assertTrue(fee.getParsedResult().amount_refunded EQ 60, "Application fee wasn't half refunded") />
+
+		<cfdump var="#local.fee.getParsedResult()#" output="console" label="fee" />
+
+		<!--- Refund Remainder of Charge To Destination Account --->
+		<cfset offlineInjector(arguments.gw, this, "mock_refund_partial_charge_to_connected_account_ok", "doHttpCall") />
+		<cfset local.refundMoney = variables.svc.createMoney(400, arguments.gw.currency) />
+		<cfset local.refund = arguments.gw.refund(money = refundMoney, transactionId = charge.getTransactionID(), refund_application_fee = true, reverse_transfer = true) />
+		<cfset standardResponseTests(response = local.refund, expectedObjectName = "refund", expectedIdPrefix="re_") />
+		<cfset assertTrue(refund.getParsedResult().amount EQ 400, "Refund should have been complete now after 3rd refund") />
+
+		<cfdump var="#local.refund.getParsedResult()#" output="console" label="refund" />
+		<cfset local.txn = arguments.gw.getBalanceTransaction(id = local.refund.getParsedResult().balance_transaction) />
+		<cfdump var="#local.txn.getParsedResult()#" output="console" label="balance transaction" />
+
+		<!--- verify fee was refunded --->
+		<cfset offlineInjector(arguments.gw, this, "mock_application_fee_reversal_partial", "doHttpCall") />
+		<cfset local.fee = arguments.gw.getApplicationFee(local.charge.getParsedResult().application_fee) />
+		<cfset standardResponseTests(response = local.fee, expectedObjectName = "application_fee", expectedIdPrefix="fee_") />
+		<cfdump var="#local.fee.getParsedResult()#" output="console" label="fee" />
+		<cfset assertTrue(fee.getParsedResult().refunded, "Application fee is only marked as refunded once FULLY refunded") />
+		<cfset assertTrue(fee.getParsedResult().amount EQ fee.getParsedResult().amount_refunded, "Application fee wasn't fully refunded") />
+		<cfset assertTrue(fee.getParsedResult().amount_refunded EQ 100, "Application fee wasn't fully refunded") />
+
+		<cfset local.charge2 = arguments.gw.status(local.charge.getParsedResult().id) />
+		<cfdump var="#local.charge2.getParsedResult()#" output="console" label="fee" />
+
+	</cffunction>
+
+
+	<cffunction name="testDestinationMultipleRefundManualApplicationFeeReversal" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
+		<cfargument name="gw" type="any" required="true" />
+
+		<!--- handle simple "full" refunds plus more complicated partial/multi refunds where formula is:
+			  fees = fees(original_charge - amount_already_refunded) - fees(original_charge - amount_already_refunded - amount_to_be_refunded)
+			  assume a $2000 charge refunded in three increments of 500, 1000, 500, the fees per refund should be:
+
+			  1st $500 refund = fees(2000 - 0) - fees(2000 - 0 - 500) = fees(2000) - fees(1500) = fees on part of charge from $1500 to $2000 (3% only, no 30c fee)
+			  2nd $1000 refund = fees(2000 - 500) - fees(2000 - 500 - 1000) = fees(1500) - fees(500) = fees on part of charge from $500 to $1500 ($500 * 5%, $500 * 3%, no 30c fee)
+			  3rd $500 refund = fees(2000 - 1500) - fees(2000 - 1500 - 500) = fees(500) - fees(0) = fees on first $500 ($500 * 5% PLUS 30c fee)
+		  --->
+
+
+		<!--- Create Connected Account --->
+		<cfset offlineInjector(arguments.gw, this, "mock_create_account_ok", "doHttpCall") />
+		<cfset local.connectedAccount = arguments.gw.createConnectedAccount(managed = true, country = arguments.gw.country) />
+		<cfset standardResponseTests(response = local.connectedAccount, expectedObjectName = "account", expectedIdPrefix="acct_") />
+		<cfset local.connectedAccountToken = variables.svc.createToken().setID(local.connectedAccount.getTransactionId()) />
+
+		<!--- create a token on the platform account --->
+		<cfset offlineInjector(arguments.gw, this, "mock_token_ok", "doHttpCall") />
+		<cfset local.response = arguments.gw.validate(money = variables.svc.createMoney(5000, arguments.gw.currency), account = createCardHelper()) />
+		<cfset standardResponseTests(response = local.response, expectedObjectName = "token", expectedIdPrefix="tok_") />
+		<cfset local.token = variables.svc.createToken().setID(local.response.getTransactionId()) />
+
+		<!--- Destination Charge --->
+		<cfset local.money = variables.svc.createMoney(200000, arguments.gw.currency) />
+		<cfset local.application_fee = variables.svc.createMoney(8030, arguments.gw.currency)>
+		<cfset offlineInjector(arguments.gw, this, "mock_direct_charge_with_application_fee_ok", "doHttpCall") />
+		<cfset local.charge = arguments.gw.purchase(money = money, account = token, options = {"destination": connectedAccountToken, "application_fee": application_fee}) />
+		<cfset standardResponseTests(response = local.charge, expectedObjectName = "charge", expectedIdPrefix="ch_") />
+		<cfset assertTrue(structKeyExists(charge.getParsedResult(), "application_fee"), "There should be an application fee") />
+
+		<!--- Refund Partial Charge To Destination Account --->
+		<cfset offlineInjector(arguments.gw, this, "mock_refund_500", "doHttpCall") />
+		<cfset local.refundMoney = variables.svc.createMoney(50000, arguments.gw.currency) />
+		<cfset local.refund = arguments.gw.refund(money = refundMoney, transactionId = charge.getTransactionID(), reverse_transfer = true, options = {"expand[]": "balance_transaction.source.balance_transaction", "expand[]": "charge.balance_transaction"}) />
+		<cfset standardResponseTests(response = local.refund, expectedObjectName = "refund", expectedIdPrefix="re_") />
+		<cfset assertTrue(refund.getParsedResult().amount EQ 50000, "Refund should have been partial") />
+		<cfset debug(refund.getParsedResult()) />
+
+		<!--- Refund Partial Application Fee To Destination Account --->
+		<cfset offlineInjector(arguments.gw, this, "mock_charge_status_ok", "doHttpCall") />
+		<cfset local.status = arguments.gw.status(transactionId = local.charge.getTransactionID()) />
+		<cfset local.refundMoney = variables.svc.createMoney(1500, arguments.gw.currency) />
+		<cfset offlineInjector(arguments.gw, this, "mock_refund_application_fee_1500", "doHttpCall") />
+		<cfset local.refundfees = arguments.gw.refundApplicationFee(money = refundMoney, id = status.getParsedResult().application_fee) />
+		<cfset standardResponseTests(response = local.refundfees, expectedObjectName = "fee_refund", expectedIdPrefix="fr_") />
+		<cfset assertTrue(refundfees.getParsedResult().amount EQ 1500, "Fee refund should have been partial") />
+
+
+		<!--- Refund Partial Charge To Destination Account --->
+		<cfset offlineInjector(arguments.gw, this, "mock_refund_1000", "doHttpCall") />
+		<cfset local.refundMoney = variables.svc.createMoney(100000, arguments.gw.currency) />
+		<cfset local.refund = arguments.gw.refund(money = refundMoney, transactionId = charge.getTransactionID(), reverse_transfer = true) />
+		<cfset standardResponseTests(response = local.refund, expectedObjectName = "refund", expectedIdPrefix="re_") />
+		<cfset assertTrue(refund.getParsedResult().amount EQ 100000, "Refund should have been partial") />
+
+
+		<cfset debug(refundfees.getParsedResult()) />
+		<cfset debug(arguments.gw.getBalanceTransaction(refundfees.getParsedResult().balance_transaction).getParsedResult()) />
+		<cfset local.fee = arguments.gw.getApplicationFee(local.charge.getParsedResult().application_fee, {"expand[]": "balance_transaction"}) />
+		<cfset debug(arguments.gw.status(charge.getTransactionID()).getParsedResult()) />
+		<cfset debug(arguments.gw.status(transactionId = arguments.gw.getBalanceTransaction(charge.getParsedResult().balance_transaction).getParsedResult().sourced_transfers.data[1].destination_payment, options = {ConnectedAccount: connectedAccountToken}).getParsedResult()) />
+
+
+		<cfset debug(arguments.gw.listTransfers(options = {ConnectedAccount: connectedAccountToken}).getParsedResult()) />
+		<cfset local.source = arguments.gw.listBalanceHistory(options = {ConnectedAccount: connectedAccountToken, "expand[]": "data.source", "limit": 20}) />
+		<cfset debug(source.getParsedResult()) />
+
+<cfexit />
+
+		<!--- verify fee was refunded --->
+		<cfset offlineInjector(arguments.gw, this, "mock_application_fee_reversal_partial_500", "doHttpCall") />
+		<cfset local.fee = arguments.gw.getApplicationFee(local.charge.getParsedResult().application_fee, {"expand[]": "balance_transaction"}) />
+		<cfset standardResponseTests(response = local.fee, expectedObjectName = "application_fee", expectedIdPrefix="fee_") />
+		<cfset assertTrue(NOT fee.getParsedResult().refunded, "Application fee is only marked as refunded if FULLY refunded") />
+		<cfset assertTrue(fee.getParsedResult().amount NEQ fee.getParsedResult().amount_refunded, "Application fee was fully refunded") />
+		<cfset assertTrue(fee.getParsedResult().amount_refunded EQ 1500, "Application fee wasn't partially refunded") />
+
+
+		<!--- Refund Partial Charge To Destination Account --->
+		<cfset offlineInjector(arguments.gw, this, "mock_refund_1000", "doHttpCall") />
+		<cfset local.refundMoney = variables.svc.createMoney(100000, arguments.gw.currency) />
+		<cfset local.refund = arguments.gw.refund(money = refundMoney, transactionId = charge.getTransactionID(), reverse_transfer = true) />
+		<cfset standardResponseTests(response = local.refund, expectedObjectName = "refund", expectedIdPrefix="re_") />
+		<cfset assertTrue(refund.getParsedResult().amount EQ 100000, "Refund should have been partial") />
+
+		<!--- Refund Partial Application Fee To Destination Account --->
+		<cfset offlineInjector(arguments.gw, this, "mock_charge_status_ok", "doHttpCall") />
+		<cfset local.status = arguments.gw.status(transactionId = local.charge.getTransactionID()) />
+		<cfset local.refundMoney = variables.svc.createMoney(4000, arguments.gw.currency) />
+		<cfset offlineInjector(arguments.gw, this, "mock_refund_application_fee_4000", "doHttpCall") />
+		<cfset local.refundfees = arguments.gw.refundApplicationFee(money = refundMoney, id = status.getParsedResult().application_fee) />
+		<cfset standardResponseTests(response = local.refundfees, expectedObjectName = "fee_refund", expectedIdPrefix="fr_") />
+		<cfset assertTrue(refundfees.getParsedResult().amount EQ 4000, "Fee refund should have been partial") />
+
+
+		<!--- verify fee was refunded --->
+		<cfset offlineInjector(arguments.gw, this, "mock_application_fee_reversal_partial_1500", "doHttpCall") />
+		<cfset local.fee = arguments.gw.getApplicationFee(local.charge.getParsedResult().application_fee) />
+		<cfset standardResponseTests(response = local.fee, expectedObjectName = "application_fee", expectedIdPrefix="fee_") />
+		<cfset assertTrue(NOT fee.getParsedResult().refunded, "Application fee is only marked as refunded if FULLY refunded") />
+		<cfset assertTrue(fee.getParsedResult().amount NEQ fee.getParsedResult().amount_refunded, "Application fee was fully refunded") />
+		<cfset assertTrue(fee.getParsedResult().amount_refunded EQ 5500, "Application fee wasn't half refunded") />
+
+		<!--- Refund Remainder of Charge To Destination Account --->
+		<cfset offlineInjector(arguments.gw, this, "mock_refund_500", "doHttpCall") />
+		<cfset local.refundMoney = variables.svc.createMoney(50000, arguments.gw.currency) />
+		<cfset local.refund = arguments.gw.refund(money = refundMoney, transactionId = charge.getTransactionID(), reverse_transfer = true) />
+		<cfset standardResponseTests(response = local.refund, expectedObjectName = "refund", expectedIdPrefix="re_") />
+		<cfset assertTrue(refund.getParsedResult().amount EQ 50000, "Refund should have been complete now after 3rd refund") />
+
+		<!--- Refund Partial Application Fee To Destination Account --->
+		<cfset offlineInjector(arguments.gw, this, "mock_charge_status_ok", "doHttpCall") />
+		<cfset local.status = arguments.gw.status(transactionId = local.charge.getTransactionID()) />
+		<cfset local.refundMoney = variables.svc.createMoney(2530, arguments.gw.currency) />
+		<cfset offlineInjector(arguments.gw, this, "mock_refund_application_fee_2530", "doHttpCall") />
+		<cfset local.refundfees = arguments.gw.refundApplicationFee(money = refundMoney, id = status.getParsedResult().application_fee) />
+		<cfset standardResponseTests(response = local.refundfees, expectedObjectName = "fee_refund", expectedIdPrefix="fr_") />
+		<cfset assertTrue(refundfees.getParsedResult().amount EQ 2530, "Fee refund should have been partial") />
+
+
+		<!--- verify fee was refunded --->
+		<cfset offlineInjector(arguments.gw, this, "mock_application_fee_reversal_partial_2000", "doHttpCall") />
+		<cfset local.fee = arguments.gw.getApplicationFee(local.charge.getParsedResult().application_fee) />
+		<cfset standardResponseTests(response = local.fee, expectedObjectName = "application_fee", expectedIdPrefix="fee_") />
+		<cfdump var="#local.fee.getParsedResult()#" output="console" label="fee" />
+		<cfset assertTrue(fee.getParsedResult().refunded, "Application fee is only marked as refunded once FULLY refunded") />
+		<cfset assertTrue(fee.getParsedResult().amount EQ fee.getParsedResult().amount_refunded, "Application fee wasn't fully refunded") />
+		<cfset assertTrue(fee.getParsedResult().amount_refunded EQ 8030, "Application fee wasn't fully refunded") />
 
 	</cffunction>
 
@@ -497,7 +754,7 @@
 		<cfset local.transfer = arguments.gw.transfer(money = transferAmount, destination = local.connectedAccountToken) />
 		<cfset standardResponseTests(response = local.transfer, expectedObjectName = "transfer", expectedIdPrefix="tr_") />
 	</cffunction>
-  
+
 
 	<cffunction name="testTransferChargeToConnectedAccount" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
@@ -526,7 +783,7 @@
 		<cfset local.transfer = arguments.gw.transfer(money = transferAmount, destination = local.connectedAccountToken, options = {source_transaction: local.charge.getTransactionId()}) />
 		<cfset standardResponseTests(response = local.transfer, expectedObjectName = "transfer", expectedIdPrefix="tr_") />
 	</cffunction>
-  
+
 
 	<cffunction name="testTransferWithApplicationFee" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
@@ -563,7 +820,7 @@
 		<cfset standardResponseTests(response = local.refund, expectedObjectName = "transfer_reversal", expectedIdPrefix="trr_") />
 
 	</cffunction>
-  
+
 
 	<cffunction name="testReversingTransfer" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
 		<cfargument name="gw" type="any" required="true" />
@@ -600,7 +857,57 @@
 	</cffunction>
 
 
+	<cffunction name="testReconcilingTransfers" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
+		<cfargument name="gw" type="any" required="true" />
 
+		<!--- exclusive track days --->
+		<cfset local.connectedAccountToken = variables.svc.createToken().setID('acct_16Get7LvIcCI5bCs') />
+
+		<!--- get a list of bank deposits --->
+		<cfset local.list = arguments.gw.listTransfers({ConnectedAccount: connectedAccountToken, "limit": 20}) />
+		<cfset debug(list.getParsedResult()) />
+
+		<!--- get a list of transfers included in a bank deposit, includes the py_ value we store in vchDisbursementID --->
+		<cfset debug("<h2>Transactions In Deposit #list.getParsedResult().data[2].id#</h2>") />
+		<cfset local.source = arguments.gw.listBalanceHistory(options = {ConnectedAccount: connectedAccountToken, "transfer": 'tr_16VESwLvIcCI5bCsfzahubNN', "expand[]": "data.source", "type": "payment", "limit": 100}) />
+		<cfset local.x = source.getParsedResult().data />
+		<cfset debug(source.getResult()) />
+		<cfloop array="#local.x#" index="local.ii">
+			<cfif ii.amount LT 0 OR ii.type NEQ "payment">
+				<cfset debug(ii) />
+			<cfelseif arraylen(ii.source.refunds.data)>
+				<cfset debug(ii) />
+			</cfif>
+		</cfloop>
+		<cfexit />
+
+		<cfset debug(source.getParsedResult()) />
+
+		<!--- start with py_, get pyr_ from refunds.data[1].id --->
+		<cfset debug(arguments.gw.status(transactionid = "py_16TOOoLvIcCI5bCsV6tVd9Tm", options = {ConnectedAccount: connectedAccountToken}).getParsedResult()) />
+		<cfset debug(arguments.gw.getBalanceTransaction(id = "txn_16U81OLvIcCI5bCsEU0EDlAG", options = {ConnectedAccount: connectedAccountToken, "expand[]": "source.data"}).getParsedResult()) />
+
+		<!--- returns an array of expanded transfers/payments + source transactions with an application_fee, for each payment: --->
+		<cfset local.fees = arguments.gw.getApplicationFee(id = source.getParsedResult().data[1].source.application_fee) />
+		<cfset debug("The transaction #fees.getParsedResult().originating_transaction# was deposited in transfer #list.getParsedResult().data[1].id# as part of #dollarFormat(list.getParsedResult().data[1].amount/100)# on #arguments.gw.UTCToDate(list.getParsedResult().data[1].date)# as 1 of #arrayLen(source.getParsedResult().data)# transactions") />
+
+		<!--- and if we want the original amount... --->
+		<cfset local.payment = arguments.gw.status(transactionId = fees.getParsedResult().originating_transaction) />
+		<cfset debug("And the original payment amount was #dollarFormat(payment.getParsedResult().amount/100)# with uidPayment #payment.getParsedResult().metadata.uidPayment#") />
+
+	</cffunction>
+
+
+	<cffunction name="testListApplicationFees" access="public" returntype="void" output="false" mxunit:dataprovider="gateways">
+		<cfargument name="gw" type="any" required="true" />
+
+		<!--- get a list of bank deposits --->
+		<cfset local.list = arguments.gw.listApplicationFees() />
+		<cfset debug(list.getParsedResult()) />
+
+		<cfset debug(arguments.gw.status('ch_6hTqQP0SGy752h').getParsedResult()) />
+		<cfset debug(arguments.gw.getBalanceTransaction('txn_6hTqSVXdCDC7OP').getParsedResult()) />
+	</cffunction>
 
 
 	<!--- HELPERS --->
@@ -615,7 +922,7 @@
 		<cfset local.account.setLastName("Doe") />
 		<cfset local.account.setAddress("888") />
 		<cfset local.account.setPostalCode("77777") />
-		<cfreturn local.account />	
+		<cfreturn local.account />
 	</cffunction>
 
 
@@ -633,7 +940,7 @@
 		<cfsavecontent variable="local.response">
 			{ "object": "list", "has_more": false, "url": "/v1/accounts", "data": [ { "id": "acct_15c27zIZh3r4vhIW", "email": null, "statement_descriptor": null, "display_name": null, "timezone": "Etc/UTC", "details_submitted": false, "charges_enabled": true, "transfers_enabled": false, "currencies_supported": [ "cad", "usd" ], "default_currency": "cad", "country": "CA", "object": "account", "business_name": null, "managed": true, "product_description": null, "legal_entity": { "type": null, "business_name": null, "address": { "line1": null, "line2": null, "city": null, "state": null, "postal_code": null, "country": "CA" }, "first_name": null, "last_name": null, "personal_address": { "line1": null, "line2": null, "city": null, "state": null, "postal_code": null, "country": null }, "dob": { "day": null, "month": null, "year": null }, "additional_owners": null, "verification": { "status": "unchecked", "document": null, "details": null } }, "bank_accounts": { "object": "list", "total_count": 0, "has_more": false, "url": "/v1/accounts/acct_15c27zIZh3r4vhIW/bank_accounts", "data": [] }, "verification": { "fields_needed": [ "legal_entity.type", "tos_acceptance.ip", "tos_acceptance.date" ], "due_by": null, "contacted": false }, "transfer_schedule": { "delay_days": 7, "interval": "daily" }, "tos_acceptance": { "date": null, "ip": null, "user_agent": null }, "decline_charge_on": { "cvc_failure": false, "avs_failure": false } }, { "id": "acct_15c25oAiIdhH6A9Z", "email": null, "statement_descriptor": null, "display_name": null, "timezone": "Etc/UTC", "details_submitted": false, "charges_enabled": true, "transfers_enabled": false, "currencies_supported": [ "cad", "usd" ], "default_currency": "cad", "country": "CA", "object": "account", "business_name": null, "managed": true, "product_description": null, "legal_entity": { "type": null, "business_name": null
 				, "address": { "line1": null, "line2": null, "city": null, "state": null, "postal_code": null, "country": "CA" }, "first_name": null, "last_name": null, "personal_address": { "line1": null, "line2": null, "city": null, "state": null, "postal_code": null, "country": null }, "dob": { "day": null, "month": null, "year": null }, "additional_owners": null
-				, "verification": { "status": "unchecked", "document": null, "details": null } }, "bank_accounts": { "object": "list", "total_count": 0, "has_more": false, "url": "/v1/accounts/acct_15c25oAiIdhH6A9Z/bank_accounts", "data": [] }, "verification": { "fields_needed": [ "legal_entity.type", "tos_acceptance.ip", "tos_acceptance.date" ], "due_by": null, "contacted": false }, "transfer_schedule": { "delay_days": 7, "interval": "daily" }, "tos_acceptance": { "date": null, "ip": null, "user_agent": null }, "decline_charge_on": { "cvc_failure": false, "avs_failure": false } }, { "id": "acct_15c1qTLoeW7UuY75", "email": null, "statement_descriptor": null, "display_name": null, "timezone": "Etc/UTC", "details_submitted": false, "charges_enabled": true, "transfers_enabled": false, "currencies_supported": [ "cad", "usd" ], "default_currency": "cad", "country": "CA", "object": "account", "business_name": null, "managed": true, "product_description": null, "legal_entity": { "type": null, "business_name": null, "address": { "line1": null, "line2": null, "city": null, "state": null, "postal_code": null, "country": "CA" }, "first_name": null, "last_name": null, "personal_address": { "line1": null, "line2": null, "city": null, "state": null, "postal_code": null, "country": null }, "dob": { "day": null, "month": null, "year": null }, "additional_owners": null, "verification": { "status": "unchecked", "document": null, "details": null } }, "bank_accounts": { "object": "list", "total_count": 0, "has_more": false, "url": "/v1/accounts/acct_15c1qTLoeW7UuY75/bank_accounts", "data": [] }, "verification": { "fields_needed": [ "legal_entity.type", "tos_acceptance.ip", "tos_acceptance.date" ], "due_by": null, "contacted": false }, "transfer_schedule": { "delay_days": 7, "interval": "daily" }, "tos_acceptance": { "date": null, "ip": null, "user_agent": null }, "decline_charge_on": { "cvc_failure": false, "avs_failure": false } } ] 
+				, "verification": { "status": "unchecked", "document": null, "details": null } }, "bank_accounts": { "object": "list", "total_count": 0, "has_more": false, "url": "/v1/accounts/acct_15c25oAiIdhH6A9Z/bank_accounts", "data": [] }, "verification": { "fields_needed": [ "legal_entity.type", "tos_acceptance.ip", "tos_acceptance.date" ], "due_by": null, "contacted": false }, "transfer_schedule": { "delay_days": 7, "interval": "daily" }, "tos_acceptance": { "date": null, "ip": null, "user_agent": null }, "decline_charge_on": { "cvc_failure": false, "avs_failure": false } }, { "id": "acct_15c1qTLoeW7UuY75", "email": null, "statement_descriptor": null, "display_name": null, "timezone": "Etc/UTC", "details_submitted": false, "charges_enabled": true, "transfers_enabled": false, "currencies_supported": [ "cad", "usd" ], "default_currency": "cad", "country": "CA", "object": "account", "business_name": null, "managed": true, "product_description": null, "legal_entity": { "type": null, "business_name": null, "address": { "line1": null, "line2": null, "city": null, "state": null, "postal_code": null, "country": "CA" }, "first_name": null, "last_name": null, "personal_address": { "line1": null, "line2": null, "city": null, "state": null, "postal_code": null, "country": null }, "dob": { "day": null, "month": null, "year": null }, "additional_owners": null, "verification": { "status": "unchecked", "document": null, "details": null } }, "bank_accounts": { "object": "list", "total_count": 0, "has_more": false, "url": "/v1/accounts/acct_15c1qTLoeW7UuY75/bank_accounts", "data": [] }, "verification": { "fields_needed": [ "legal_entity.type", "tos_acceptance.ip", "tos_acceptance.date" ], "due_by": null, "contacted": false }, "transfer_schedule": { "delay_days": 7, "interval": "daily" }, "tos_acceptance": { "date": null, "ip": null, "user_agent": null }, "decline_charge_on": { "cvc_failure": false, "avs_failure": false } } ]
 			}
 		</cfsavecontent>
 		<cfreturn { StatusCode = '200 OK', FileContent = response } />
@@ -662,7 +969,7 @@
 	<cffunction name="mock_delete_bank_accounts_fail" access="private">
 		<cfreturn { StatusCode = '400 OK', FileContent = '{ "error": { "type": "invalid_request_error", "message": "You cannot delete the default bank account for your default currency. Please make another bank account the default using the `default_for_currency` param, and then delete this one." } }' } />
 	</cffunction>
-	
+
 	<cffunction name="mock_upload_identity_file_ok" access="private">
 		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "file_15iCG7D8ot0g87U6Wxb15c1r", "created": 1426024967, "size": 65264, "purpose": "identity_document", "object": "file_upload", "url": null, "type": "jpg" }' } />
 	</cffunction>
@@ -678,15 +985,15 @@
 	<cffunction name="mock_create_customer_ok" access="private">
 		<cfreturn { StatusCode = '200 OK', FileContent = '{ "object": "customer", "created": 1426783987, "id": "cus_5tui4CxfSIMCPh", "livemode": false, "description": null, "email": null, "delinquent": false, "metadata": {}, "subscriptions": { "object": "list", "total_count": 0, "has_more": false, "url": "/v1/customers/cus_5tui4CxfSIMCPh/subscriptions", "data": [] }, "discount": null, "account_balance": 0, "currency": null, "sources": { "object": "list", "total_count": 1, "has_more": false, "url": "/v1/customers/cus_5tui4CxfSIMCPh/sources", "data": [ { "id": "card_5tuiNbFo56IX17", "object": "card", "last4": "0077", "brand": "Visa", "funding": "credit", "exp_month": 10, "exp_year": 2016, "fingerprint": "NZ56hJ5g3nSG1X1f", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass", "dynamic_last4": null, "metadata": {}, "customer": "cus_5tui4CxfSIMCPh" } ] }, "default_source": "card_5tuiNbFo56IX17" }' } />
 	</cffunction>
-	
+
 	<cffunction name="mock_get_token_for_customer_ok" access="private">
 		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "tok_15i6vOBzXo04pSHuixVMHcTl", "livemode": false, "created": 1426784114, "used": false, "object": "token", "type": "card", "card": { "id": "card_15i6vOBzXo04pSHuW1cb74Cy", "object": "card", "last4": "0077", "brand": "Visa", "funding": "credit", "exp_month": 10, "exp_year": 2016, "fingerprint": "l8rbA7VqfygKBhfJ", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "unchecked", "address_line1_check": "unchecked", "address_zip_check": "unchecked", "dynamic_last4": null }, "client_ip": "184.66.107.116" }' } />
 	</cffunction>
-	
+
 	<cffunction name="mock_charge_ok" access="private">
 		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "ch_5qdkfZcTB6Z29E", "object": "charge", "created": 1426028918, "livemode": false, "paid": true, "status": "succeeded", "amount": 1000, "currency": "cad", "refunded": false, "source": { "id": "card_5qdkgctPOLlZi3", "object": "card", "last4": "0077", "brand": "Visa", "funding": "credit", "exp_month": 10, "exp_year": 2016, "fingerprint": "NZ56hJ5g3nSG1X1f", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass", "dynamic_last4": null, "metadata": {}, "customer": null }, "captured": true, "balance_transaction": "txn_5qdkXWc0zYCeP9", "failure_message": null, "failure_code": null, "amount_refunded": 0, "customer": null, "invoice": null, "description": "unit-test charge", "dispute": null, "metadata": {}, "statement_descriptor": null, "fraud_details": {}, "receipt_email": null, "receipt_number": null, "shipping": null, "application_fee": null, "refunds": { "object": "list", "total_count": 0, "has_more": false, "url": "/v1/charges/ch_5qdkfZcTB6Z29E/refunds", "data": [] } }' } />
 	</cffunction>
-	
+
 	<cffunction name="mock_direct_charge_ok" access="private">
 		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "ch_5m7WiasFMFf5A5", "object": "charge", "created": 1424986511, "livemode": false, "paid": true, "status": "succeeded", "amount": 5000, "currency": "cad", "refunded": false, "source": { "id": "card_5m7WAou95fVC5b", "object": "card", "last4": "4242", "brand": "Visa", "funding": "credit", "exp_month": 10, "exp_year": 2016, "fingerprint": "sBxTyx7XVdjznwyt", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass", "dynamic_last4": null, "metadata": { }, "customer": null }, "captured": true, "balance_transaction": "txn_1IeEOass2YWqgM", "failure_message": null, "failure_code": null, "amount_refunded": 0, "customer": null, "invoice": null, "description": null, "dispute": null, "metadata": { }, "statement_descriptor": null, "fraud_details": { }, "receipt_email": null, "receipt_number": null, "shipping": null, "application_fee": null, "refunds": { "object": "list", "total_count": 0, "has_more": false, "url": "/v1/charges/ch_5m7WiasFMFf5A5/refunds", "data": [  ] } }' } />
 	</cffunction>
@@ -694,43 +1001,43 @@
 	<cffunction name="mock_direct_charge_with_application_fee_ok" access="private">
 		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "ch_5m7WiasFMFf5A5", "object": "charge", "created": 1424986511, "livemode": false, "paid": true, "status": "succeeded", "amount": 5000, "currency": "cad", "refunded": false, "source": { "id": "card_5m7WAou95fVC5b", "object": "card", "last4": "4242", "brand": "Visa", "funding": "credit", "exp_month": 10, "exp_year": 2016, "fingerprint": "sBxTyx7XVdjznwyt", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass", "dynamic_last4": null, "metadata": { }, "customer": null }, "captured": true, "balance_transaction": "txn_1IeEOass2YWqgM", "failure_message": null, "failure_code": null, "amount_refunded": 0, "customer": null, "invoice": null, "description": null, "dispute": null, "metadata": { }, "statement_descriptor": null, "fraud_details": { }, "receipt_email": null, "receipt_number": null, "shipping": null, "application_fee": "fee_5tv0IlPjoHmF8M", "refunds": { "object": "list", "total_count": 0, "has_more": false, "url": "/v1/charges/ch_5m7WiasFMFf5A5/refunds", "data": [  ] } }' } />
 	</cffunction>
-	
+
 	<cffunction name="mock_destination_charge_ok" access="private">
 		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "ch_5m7WiasFMFf5A5", "object": "charge", "created": 1424986511, "livemode": false, "paid": true, "status": "succeeded", "amount": 5000, "currency": "cad", "refunded": false, "source": { "id": "card_5m7WAou95fVC5b", "object": "card", "last4": "4242", "brand": "Visa", "funding": "credit", "exp_month": 10, "exp_year": 2016, "fingerprint": "sBxTyx7XVdjznwyt", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass", "dynamic_last4": null, "metadata": { }, "customer": null }, "captured": true, "balance_transaction": "txn_1IeEOass2YWqgM", "failure_message": null, "failure_code": null, "amount_refunded": 0, "customer": null, "invoice": null, "description": null, "dispute": null, "metadata": { }, "statement_descriptor": null, "fraud_details": { }, "receipt_email": null, "receipt_number": null, "shipping": null, "application_fee": null, "refunds": { "object": "list", "total_count": 0, "has_more": false, "url": "/v1/charges/ch_5m7WiasFMFf5A5/refunds", "data": [  ] } }' } />
 	</cffunction>
-	
+
 	<cffunction name="mock_destination_charge_with_application_fee_ok" access="private">
 		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "ch_6KwJitWr4UhhGP", "object": "charge", "created": 1433017215, "livemode": false, "paid": true, "status": "succeeded", "amount": 1000, "currency": "usd", "refunded": false, "source": { "id": "card_6KwJQeV9SrjUFf", "object": "card", "last4": "0077", "brand": "Visa", "funding": "credit", "exp_month": 10, "exp_year": 2016, "fingerprint": "g9TMHGodJg3y3bPf", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass", "dynamic_last4": null, "metadata": {}, "customer": null }, "captured": true, "balance_transaction": "txn_6KwJRBe0EdUhsv", "failure_message": null, "failure_code": null, "amount_refunded": 0, "customer": null, "invoice": null, "description": null, "dispute": null, "metadata": {}, "statement_descriptor": null, "fraud_details": {}, "transfer": "tr_6KwJBmgnps2mxA", "receipt_email": null, "receipt_number": null, "shipping": null, "destination": "acct_168GRDEPQLPOH7Lc", "application_fee": "fee_6KwJ1B5kGl9tkl", "refunds": { "object": "list", "total_count": 0, "has_more": false, "url": "/v1/charges/ch_6KwJitWr4UhhGP/refunds", "data": [] } }' } />
 	</cffunction>
-	 
+
 	<cffunction name="mock_refund_charge_to_connected_account_ok" access="private">
 		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "re_1hd2eEhc0a2gF2", "amount": 1000, "currency": "cad", "created": 1366751825, "object": "refund", "balance_transaction": "txn_1hd2bCSoaEP0e5", "metadata": { }, "charge": "ch_1hCcxjT1gTWGWz", "receipt_number": null, "reason": null }' } />
 	</cffunction>
 
 	<cffunction name="mock_application_fee_reversal_full" access="private">
 		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "fee_6Kw2F2UYTTE0HR", "object": "application_fee", "created": 1433016173, "livemode": false, "amount": 100, "currency": "usd", "refunded": true, "amount_refunded": 100, "refunds": { "object": "list", "total_count": 1, "has_more": false, "url": "/v1/application_fees/fee_6Kw2F2UYTTE0HR/refunds", "data": [ { "id": "fr_6Kw2d0iNIz2vnh", "amount": 100, "currency": "usd", "created": 1433016174, "object": "fee_refund", "balance_transaction": "txn_6Kw2jbKb4srJwA", "metadata": {}, "fee": "fee_6Kw2F2UYTTE0HR" } ] }, "balance_transaction": "txn_6Kw2aZCuHXnEHr", "account": "acct_168GAQGaTtOjJ24S", "application": "ca_6KX23cyOabAfQUeyU6Qp8M1vc221RG2c", "charge": "ch_168GATGaTtOjJ24SHXAezgtI", "originating_transaction": null }' } />
-	</cffunction> 
+	</cffunction>
 
 	<cffunction name="mock_application_fee_reversal_partial" access="private">
 		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "fee_6Kw676LQSoyNu0", "object": "application_fee", "created": 1433016412, "livemode": false, "amount": 100, "currency": "cad", "refunded": false, "amount_refunded": 25, "refunds": { "object": "list", "total_count": 1, "has_more": false, "url": "/v1/application_fees/fee_6Kw676LQSoyNu0/refunds", "data": [ { "id": "fr_6Kw6NJ6zdmkr4c", "amount": 50, "currency": "cad", "created": 1433016413, "object": "fee_refund", "balance_transaction": "txn_6Kw6ni6Dp6zcux", "metadata": {}, "fee": "fee_6Kw676LQSoyNu0" } ] }, "balance_transaction": "txn_6Kw6hFdC6tzDJN", "account": "acct_168GEHJOqQ1BzVqF", "application": "ca_5RWA5Y5BtyGpY2EZ3Lomyd5BBbWSfjhQ", "charge": "ch_168GEKJOqQ1BzVqFbA95vfdG", "originating_transaction": null }' } />
-	</cffunction> 
+	</cffunction>
 
 	<cffunction name="mock_refund_partial_charge_to_connected_account_ok" access="private">
 		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "re_1hd2eEhc0a2gF2", "amount": 250, "currency": "cad", "created": 1366751825, "object": "refund", "balance_transaction": "txn_1hd2bCSoaEP0e5", "metadata": { }, "charge": "ch_1hCcxjT1gTWGWz", "receipt_number": null, "reason": null }' } />
 	</cffunction>
-	
+
 	<cffunction name="mock_refund_to_account_pulling_back_funds_from_connected_account_ok" access="private">
 		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "re_1hd2eEhc0a2gF2", "amount": 46000, "currency": "cad", "created": 1366751825, "object": "refund", "balance_transaction": "txn_1hd2bCSoaEP0e5", "metadata": { }, "charge": "ch_1hCcxjT1gTWGWz", "receipt_number": null, "reason": null }' } />
 	</cffunction>
-	
+
 	<cffunction name="mock_transfer_from_platform_stripe_account_to_connected_stripe_account_ok" access="private">
 		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "tr_5tush9wjXsddbe", "object": "transfer", "created": 1426784550, "date": 1426784550, "livemode": false, "amount": 500, "currency": "cad", "reversed": false, "status": "pending", "type": "stripe_account", "reversals": { "object": "list", "total_count": 0, "has_more": false, "url": "/v1/transfers/tr_5tush9wjXsddbe/reversals", "data": [] }, "balance_transaction": "txn_5tusPLMfovpTbD", "destination": "acct_15i72LBYaeaZycDD", "destination_payment": "py_15i72QBYaeaZycDDmMwTmIJB", "description": null, "failure_message": null, "failure_code": null, "amount_reversed": 0, "metadata": {}, "statement_descriptor": null, "recipient": null, "source_transaction": null, "application_fee": null }' } />
 	</cffunction>
-	
+
 	<cffunction name="mock_transfer_with_application_fee_ok" access="private">
 		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "tr_5tv0QCDmEcYE7R", "object": "transfer", "created": 1426785025, "date": 1426785025, "livemode": false, "amount": 500, "currency": "cad", "reversed": false, "status": "pending", "type": "stripe_account", "reversals": { "object": "list", "total_count": 0, "has_more": false, "url": "/v1/transfers/tr_5tv0QCDmEcYE7R/reversals", "data": [] }, "balance_transaction": "txn_5tv0uxCGuEPTa6", "destination": "acct_15i7A0GTR51tuS9z", "destination_payment": "py_15i7A5GTR51tuS9z12wPQbnF", "description": null, "failure_message": null, "failure_code": null, "amount_reversed": 0, "metadata": {}, "statement_descriptor": null, "recipient": null, "source_transaction": null, "application_fee": "fee_5tv0IlPjoHmF8M" }' } />
 	</cffunction>
-	
+
 	<cffunction name="mock_reversing_transfer_ok" access="private">
 		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "trr_6LFmN4iXIyJXRn", "amount": 400, "currency": "usd", "created": 1433089601, "object": "transfer_reversal", "balance_transaction": "txn_6LFmfe6M036xBi", "metadata": {}, "transfer": "tr_6LFmp9o75ZTRwW" }' } />
 	</cffunction>
@@ -738,7 +1045,7 @@
 	<cffunction name="mock_reversing_transfer_with_application_fee_ok" access="private">
 		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "trr_6LFjuyYGLitcYH", "amount": 400, "currency": "usd", "created": 1433089408, "object": "transfer_reversal", "balance_transaction": "txn_6LFjaWciOV1ysS", "metadata": {}, "transfer": "tr_6LFjfPdhi0XkWJ" }' } />
 	</cffunction>
-	
+
 	<cffunction name="mock_update_account_validation_passes_ok" access="private">
 		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "acct_15odyvFUmKIEYcf3", "email": "test20150406172553@test.tst", "statement_descriptor": null, "display_name": null, "timezone": "Etc/UTC", "details_submitted": false, "charges_enabled": true, "transfers_enabled": true, "currencies_supported": [ "cad", "usd" ], "default_currency": "cad", "country": "CA", "object": "account", "business_name": null, "business_url": null, "support_phone": null, "metadata": {}, "managed": true, "product_description": null, "debit_negative_balances": false, "bank_accounts": { "object": "list", "total_count": 1, "has_more": false, "url": "/v1/accounts/acct_15odyvFUmKIEYcf3/bank_accounts", "data": [ { "object": "bank_account", "id": "ba_15odywFUmKIEYcf3q2ZDAw0L", "last4": "6789", "country": "CA", "currency": "cad", "status": "new", "fingerprint": "Z3T7RQTuRWxBOKav", "routing_number": "11000-000", "bank_name": null, "default_for_currency": true } ] }, "verification": { "fields_needed": [], "due_by": null, "contacted": false }, "transfer_schedule": { "delay_days": 7, "interval": "daily" }, "tos_acceptance": { "ip": "184.66.107.116", "date": 1428338336, "user_agent": null }, "legal_entity": { "type": "company", "business_name": null, "address": { "line1": "123 Another Street", "line2": null, "city": "Some City", "state": "A State", "postal_code": "123ABC", "country": "CA" }, "first_name": "John", "last_name": "Smith", "personal_address": { "line1": null, "line2": null, "city": null, "state": null, "postal_code": null, "country": null }, "dob": { "day": 20, "month": 5, "year": 1990 }, "additional_owners": null, "verification": { "status": "unchecked", "document": null, "details": null } }, "decline_charge_on": { "cvc_failure": false, "avs_failure": false } }' } />
 	</cffunction>
@@ -747,5 +1054,40 @@
 		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "tok_1IZvRgzvQlffjs", "livemode": false, "created": 1360974256, "used": false, "object": "token", "card": { "object": "card", "last4": "4242", "type": "Visa", "exp_month": 10, "exp_year": 2014, "fingerprint": "sBxTyx7XVdjznwyt", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "" } }' } />
 	</cffunction>
 
+	<cffunction name="mock_refund_application_fee_1500" access="private">
+		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "fr_6aMkydT3NgKnJ6", "amount": 1500, "currency": "cad", "created": 1436575141, "object": "fee_refund", "balance_transaction": "txn_6aMkqsfIgYbP3e", "metadata": {}, "fee": "fee_6aMkcmhcARZAjd" }' } />
+	</cffunction>
+
+	<cffunction name="mock_refund_application_fee_4000" access="private">
+		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "fr_6aMkydT3NgKnJ6", "amount": 4000, "currency": "cad", "created": 1436575142, "object": "fee_refund", "balance_transaction": "txn_6aMkqsfIgYbP3e", "metadata": {}, "fee": "fee_6aMkcmhcARZAjd" }' } />
+	</cffunction>
+
+	<cffunction name="mock_refund_application_fee_2530" access="private">
+		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "fr_6aMkydT3NgKnJ6", "amount": 2530, "currency": "cad", "created": 1436575143, "object": "fee_refund", "balance_transaction": "txn_6aMkqsfIgYbP3e", "metadata": {}, "fee": "fee_6aMkcmhcARZAjd" }' } />
+	</cffunction>
+
+	<cffunction name="mock_charge_status_ok" access="private">
+		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "ch_6aMkMr07ucYXYc", "object": "charge", "created": 1436575135, "livemode": false, "paid": true, "status": "succeeded", "amount": 200000, "currency": "cad", "refunded": false, "source": { "id": "card_6aMkM9EHEN1Lyk", "object": "card", "last4": "0077", "brand": "Visa", "funding": "credit", "exp_month": 10, "exp_year": 2016, "fingerprint": "NZ56hJ5g3nSG1X1f", "country": "US", "name": "John Doe", "address_line1": "888", "address_line2": "", "address_city": null, "address_state": "", "address_zip": "77777", "address_country": "", "cvc_check": "pass", "address_line1_check": "pass", "address_zip_check": "pass", "tokenization_method": null, "dynamic_last4": null, "metadata": {}, "customer": null }, "captured": true, "balance_transaction": "txn_6aMk0JdeqDkaqC", "failure_message": null, "failure_code": null, "amount_refunded": 0, "customer": null, "invoice": null, "description": null, "dispute": null, "metadata": {}, "statement_descriptor": null, "fraud_details": {}, "transfer": "tr_6aMk7phRtKaDdB", "receipt_email": null, "receipt_number": null, "shipping": null, "destination": "acct_16NC13GDG1DKbUFt", "application_fee": "fee_6aMkcmhcARZAjd", "refunds": { "object": "list", "total_count": 0, "has_more": false, "url": "/v1/charges/ch_6aMkMr07ucYXYc/refunds", "data": [] } }' } />
+	</cffunction>
+
+	<cffunction name="mock_refund_500" access="private">
+		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "re_6aMka4BvrsW74d", "amount": 50000, "currency": "cad", "created": 1436575140, "object": "refund", "balance_transaction": "txn_6aMkD1K18dcX3v", "metadata": {}, "charge": "ch_6aMkMr07ucYXYc", "receipt_number": null, "reason": null }' } />
+	</cffunction>
+
+	<cffunction name="mock_refund_1000" access="private">
+		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "re_6aMka4BvrsW74d", "amount": 100000, "currency": "cad", "created": 1436575140, "object": "refund", "balance_transaction": "txn_6aMkD1K18dcX3v", "metadata": {}, "charge": "ch_6aMkMr07ucYXYc", "receipt_number": null, "reason": null }' } />
+	</cffunction>
+
+	<cffunction name="mock_application_fee_reversal_partial_500" access="private">
+		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "fee_6Kw676LQSoyNu0", "object": "application_fee", "created": 1433016412, "livemode": false, "amount": 8030, "currency": "cad", "refunded": false, "amount_refunded": 1500, "refunds": { "object": "list", "total_count": 1, "has_more": false, "url": "/v1/application_fees/fee_6Kw676LQSoyNu0/refunds", "data": [ { "id": "fr_6Kw6NJ6zdmkr4c", "amount": 50, "currency": "cad", "created": 1433016413, "object": "fee_refund", "balance_transaction": "txn_6Kw6ni6Dp6zcux", "metadata": {}, "fee": "fee_6Kw676LQSoyNu0" } ] }, "balance_transaction": "txn_6Kw6hFdC6tzDJN", "account": "acct_168GEHJOqQ1BzVqF", "application": "ca_5RWA5Y5BtyGpY2EZ3Lomyd5BBbWSfjhQ", "charge": "ch_168GEKJOqQ1BzVqFbA95vfdG", "originating_transaction": null }' } />
+	</cffunction>
+
+	<cffunction name="mock_application_fee_reversal_partial_1500" access="private">
+		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "fee_6aMkcmhcARZAjd", "object": "application_fee", "created": 1436575135, "livemode": false, "amount": 8030, "currency": "cad", "refunded": false, "amount_refunded": 5500, "refunds": { "object": "list", "total_count": 2, "has_more": false, "url": "/v1/application_fees/fee_6aMkcmhcARZAjd/refunds", "data": [ { "id": "fr_6aMkRsOkuREdsD", "amount": 4000, "currency": "cad", "created": 1436575142, "object": "fee_refund", "balance_transaction": "txn_6aMktKiWBM6aNy", "metadata": {}, "fee": "fee_6aMkcmhcARZAjd" }, { "id": "fr_6aMkydT3NgKnJ6", "amount": 1500, "currency": "cad", "created": 1436575141, "object": "fee_refund", "balance_transaction": "txn_6aMkqsfIgYbP3e", "metadata": {}, "fee": "fee_6aMkcmhcARZAjd" } ] }, "balance_transaction": "txn_6aMkdNTG0M4upB", "account": "acct_16NC13GDG1DKbUFt", "application": "ca_5RWA5Y5BtyGpY2EZ3Lomyd5BBbWSfjhQ", "charge": "py_16NC15GDG1DKbUFtQOl1cb3d", "originating_transaction": "ch_6aMkMr07ucYXYc" }' } />
+	</cffunction>
+
+	<cffunction name="mock_application_fee_reversal_partial_2000" access="private">
+		<cfreturn { StatusCode = '200 OK', FileContent = '{ "id": "fee_6aMkcmhcARZAjd", "object": "application_fee", "created": 1436575135, "livemode": false, "amount": 8030, "currency": "cad", "refunded": true, "amount_refunded": 8030, "refunds": { "object": "list", "total_count": 3, "has_more": false, "url": "/v1/application_fees/fee_6aMkcmhcARZAjd/refunds", "data": [ { "id": "fr_6aMkDHvrSPiTYw", "amount": 2530, "currency": "cad", "created": 1436575150, "object": "fee_refund", "balance_transaction": "txn_6aMkYwhPgreLOb", "metadata": {}, "fee": "fee_6aMkcmhcARZAjd" }, { "id": "fr_6aMkRsOkuREdsD", "amount": 4000, "currency": "cad", "created": 1436575142, "object": "fee_refund", "balance_transaction": "txn_6aMktKiWBM6aNy", "metadata": {}, "fee": "fee_6aMkcmhcARZAjd" }, { "id": "fr_6aMkydT3NgKnJ6", "amount": 1500, "currency": "cad", "created": 1436575141, "object": "fee_refund", "balance_transaction": "txn_6aMkqsfIgYbP3e", "metadata": {}, "fee": "fee_6aMkcmhcARZAjd" } ] }, "balance_transaction": "txn_6aMkdNTG0M4upB", "account": "acct_16NC13GDG1DKbUFt", "application": "ca_5RWA5Y5BtyGpY2EZ3Lomyd5BBbWSfjhQ", "charge": "py_16NC15GDG1DKbUFtQOl1cb3d", "originating_transaction": "ch_6aMkMr07ucYXYc" }' } />
+	</cffunction>
 
 </cfcomponent>
