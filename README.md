@@ -1,7 +1,7 @@
 CFPAYMENT
 =========
 
-⚠️  After 16 years, our team is moving on to [stripe-cfml](https://github.com/jcberquist/stripe-cfml) and I am retiring CFPAYMENT.  
+⚠️  After 16 years, our team is moving on to [stripe-cfml](https://github.com/jcberquist/stripe-cfml) and I am retiring CFPAYMENT. A sincere thank you goes out to the users and contributors, specifically @cybersonic, @chrismayes, @phillipsenn, @philcruz, @penhorwood, @mark-hetherington, @gpickin, and @capedcoder!
 
 Overview
 ==================
